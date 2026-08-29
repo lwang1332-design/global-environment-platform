@@ -40,7 +40,7 @@ jobs:
           const url='https://lwang1332-design.github.io/global-environment-platform/?e2e='+Date.now();
           const resp=await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
           console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
-          await page.locator('#q').fill('30.5085,47.7804');
+          await page.locator('#query').fill('30.5085,47.7804');
           await page.locator('#years').selectOption('1');
           await page.locator('#go').click();
           await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败');},{timeout:180000});
