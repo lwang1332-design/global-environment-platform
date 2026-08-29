@@ -1,5 +1,5 @@
-const CACHE='global-env-v2.6-shell-v1';
-const SHELL=['./','./index.html','./manifest.webmanifest','./icons/icon-192.png','./icons/icon-512.png'];
+const CACHE='global-env-v2.6-shell-v2';
+const SHELL=['./','./index.html','./manifest.webmanifest','./icons/app-icon.svg','./payload1.js','./payload2.js','./payload3.js','./payload4.js'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)));self.skipWaiting();});
 self.addEventListener('activate',e=>{e.waitUntil(caches.keys().then(keys=>Promise.all(keys.filter(k=>k!==CACHE).map(k=>caches.delete(k)))));self.clients.claim();});
 self.addEventListener('fetch',e=>{
