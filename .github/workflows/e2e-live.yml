@@ -1,0 +1,56 @@
+name: E2E Live Check
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  live-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0
+          npx playwright install chromium
+      - name: Check ERA5 endpoint
+        run: |
+          python - <<'PY'
+          import json, urllib.request
+          u='https://archive-api.open-meteo.com/v1/archive?latitude=30.5085&longitude=47.7804&start_date=2025-01-01&end_date=2025-01-03&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,snowfall,wind_speed_10m,shortwave_radiation,surface_pressure,cloud_cover&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&timezone=UTC&wind_speed_unit=ms&models=era5'
+          with urllib.request.urlopen(u, timeout=60) as r:
+              j=json.load(r)
+          assert len(j['hourly']['temperature_2m'])>0
+          print('ERA5_OK', len(j['hourly']['temperature_2m']), j['hourly']['temperature_2m'][:3])
+          PY
+      - name: Browser click and calculate
+        run: |
+          cat > e2e.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage({viewport:{width:1440,height:1000}});
+          page.on('console', m=>console.log('BROWSER',m.type(),m.text()));
+          page.on('pageerror', e=>console.log('PAGEERROR',e.message));
+          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e='+Date.now();
+          const resp=await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+          console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
+          await page.locator('#q').fill('30.5085,47.7804');
+          await page.locator('#years').selectOption('1');
+          await page.locator('#go').click();
+          await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败');},{timeout:180000});
+          const status=await page.locator('#status').textContent();
+          console.log('FINAL_STATUS',status);
+          const body=await page.locator('body').innerText();
+          console.log('HAS_SEVERITY',body.includes('环境严酷度'));
+          if(!status.includes('真实数据计算完成')) throw new Error('Calculation failed: '+status);
+          if(body.includes('NaN')) throw new Error('NaN found in rendered output');
+          await page.screenshot({path:'e2e-result.png',fullPage:true});
+          await browser.close();
+          JS
+          node e2e.mjs
