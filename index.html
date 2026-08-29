@@ -1,1 +1,285 @@
-<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover"><meta name="theme-color" content="#0a2a59"><meta name="mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-capable" content="yes"><meta name="apple-mobile-web-app-title" content="全球环境评估"><link rel="manifest" href="./manifest.webmanifest"><title>全球风电机组环境适应性评估平台 V2.7</title><style>html,body{margin:0;height:100%;font-family:Arial,"Microsoft YaHei",sans-serif;background:#f4f7fb;color:#0a2a59}.loading{height:100%;display:grid;place-items:center;text-align:center}.loading b{font-size:20px}.loading p{color:#667085;font-size:13px}</style></head><body><div class="loading"><div><b>全球环境评估平台 V2.7</b><p>正在加载工程计算模型与 ERA5 数据接口…</p></div></div><script src="./payload1.js"></script><script src="./payload2.js"></script><script src="./payload3.js"></script><script src="./payload4.js"></script><script>(async()=>{try{const bin=Uint8Array.from(atob(window.__P||''),c=>c.charCodeAt(0));const ds=new DecompressionStream('gzip');let html=await new Response(new Blob([bin]).stream().pipeThrough(ds)).text();html=html.replaceAll('V2.6','V2.7');const bridge='<script src="./v27-bootstrap.js"><\/script>';if(html.includes('</head>')) html=html.replace('</head>',bridge+'</head>');else html=bridge+html;document.open();document.write(html);document.close()}catch(e){document.body.innerHTML='<div class="loading"><div><b>加载失败</b><p>'+e.message+'</p><p>请使用最新版 Chrome / Edge / Safari。</p></div></div>'}})();</script></body></html>
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover">
+<meta name="theme-color" content="#0a2a59">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="全球环境评估">
+<link rel="manifest" href="./manifest.webmanifest">
+<link rel="apple-touch-icon" href="./icons/icon-192.png">
+<title>全球风电机组环境适应性评估平台 V2.7 PWA</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--navy:#0a2a59;--blue:#1769e0;--muted:#667085;--line:#e3e8f0;--green:#0f9d68;--amber:#e59b13;--red:#d92d20;--shadow:0 6px 20px rgba(10,42,89,.07)}
+*{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:#1e293b;font-size:12px}
+header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 18px}.brand{display:flex;align-items:center;gap:10px}.logo{width:34px;height:34px;border-radius:9px;background:linear-gradient(145deg,var(--navy),var(--blue));color:#fff;display:grid;place-items:center;font-weight:900}.brand h1{font-size:17px;margin:0;color:var(--navy)}.brand p{margin:2px 0 0;color:var(--muted);font-size:10px}.ver{font-size:11px;background:#eef4ff;color:var(--blue);padding:6px 10px;border-radius:999px;font-weight:800}
+.toolbar{height:48px;padding:7px 12px;display:grid;grid-template-columns:300px 120px 96px 1fr;gap:8px;align-items:center;background:#fff;border-bottom:1px solid var(--line)}input,select,button{height:33px;border:1px solid var(--line);border-radius:8px;padding:0 9px;background:#fff;outline:none;font-size:11px}button{background:var(--blue);color:#fff;border:0;font-weight:800;cursor:pointer}.status{justify-self:end;color:var(--muted);font-size:10px}
+.dashboard{height:calc(100vh - 106px);padding:10px;display:grid;grid-template-columns:23% 55% 22%;grid-template-rows:22% 35% 43%;gap:10px}.card{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);min-width:0;min-height:0;overflow:hidden}.head{height:34px;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 10px}.head h2{font-size:12px;color:var(--navy);margin:0}.head span{font-size:9px;color:var(--muted)}.pad{padding:9px;height:calc(100% - 34px);overflow:auto}.muted{color:var(--muted)}
+.mapCard{grid-column:1;grid-row:1}.envCard{grid-column:1;grid-row:2}.riskCard{grid-column:2;grid-row:1}.summaryCard{grid-column:3;grid-row:1}.matrixCard{grid-column:2;grid-row:2}.decisionCard{grid-column:3;grid-row:2 / span 2}.physicsCard{grid-column:1 / span 2;grid-row:3}
+#map{height:calc(100% - 34px)}.mapOverlay{position:absolute;z-index:500;left:8px;bottom:8px;background:rgba(255,255,255,.94);border:1px solid var(--line);border-radius:9px;padding:6px 8px;font-size:9px;line-height:1.45}.mapWrap{height:100%;position:relative}.envGrid{display:grid;grid-template-columns:1fr;gap:5px}.envDomain{border:1px solid var(--line);border-radius:8px;background:#fff;user-select:none;overflow:hidden}.envDomain .domainHead{min-height:27px;padding:5px 7px;display:grid;grid-template-columns:1fr auto;align-items:center;gap:6px;background:#fbfcff}.envDomain .domainName{font-size:9px;font-weight:800;color:var(--navy)}.envDomain .domainSummary{font-size:9px;font-weight:800;color:var(--blue);white-space:nowrap}.envDomain .domainSub{display:grid;grid-template-columns:1fr 1fr;gap:2px 8px;border-top:1px dashed var(--line);padding:4px 7px;background:#fff}.subKV{display:flex;justify-content:space-between;font-size:8px;padding:2px 0;border-bottom:1px dashed #eef1f5}.subKV span{color:var(--muted)}.subKV b{color:#1e293b;white-space:nowrap}.envHint{display:none}.l1bar{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:6px}.l1item{border:1px solid var(--line);border-radius:7px;padding:5px 6px;background:#fbfcff;font-size:8px;line-height:1.35;min-height:42px}.l1item b{display:flex;justify-content:space-between;align-items:center;color:var(--navy);font-size:8.5px;margin-bottom:2px}.l1value{font-size:9px;color:#1e293b;font-weight:800;margin:1px 0}.l1desc{font-size:7.5px;color:var(--muted);line-height:1.25}.l1ok{color:var(--green);font-weight:800}.l1partial{color:var(--amber);font-weight:800}.sourceTag{font-size:7px;color:var(--muted);font-weight:500;margin-left:3px}
+.riskGrid{display:grid;grid-template-columns:1fr 1fr;grid-auto-rows:1fr;gap:5px 14px;height:100%;align-content:stretch}.riskrow{cursor:pointer}.riskhead{display:flex;justify-content:space-between;font-size:10px}.bar{height:7px;background:#edf1f6;border-radius:999px;overflow:hidden;margin-top:4px}.bar i{display:block;height:100%;background:linear-gradient(90deg,#8bb8ff,var(--blue))}.riskrow.active .riskhead{color:var(--blue);font-weight:800}
+.score3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}.scoreBox{border:1px solid var(--line);border-radius:10px;padding:7px;text-align:center}.scoreBox label{font-size:9px;color:var(--muted)}.scoreBox strong{display:block;font-size:23px;color:var(--navy);margin-top:4px}.badge{display:inline-block;padding:3px 7px;border-radius:999px;font-size:9px;font-weight:800}.g{background:#dcfce7;color:#087a50}.a{background:#fff4d5;color:#9a6700}.r{background:#feecee;color:#b4232b}.gray{background:#f2f4f7;color:#667085}
+.projectMeta{margin-top:5px;display:grid;grid-template-columns:1fr 1fr;gap:4px 8px;font-size:9px}.projectMeta div{display:flex;justify-content:space-between;border-bottom:1px dashed var(--line);padding:3px 0}
+.matrixWrap{height:100%;overflow:auto}.matrix{width:100%;border-collapse:separate;border-spacing:3px;font-size:9px}.matrix th{position:sticky;top:0;background:#fff;color:var(--muted);font-weight:700;padding:4px 2px;white-space:nowrap}.matrix td{padding:0;text-align:center}.matrix .rowhead{text-align:left;color:var(--navy);font-weight:800;white-space:nowrap;padding-right:5px}.cell{height:23px;border-radius:5px;display:grid;place-items:center;font-weight:800;cursor:pointer;border:1px solid rgba(0,0,0,.03)}.l{background:#edf8f3;color:#087a50}.m{background:#fff4d5;color:#9a6700}.h{background:#feecee;color:#b4232b}.cell.sel{outline:2px solid var(--blue);outline-offset:1px}
+.decisionTop{display:grid;grid-template-columns:1fr 1fr;gap:6px}.mini{border:1px solid var(--line);border-radius:9px;padding:7px}.mini b{color:var(--navy)}.topList{margin:4px 0 0;padding:0;list-style:none}.topList li{display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px dashed var(--line);font-size:9px}.chain{margin-top:7px;border:1px solid #d7e5ff;background:#f6f9ff;border-radius:9px;padding:8px;font-size:9px;line-height:1.6}.actions{margin-top:7px}.actions div{padding:4px 0;border-bottom:1px dashed var(--line);font-size:9px}.ai{margin-top:7px;background:#0f172a;color:#dbeafe;border-radius:9px;padding:8px;font-size:9px;line-height:1.6}
+.physGrid{display:flex;flex-direction:column;gap:5px;height:100%;min-height:0}.phys{border:1px solid var(--line);border-radius:8px;padding:6px 9px;overflow:hidden;display:grid;grid-template-columns:120px 1fr;align-items:center;gap:10px;background:#fff;min-height:0;flex:1}.phys>div:first-child{display:flex;align-items:center;gap:7px}.phys h3{font-size:10px;margin:0;color:var(--navy);line-height:1.25;white-space:nowrap}.resultFlag{display:inline-block;margin:0;padding:3px 6px;border-radius:999px;background:#eef4ff;color:var(--blue);font-size:8px;font-weight:800;white-space:nowrap}.phys .resultBody{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0 12px;align-items:center}.phys .kv{font-size:8.5px;padding:2px 0;border-bottom:0;border-right:1px dashed var(--line);padding-right:10px}.phys .kv:last-child{border-right:0}.phys .kv b{font-size:9px;color:var(--navy)}.kv{display:flex;justify-content:space-between;padding:2px 0;border-bottom:1px dashed var(--line);font-size:8px;min-width:0}.kv span{color:var(--muted);white-space:nowrap;margin-right:4px}.kv b{white-space:nowrap;color:#1e293b}
+
+.pageNav{display:flex;gap:6px;margin-left:12px}.navBtn{height:28px;padding:0 10px;border-radius:7px;border:1px solid var(--line);background:#fff;color:var(--navy);font-size:10px;font-weight:800;cursor:pointer}.navBtn.active{background:var(--navy);color:#fff}.page{display:none}.page.active{display:block}.adminPage{height:calc(100vh - 106px);padding:10px;overflow:auto}.adminGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}.adminCard{background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);padding:10px}.adminCard h3{margin:0 0 8px;color:var(--navy);font-size:12px}.fieldGrid{display:grid;grid-template-columns:1fr 110px;gap:6px 8px;align-items:center}.fieldGrid label{font-size:9px;color:var(--muted)}.fieldGrid input,.fieldGrid select{height:28px;font-size:9px}.adminActions{display:flex;gap:8px;position:sticky;bottom:0;background:rgba(244,247,251,.96);padding:10px 0;margin-top:10px}.adminActions button{height:32px}.ghost{background:#fff;color:var(--navy);border:1px solid var(--line)}.lockBanner{display:flex;justify-content:space-between;align-items:center;background:#fff7e6;border:1px solid #f6d58d;color:#8a5b00;border-radius:9px;padding:8px 10px;margin-bottom:10px;font-size:10px}.modalMask{position:fixed;inset:0;background:rgba(15,23,42,.45);display:none;align-items:center;justify-content:center;z-index:2000}.modalMask.show{display:flex}.loginBox{width:310px;background:#fff;border-radius:14px;padding:18px;box-shadow:0 20px 50px rgba(0,0,0,.2)}.loginBox h3{margin:0 0 6px;color:var(--navy)}.loginBox p{font-size:9px;color:var(--muted)}.loginBox input{width:100%;margin:8px 0}.loginBtns{display:flex;gap:8px}.metricNote{font-size:7.5px;color:var(--muted);margin-left:6px}.judge{font-weight:800}.judge.ok{color:var(--green)}.judge.warn{color:var(--amber)}.judge.bad{color:var(--red)}.sourceLine{font-size:7px;color:var(--muted);margin-top:2px}.capTable{width:100%;border-collapse:collapse;font-size:9px}.capTable th,.capTable td{border-bottom:1px solid var(--line);padding:5px 4px;text-align:left}.capTable th{color:var(--muted)}
+@media(max-width:1200px) and (min-width:901px){.dashboard{grid-template-columns:24% 54% 22%;gap:7px;padding:7px}.toolbar{grid-template-columns:250px 105px 88px 1fr}.head span{font-size:8px}.envDomain .domainName,.envDomain .domainSummary{font-size:8px}.phys{grid-template-columns:105px 1fr;padding:5px 7px}.phys .kv{font-size:7.5px}.matrix{font-size:8px}.cell{height:20px}}@media(max-width:900px){html,body{overflow:auto}.dashboard{height:auto;grid-template-columns:1fr;grid-template-rows:none}.mapCard,.envCard,.riskCard,.summaryCard,.matrixCard,.decisionCard,.physicsCard{grid-column:1;grid-row:auto;height:auto;min-height:300px}.physicsCard{min-height:620px}.toolbar{grid-template-columns:1fr 90px 86px}.status{display:none}.physGrid{display:flex;flex-direction:column}.phys{grid-template-columns:110px 1fr}.phys .resultBody{grid-template-columns:repeat(2,minmax(0,1fr))}.l1bar{grid-template-columns:1fr 1fr}.envGrid{grid-template-columns:1fr}}
+
+/* V2.7 PWA mobile optimization */
+.installBtn{background:#0f9d68;color:#fff;border-color:#0f9d68}
+.offlinePill{position:fixed;right:10px;bottom:10px;z-index:3000;background:#fff4d5;color:#9a6700;border:1px solid #f3d27a;border-radius:999px;padding:6px 9px;font-size:9px;font-weight:800;display:none;box-shadow:var(--shadow)}
+@media(max-width:900px){
+ html,body{height:auto;min-height:100%;overflow:auto;font-size:13px;background:#f4f7fb;-webkit-text-size-adjust:100%}
+ body{padding-bottom:calc(74px + env(safe-area-inset-bottom))}
+ header{height:auto;min-height:62px;padding:8px 10px;gap:8px;align-items:flex-start;position:sticky;top:0;z-index:1200;box-shadow:0 2px 10px rgba(10,42,89,.06)}
+ .brand{gap:8px;min-width:0}.logo{width:34px;height:34px;flex:0 0 auto}.brand h1{font-size:14px;line-height:1.25;max-width:210px}.brand p{display:none}.ver{display:none}
+ header>div:last-child{margin-left:auto}.pageNav{position:fixed;left:8px;right:8px;bottom:calc(8px + env(safe-area-inset-bottom));z-index:2500;background:rgba(255,255,255,.96);backdrop-filter:blur(12px);border:1px solid var(--line);border-radius:14px;padding:6px;box-shadow:0 10px 30px rgba(10,42,89,.18);display:grid;grid-template-columns:1fr 1fr auto;gap:5px;margin:0}
+ .navBtn{height:40px;font-size:11px;border-radius:10px;padding:0 10px}.installBtn{min-width:74px}
+ .toolbar{height:auto;position:sticky;top:62px;z-index:1100;padding:7px 8px;display:grid;grid-template-columns:minmax(0,1fr) 88px 84px;gap:6px}.toolbar input,.toolbar select,.toolbar button{height:38px;font-size:12px}.status{grid-column:1/-1;display:block!important;justify-self:start;padding:0 2px;font-size:9px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+ .page.active{display:block}.dashboard{height:auto;padding:8px;display:flex;flex-direction:column;gap:8px}.card{border-radius:11px;box-shadow:0 3px 12px rgba(10,42,89,.05)}
+ .mapCard{order:1;height:260px;min-height:260px}.summaryCard{order:2;min-height:0;height:auto}.riskCard{order:3;min-height:0;height:auto}.envCard{order:4;min-height:0;height:auto}.physicsCard{order:5;min-height:0;height:auto}.matrixCard{order:6;min-height:340px;height:auto}.decisionCard{order:7;min-height:0;height:auto}
+ .head{height:38px;padding:0 10px}.head h2{font-size:12px}.head span{font-size:8px;max-width:58%;text-align:right;line-height:1.2}.pad{height:auto;max-height:none;overflow:visible;padding:8px}
+ #map{height:222px}.mapWrap{height:222px}.mapOverlay{font-size:9px}
+ .score3{grid-template-columns:repeat(3,1fr);gap:5px}.scoreBox{padding:7px 3px}.scoreBox label{font-size:8px}.scoreBox strong{font-size:21px}
+ .projectMeta{grid-template-columns:1fr 1fr;font-size:9px}.riskGrid{grid-template-columns:1fr 1fr;grid-auto-rows:auto;height:auto;gap:8px 12px}.riskrow{padding:3px 0}.riskhead{font-size:10px}.bar{height:8px}
+ .l1bar{grid-template-columns:1fr;gap:5px}.l1item{font-size:9px;padding:7px;min-height:0}.l1item b{font-size:10px}.l1value{font-size:10px}.l1desc{font-size:8px}
+ .envGrid{gap:6px}.envDomain .domainHead{min-height:34px;padding:7px}.envDomain .domainName{font-size:10px}.envDomain .domainSummary{font-size:10px}.envDomain .domainSub{grid-template-columns:1fr 1fr;padding:5px 7px;gap:2px 10px}.subKV{font-size:9px;padding:3px 0}
+ .physGrid{height:auto;gap:6px}.phys{display:block;flex:none;padding:8px;overflow:visible}.phys>div:first-child{justify-content:space-between;margin-bottom:5px}.phys h3{font-size:11px}.resultFlag{font-size:9px}.phys .resultBody{grid-template-columns:1fr;gap:0}.phys .kv{font-size:9px;border-right:0;border-bottom:1px dashed var(--line);padding:5px 0}.phys .kv b{font-size:10px}.phys .kv:last-child{border-bottom:0}
+ .matrixWrap{overflow:auto;-webkit-overflow-scrolling:touch;max-height:430px}.matrix{font-size:9px;min-width:760px}.matrix th:first-child,.matrix .rowhead{position:sticky;left:0;background:#fff;z-index:3}.matrix th{z-index:2}.cell{height:30px;min-width:45px}
+ .decisionTop{grid-template-columns:1fr 1fr}.mini{padding:8px}.topList li{font-size:9px}.chain,.actions div,.ai{font-size:9.5px;line-height:1.55}
+ .adminPage{height:auto;padding:8px 8px 90px;overflow:visible}.adminGrid{grid-template-columns:1fr;gap:8px}.adminCard{padding:10px;border-radius:11px}.adminCard h3{font-size:12px}.fieldGrid{grid-template-columns:minmax(0,1fr) 118px;gap:8px}.fieldGrid label{font-size:10px}.fieldGrid input,.fieldGrid select{height:36px;font-size:11px}.adminActions{position:sticky;bottom:72px;z-index:1500;padding:7px;background:rgba(244,247,251,.96);border-radius:10px}.adminActions button{height:38px}
+ .loginBox{width:calc(100vw - 30px);max-width:360px;padding:16px}.loginBox input{height:42px;font-size:15px}.loginBtns button{height:40px;flex:1}
+}
+@media(max-width:420px){
+ .brand h1{font-size:13px;max-width:180px}.toolbar{grid-template-columns:minmax(0,1fr) 82px 78px}.scoreBox strong{font-size:19px}.envDomain .domainSub{grid-template-columns:1fr}.projectMeta{grid-template-columns:1fr}.decisionTop{grid-template-columns:1fr}.riskGrid{grid-template-columns:1fr 1fr}.pageNav{grid-template-columns:1fr 1fr auto}
+}
+
+</style>
+</head>
+<body>
+<header><div class="brand"><div class="logo">GE</div><div><h1>全球风电机组环境适应性评估平台</h1><p>Environment → Physics → Equipment → Engineering Decision</p></div></div><div style="display:flex;align-items:center"><div class="pageNav"><button class="navBtn active" id="navMain" onclick="showPage('main')">评估主页</button><button class="navBtn" id="navAdmin" onclick="openAdmin()">管理员参数</button><button class="navBtn installBtn" id="installBtn" style="display:none">安装App</button></div><div class="ver">V2.7 · 稳定数据版</div></div></header>
+<div class="toolbar"><input id="query" value="Basra, Iraq" placeholder="城市/国家或 纬度,经度"><select id="years"><option value="1">最近1年</option><option value="3" selected>最近3年</option><option value="5">最近5年</option></select><button id="go">开始评估</button><div class="status" id="status">点击开始评估获取真实数据</div></div>
+<div id="mainPage" class="page active"><div class="dashboard">
+<section class="card mapCard"><div class="head"><h2>01 项目定位</h2><span>点击地图重新计算</span></div><div class="mapWrap"><div id="map"></div><div class="mapOverlay" id="mapInfo">Basra, Iraq<br>等待定位...</div></div></section>
+<section class="card envCard"><div class="head"><h2>02 真实环境数据</h2><span>上方：L1真实数据库；下方：一级环境域直接显示二级真实数据</span></div><div class="pad"><div class="l1bar" id="l1bar"></div><div class="envGrid" id="envGrid"></div></div></section>
+<section class="card riskCard"><div class="head"><h2>03 环境风险画像</h2><span>点击风险联动</span></div><div class="pad"><div class="riskGrid" id="riskList"></div></div></section>
+<section class="card summaryCard"><div class="head"><h2>04 项目综合结论</h2><span>环境 ≠ 适应能力</span></div><div class="pad"><div class="score3"><div class="scoreBox"><label>环境严酷度</label><strong id="severity">--</strong></div><div class="scoreBox"><label>设计能力满足率</label><strong id="adapt">--</strong></div><div class="scoreBox"><label>风险 Gap</label><strong id="gap">--</strong></div></div><div style="margin-top:7px"><span id="riskBadge" class="badge gray">等待</span></div><div class="projectMeta" id="projectMeta"></div></div></section>
+<section class="card matrixCard"><div class="head"><h2>05 环境 × 设备风险矩阵</h2><span>R = H × S × E，点击单元格查看失效链</span></div><div class="pad matrixWrap"><table class="matrix" id="matrix"></table></div></section>
+<section class="card decisionCard"><div class="head"><h2>07 工程决策</h2><span id="selection">自动选择最高风险</span></div><div class="pad"><div class="decisionTop"><div class="mini"><b>TOP环境</b><ul class="topList" id="topEnv"></ul></div><div class="mini"><b>TOP设备</b><ul class="topList" id="topEquip"></ul></div></div><div class="chain" id="failureChain">查询后显示环境→失效机理→设备后果。</div><div class="actions" id="actions"></div><div class="ai" id="aiSummary">AI工程结论：等待计算。底层物理量由公式计算，AI仅用于解释和工程总结。</div></div></section>
+<section class="card physicsCard"><div class="head"><h2>06 物理模型实时计算结果</h2><span>关键工程量 · 年化暴露 · 极值 · 累计剂量</span></div><div class="pad"><div class="physGrid">
+<div class="phys"><div><h3>凝露</h3><span class="resultFlag" id="condFlag">--</span></div><div class="resultBody" id="condBox"></div></div>
+<div class="phys"><div><h3>盐雾 / 腐蚀</h3><span class="resultFlag" id="saltFlag">--</span></div><div class="resultBody" id="saltBox"></div></div>
+<div class="phys"><div><h3>粉尘 / 积灰</h3><span class="resultFlag" id="foulFlag">--</span></div><div class="resultBody" id="foulBox"></div></div>
+<div class="phys"><div><h3>沙蚀</h3><span class="resultFlag" id="erosionFlag">--</span></div><div class="resultBody" id="erosionBox"></div></div>
+<div class="phys"><div><h3>高海拔 / 热管理</h3><span class="resultFlag" id="altFlag">--</span></div><div class="resultBody" id="altBox"></div></div>
+<div class="phys"><div><h3>雨水 / 极端风</h3><span class="resultFlag" id="rainFlag">--</span></div><div class="resultBody" id="rainBox"></div></div>
+</div></div></section>
+</div></div>
+<div id="adminPage" class="page adminPage">
+  <div class="lockBanner"><span><b>管理员参数调试</b> · 修改后点击“应用并重算”，参数保存在当前浏览器。</span><span id="adminStatus">已解锁</span></div>
+  <div class="adminGrid">
+    <div class="adminCard"><h3>凝露模型参数</h3><div class="fieldGrid">
+      <label>金属厚度 δ (mm)</label><input id="p_delta" type="number" step="0.1">
+      <label>金属密度 ρ (kg/m³)</label><input id="p_rho" type="number" step="10">
+      <label>比热 Cp (J/kg·K)</label><input id="p_cp" type="number" step="1">
+      <label>发射率 ε</label><input id="p_eps" type="number" step="0.01">
+      <label>太阳吸收率 α</label><input id="p_alpha" type="number" step="0.01">
+      <label>天空温差 ΔTsky (K)</label><input id="p_sky" type="number" step="0.5">
+      <label>露点安全裕量目标 (K)</label><input id="p_dewMargin" type="number" step="0.5">
+    </div></div>
+    <div class="adminCard"><h3>沙尘 / 沙蚀设备参数</h3><div class="fieldGrid">
+      <label>设备通风量 Q (m³/h)</label><input id="p_Q" type="number" step="1000">
+      <label>风机直径 D (m)</label><input id="p_D" type="number" step="0.1">
+      <label>风机转速 rpm</label><input id="p_rpm" type="number" step="10">
+      <label>颗粒撞击效率 ηimpact</label><input id="p_impactEta" type="number" step="0.05">
+      <label>过滤捕集效率 ηfilter</label><input id="p_filterEta" type="number" step="0.05">
+      <label>速度指数 n</label><input id="p_ne" type="number" step="0.1">
+      <label>EI基准质量 (kg/y)</label><input id="p_eiMass" type="number" step="1">
+      <label>EI基准速度 (m/s)</label><input id="p_eiVel" type="number" step="1">
+    </div></div>
+    <div class="adminCard"><h3>设计能力 / 判据</h3><div class="fieldGrid">
+      <label>最高设计温度 (℃)</label><input id="p_capHigh" type="number" step="1">
+      <label>最低设计温度 (℃)</label><input id="p_capLow" type="number" step="1">
+      <label>允许最低露点裕量 (K)</label><input id="p_capDew" type="number" step="0.5">
+      <label>允许年凝露小时 (h/y)</label><input id="p_capCondHours" type="number" step="10">
+      <label>Cl⁻沉积通量限值 (mg/m²·d)</label><input id="p_capCl" type="number" step="0.5">
+      <label>PM10 P95限值 (μg/m³)</label><input id="p_capPm" type="number" step="5">
+      <label>沙蚀EI限值 (/y)</label><input id="p_capEi" type="number" step="0.1">
+      <label>最大散热衰减允许值 (%)</label><input id="p_capHeatLoss" type="number" step="1">
+    </div></div>
+    <div class="adminCard"><h3>环境风险阈值</h3><div class="fieldGrid">
+      <label>高温评分起点/满分 (℃)</label><input id="p_hiA" type="number" step="1"><input id="p_hiB" type="hidden">
+      <label>高温满分温度 (℃)</label><input id="p_hiB2" type="number" step="1">
+      <label>低温评分起点绝对值 (℃)</label><input id="p_loA" type="number" step="1">
+      <label>低温满分绝对值 (℃)</label><input id="p_loB" type="number" step="1">
+      <label>极端风评分起点 (m/s)</label><input id="p_windA" type="number" step="1">
+      <label>极端风满分值 (m/s)</label><input id="p_windB" type="number" step="1">
+    </div></div>
+    <div class="adminCard"><h3>风险模型系数</h3><div class="fieldGrid">
+      <label>TOP1权重</label><input id="p_w1" type="number" step="0.05">
+      <label>TOP2权重</label><input id="p_w2" type="number" step="0.05">
+      <label>TOP3权重</label><input id="p_w3" type="number" step="0.05">
+      <label>平均风险权重</label><input id="p_wavg" type="number" step="0.05">
+      <label>保护系数默认值 P</label><input id="p_protect" type="number" step="0.05">
+    </div></div>
+    <div class="adminCard"><h3>数据适用性参数</h3><div class="fieldGrid">
+      <label>海洋数据启用距离阈值 (km)</label><input id="p_marineKm" type="number" step="10">
+      <label>滨海盐雾影响距离阈值 (km)</label><input id="p_coastalKm" type="number" step="10">
+      <label>CAMS时间窗说明 (day)</label><input id="p_camsDays" type="number" step="1">
+    </div><p class="sourceLine">注：当前尚未接入真实距海岸GIS，因此海洋适用性仍按“海洋API是否返回值”判断；该阈值为后续GIS接入预留。</p></div>
+  </div>
+  <div class="adminActions"><button onclick="applyAdminParams()">应用并重算</button><button class="ghost" onclick="resetAdminParams()">恢复默认参数</button><button class="ghost" onclick="showPage('main')">返回评估主页</button></div>
+</div>
+<div class="modalMask" id="loginMask"><div class="loginBox"><h3>管理员验证</h3><p>输入管理员密码后进入关键变量调试页面。</p><input id="adminPwd" type="password" placeholder="管理员密码"><div class="loginBtns"><button onclick="verifyAdmin()">进入</button><button class="ghost" onclick="closeLogin()">取消</button></div><div id="loginMsg" style="font-size:9px;color:var(--red);margin-top:6px"></div></div></div>
+<script>
+const $=id=>document.getElementById(id),clamp=(x,a=0,b=100)=>Math.max(a,Math.min(b,x)),lin=(x,a,b)=>clamp((x-a)/(b-a)*100);const q=(a,p)=>{let x=a.filter(Number.isFinite).sort((m,n)=>m-n);if(!x.length)return NaN;let k=(x.length-1)*p,i=Math.floor(k),r=k-i;return x[i]+(x[i+1]!==undefined?r*(x[i+1]-x[i]):0)};const pct=(a,f)=>a.length?100*a.filter(f).length/a.length:0,max=a=>a.length?Math.max(...a.filter(Number.isFinite)):NaN,min=a=>a.length?Math.min(...a.filter(Number.isFinite)):NaN,iso=d=>d.toISOString().slice(0,10);
+let current={lat:30.5085,lon:47.7804,name:'Basra, Iraq'},cache=null,result={},selected={env:null,equip:null};
+const DEFAULT_PARAMS={delta:10,rho:7850,cp:500,eps:.85,alpha:.6,sky:6,dewMargin:3,Q:100000,D:1.5,rpm:900,impactEta:.5,filterEta:.9,ne:2.5,eiMass:10,eiVel:50,capHigh:45,capLow:-40,capDew:3,capCondHours:0,capCl:10,capPm:150,capEi:1,capHeatLoss:20,hiA:35,hiB:50,loA:10,loB:40,windA:20,windB:55,w1:.4,w2:.25,w3:.15,wavg:.2,protect:1,marineKm:20,coastalKm:100,camsDays:90};
+let params=Object.assign({},DEFAULT_PARAMS,JSON.parse(localStorage.getItem('GE_V25_PARAMS')||'{}'));let adminUnlocked=false;
+function showPage(name){$('mainPage').classList.toggle('active',name==='main');$('adminPage').classList.toggle('active',name==='admin');$('navMain').classList.toggle('active',name==='main');$('navAdmin').classList.toggle('active',name==='admin');if(name==='main')setTimeout(()=>map.invalidateSize(),50)}
+function openAdmin(){if(!adminUnlocked){$('loginMask').classList.add('show');$('adminPwd').focus();return}loadAdminInputs();showPage('admin')}
+function verifyAdmin(){if($('adminPwd').value==='123123'){adminUnlocked=true;$('loginMask').classList.remove('show');$('adminPwd').value='';$('loginMsg').textContent='';loadAdminInputs();showPage('admin')}else $('loginMsg').textContent='密码错误'}
+function closeLogin(){$('loginMask').classList.remove('show');$('adminPwd').value='';$('loginMsg').textContent=''}
+const PARAM_IDS={delta:'p_delta',rho:'p_rho',cp:'p_cp',eps:'p_eps',alpha:'p_alpha',sky:'p_sky',dewMargin:'p_dewMargin',Q:'p_Q',D:'p_D',rpm:'p_rpm',impactEta:'p_impactEta',filterEta:'p_filterEta',ne:'p_ne',eiMass:'p_eiMass',eiVel:'p_eiVel',capHigh:'p_capHigh',capLow:'p_capLow',capDew:'p_capDew',capCondHours:'p_capCondHours',capCl:'p_capCl',capPm:'p_capPm',capEi:'p_capEi',capHeatLoss:'p_capHeatLoss',hiA:'p_hiA',hiB:'p_hiB2',loA:'p_loA',loB:'p_loB',windA:'p_windA',windB:'p_windB',w1:'p_w1',w2:'p_w2',w3:'p_w3',wavg:'p_wavg',protect:'p_protect',marineKm:'p_marineKm',coastalKm:'p_coastalKm',camsDays:'p_camsDays'};
+function loadAdminInputs(){Object.entries(PARAM_IDS).forEach(([k,id])=>{if($(id))$(id).value=params[k]})}
+function applyAdminParams(){Object.entries(PARAM_IDS).forEach(([k,id])=>{let el=$(id);if(el&&el.value!=='')params[k]=+el.value});localStorage.setItem('GE_V25_PARAMS',JSON.stringify(params));$('adminStatus').textContent='参数已应用';if(cache)calculate()}
+function resetAdminParams(){params=Object.assign({},DEFAULT_PARAMS);localStorage.setItem('GE_V25_PARAMS',JSON.stringify(params));loadAdminInputs();$('adminStatus').textContent='已恢复默认';if(cache)calculate()}
+
+let map={setView(){},invalidateSize(){},on(){}},marker={setLatLng(){},bindPopup(){return this},openPopup(){return this}};
+const mapEl=$('map');if(mapEl){mapEl.innerHTML='<div style="height:100%;display:grid;place-items:center;background:linear-gradient(135deg,#eef4fb,#f8fbff);color:#667085;text-align:center;padding:16px;box-sizing:border-box"><div><b style="color:#0a2a59">全球位置输入</b><br><span style="font-size:12px">位置查询与环境计算不依赖第三方地图CDN。<br>可输入“Basra, Iraq”或“30.5085,47.7804”。</span></div></div>';}
+
+async function locate(s){let m=s.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*$/);if(m)return{lat:+m[1],lon:+m[2],name:`${(+m[1]).toFixed(4)}, ${(+m[2]).toFixed(4)}`};let j=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(s)+'&count=1&language=zh').then(r=>r.json());if(!j.results?.length)throw Error('未找到地点');let x=j.results[0];return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}}
+async function elev(lat,lon){try{let r=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`);if(!r.ok)throw Error();let j=await r.json();return j.elevation?.[0]??NaN}catch{return NaN}}
+async function weather(lat,lon,years){
+ let end=new Date();end.setUTCDate(end.getUTCDate()-10);let start=new Date(end);start.setUTCFullYear(start.getUTCFullYear()-years);
+ const hv='temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,snowfall,wind_speed_10m,wind_gusts_10m,shortwave_radiation,surface_pressure,cloud_cover',dv='temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum';
+ const chunks=[];let cursor=new Date(start);while(cursor<=end){let ce=new Date(Date.UTC(cursor.getUTCFullYear(),11,31));if(ce>end)ce=new Date(end);chunks.push([new Date(cursor),ce]);cursor=new Date(Date.UTC(ce.getUTCFullYear()+1,0,1));}
+ const merged={hourly:{time:[]},daily:{time:[]},elevation:NaN};
+ for(let ci=0;ci<chunks.length;ci++){const [cs,ce]=chunks[ci];$('status').textContent=`正在获取 ERA5 ${ci+1}/${chunks.length}：${cs.getUTCFullYear()}…`;const u=`https://archive-api.open-meteo.com/v1/archive?latitude=${lat}&longitude=${lon}&start_date=${iso(cs)}&end_date=${iso(ce)}&hourly=${hv}&daily=${dv}&timezone=UTC&models=era5`;let r=await fetch(u);if(!r.ok){let t=await r.text().catch(()=>'');throw Error(`ERA5查询失败 HTTP ${r.status}${t?': '+t.slice(0,100):''}`)}let j=await r.json();if(j.error)throw Error(j.reason||'ERA5返回错误');if(Number.isFinite(j.elevation))merged.elevation=j.elevation;for(const [k,v] of Object.entries(j.hourly||{})){if(Array.isArray(v)){if(!merged.hourly[k])merged.hourly[k]=[];merged.hourly[k].push(...v)}}for(const [k,v] of Object.entries(j.daily||{})){if(Array.isArray(v)){if(!merged.daily[k])merged.daily[k]=[];merged.daily[k].push(...v)}}}
+ if(!(merged.hourly.temperature_2m||[]).length)throw Error('ERA5未返回小时温度数据');return{j:merged,start:iso(start),end:iso(end)}
+}
+function condensation(h){
+ const sigma=5.670374419e-8,rho=params.rho,Cp=params.cp,delta=params.delta/1000,eps=params.eps,alphaS=params.alpha,dt=3600,CA=rho*Cp*delta;
+ const Rv=461.5,rhoAir=1.20,cpAir=1005;
+ const es=t=>610.94*Math.exp(17.625*t/(t+243.04));
+ let T=h.temperature_2m||[],Td=h.dew_point_2m||[],V=h.wind_speed_10m||[],G=h.shortwave_radiation||[],Ts=Number.isFinite(T[0])?T[0]:20;
+ let cond=0,near=0,minMargin=999,maxRun=0,run=0,totalCondKgM2=0,valid=0;
+ for(let i=0;i<T.length;i++){
+  if(!Number.isFinite(T[i])||!Number.isFinite(Td[i]))continue; valid++;
+  let hc=5.7+3.8*Math.max(0,V[i]||0),TaK=T[i]+273.15,TsK=Ts+273.15,TskyK=TaK-6;
+  let qconv=hc*(T[i]-Ts),qsolar=alphaS*Math.max(0,G[i]||0),qrad=eps*sigma*(Math.pow(TsK,4)-Math.pow(TaK-params.sky,4));
+  let dT=dt*(qconv+qsolar-qrad)/CA;Ts+=Math.max(-5,Math.min(5,dT));
+  let margin=Ts-Td[i];
+  if(margin<=0){
+   cond++;run++;maxRun=Math.max(maxRun,run);
+   // Lewis analogy: km≈hc/(ρair·cpAir), condensation driven by vapour-density difference.
+   let km=hc/(rhoAir*cpAir),rhoVair=es(Td[i])/(Rv*(T[i]+273.15)),rhoVs=es(Ts)/(Rv*(Ts+273.15));
+   totalCondKgM2+=Math.max(0,km*(rhoVair-rhoVs))*dt;
+  }else run=0;
+  if(margin<2)near++;if(margin<minMargin)minMargin=margin;
+ }
+ let condPct=valid?100*cond/valid:0,annualCondHours=valid?cond/valid*8760:0,annualCondKgM2=valid?totalCondKgM2*8760/valid:0;
+ return{condPct,annualCondHours,nearPct:valid?100*near/valid:0,minMargin,maxRunHours:maxRun,annualCondKgM2,totalCondKgM2,params:{rho,Cp,delta_mm:delta*1000,CA}};
+}
+function saltModel(h,aq){let T=h.temperature_2m||[],RH=h.relative_humidity_2m||[],tow=0,n=0;for(let i=0;i<T.length;i++)if(Number.isFinite(T[i])&&Number.isFinite(RH[i])){n++;if(T[i]>0&&RH[i]>80)tow++}let sea=aq.ok?(aq.j.hourly?.sea_salt_aerosol||[]).filter(Number.isFinite):[],so2=aq.ok?(aq.j.hourly?.sulphur_dioxide||[]).filter(Number.isFinite):[];let sea95=q(sea,.95),vd=.005,clf=.55,js=Number.isFinite(sea95)?sea95*vd*86400/1000:NaN,jcl=Number.isFinite(js)?js*clf:NaN,towPct=n?100*tow/n:0,so295=q(so2,.95);let score=(Number.isFinite(jcl)?.55*lin(jcl,1,50):0)+.3*lin(towPct,10,60)+(Number.isFinite(so295)?.15*lin(so295,10,100):0);return{towHours:tow,towPct,sea95,js,jcl,so295,score:Math.round(clamp(score))}}
+function dustModel(h,aq){
+ let pm=aq.ok?(aq.j.hourly?.pm10||[]).filter(Number.isFinite):[],du=aq.ok?(aq.j.hourly?.dust||[]).filter(Number.isFinite):[],pmMean=pm.length?pm.reduce((a,b)=>a+b,0)/pm.length:NaN,pm95=q(pm,.95),dustMean=du.length?du.reduce((a,b)=>a+b,0)/du.length:NaN,dust95=q(du,.95),Q=params.Q,eta=params.filterEta;
+ let annualExposure=Number.isFinite(pmMean)?pmMean*8760/1000:NaN,annualIn=Number.isFinite(pmMean)?pmMean*Q*8760/1e9:NaN;
+ let D=params.D,rpm=params.rpm,impactEta=params.impactEta,ne=params.ne,vtip=Math.PI*D*rpm/60,vaxial=Q/3600/(Math.PI*D*D/4),vimpact=Math.sqrt(vtip*vtip+vaxial*vaxial),dustMassIn=Number.isFinite(dustMean)?dustMean*Q*8760/1e9:NaN,impactMass=Number.isFinite(dustMassIn)?dustMassIn*impactEta:NaN;
+ let erosionIndex=Number.isFinite(impactMass)?(impactMass/params.eiMass)*Math.pow(vimpact/params.eiVel,ne):NaN;
+ let impactEnergyKJ=Number.isFinite(impactMass)?0.5*impactMass*vimpact*vimpact/1000:NaN;
+ let fouling=(Number.isFinite(pm95)?.6*lin(pm95,40,250):0)+(Number.isFinite(annualIn)?.4*lin(annualIn,10,300):0),erosion=Number.isFinite(erosionIndex)?lin(erosionIndex,.1,10):0;
+ return{pmMean,pm95,dustMean,dust95,annualExposure,annualIn,vtip,vimpact,impactMass,impactEnergyKJ,erosionIndex,fouling:Math.round(clamp(fouling)),erosion:Math.round(clamp(erosion))};
+}
+function baseStats(w,e){
+ let h=w.j.hourly||{},d=w.j.daily||{},T=(h.temperature_2m||[]).filter(Number.isFinite),RH=(h.relative_humidity_2m||[]).filter(Number.isFinite),dmax=(d.temperature_2m_max||[]).filter(Number.isFinite),dmin=(d.temperature_2m_min||[]).filter(Number.isFinite),prec=(d.precipitation_sum||[]).filter(Number.isFinite),snow=(d.snowfall_sum||[]).filter(Number.isFinite),gust=(h.wind_gusts_10m||[]).filter(Number.isFinite),wind=(h.wind_speed_10m||[]).filter(Number.isFinite),press=(h.surface_pressure||[]).filter(Number.isFinite),cloud=(h.cloud_cover||[]).filter(Number.isFinite),ph=(h.precipitation||[]).filter(Number.isFinite);
+ let avg=T.length?T.reduce((a,b)=>a+b,0)/T.length:NaN,absHum=[];for(let i=0;i<(h.temperature_2m||[]).length;i++){let t=h.temperature_2m?.[i],rh=h.relative_humidity_2m?.[i];if(Number.isFinite(t)&&Number.isFinite(rh)){let es=6.112*Math.exp((17.67*t)/(t+243.5));absHum.push(216.7*(rh/100*es)/(t+273.15))}}
+ let ranges=dmax.map((x,i)=>Number.isFinite(dmin[i])?x-dmin[i]:NaN).filter(Number.isFinite),rates=[];for(let i=1;i<(h.temperature_2m||[]).length;i++){let a=h.temperature_2m[i-1],b=h.temperature_2m[i];if(Number.isFinite(a)&&Number.isFinite(b))rates.push(Math.abs(b-a))}
+ let freezeThaw=0;for(let i=1;i<(h.temperature_2m||[]).length;i++){let a=h.temperature_2m[i-1],b=h.temperature_2m[i];if(Number.isFinite(a)&&Number.isFinite(b)&&((a<0&&b>=0)||(a>=0&&b<0)))freezeThaw++}
+ return{t99:q(dmax,.99),tmin:min(dmin),tavg:avg,dayRange:q(ranges,.95),tempRate:q(rates,.95),rh90:pct(RH,x=>x>90),rhMean:RH.length?RH.reduce((a,b)=>a+b,0)/RH.length:NaN,absHumMean:absHum.length?absHum.reduce((a,b)=>a+b,0)/absHum.length:NaN,rainMax:max(prec),rainP99h:q(ph,.99),rainAnnual:prec.length?prec.reduce((a,b)=>a+b,0)/(prec.length/365.25):NaN,snowMax:max(snow),freezeThawAnnual:freezeThaw/((h.temperature_2m||[]).length/8760),gust99:q(gust,.99),windMean:wind.length?wind.reduce((a,b)=>a+b,0)/wind.length:NaN,pressureMean:press.length?press.reduce((a,b)=>a+b,0)/press.length:NaN,cloudMean:cloud.length?cloud.reduce((a,b)=>a+b,0)/cloud.length:NaN,elev:e}}
+const sensitivity={
+'高温':{'叶片':20,'齿轮箱':65,'发电机':80,'变流器':95,'变压器':90,'冷却系统':100,'控制柜':75,'偏航':45,'变桨':60,'塔筒':20},
+'低温':{'叶片':65,'齿轮箱':95,'发电机':60,'变流器':65,'变压器':45,'冷却系统':70,'控制柜':60,'偏航':90,'变桨':90,'塔筒':35},
+'凝露':{'叶片':20,'齿轮箱':55,'发电机':90,'变流器':100,'变压器':80,'冷却系统':65,'控制柜':100,'偏航':65,'变桨':80,'塔筒':90},
+'盐雾':{'叶片':70,'齿轮箱':65,'发电机':90,'变流器':95,'变压器':90,'冷却系统':100,'控制柜':95,'偏航':85,'变桨':90,'塔筒':100},
+'粉尘积灰':{'叶片':45,'齿轮箱':50,'发电机':60,'变流器':85,'变压器':60,'冷却系统':100,'控制柜':85,'偏航':55,'变桨':55,'塔筒':30},
+'沙蚀':{'叶片':100,'齿轮箱':15,'发电机':15,'变流器':15,'变压器':10,'冷却系统':100,'控制柜':15,'偏航':30,'变桨':25,'塔筒':45},
+'强降雨':{'叶片':80,'齿轮箱':20,'发电机':30,'变流器':45,'变压器':45,'冷却系统':60,'控制柜':55,'偏航':30,'变桨':35,'塔筒':65},
+'冰雪':{'叶片':100,'齿轮箱':25,'发电机':20,'变流器':20,'变压器':20,'冷却系统':85,'控制柜':25,'偏航':45,'变桨':50,'塔筒':45},
+'高海拔':{'叶片':20,'齿轮箱':35,'发电机':70,'变流器':95,'变压器':100,'冷却系统':100,'控制柜':70,'偏航':35,'变桨':40,'塔筒':15},
+'极端风':{'叶片':100,'齿轮箱':65,'发电机':55,'变流器':15,'变压器':15,'冷却系统':30,'控制柜':10,'偏航':95,'变桨':90,'塔筒':100}
+};
+const exposure={'叶片':1,'齿轮箱':.72,'发电机':.72,'变流器':.65,'变压器':.65,'冷却系统':.9,'控制柜':.6,'偏航':.75,'变桨':.9,'塔筒':1};
+const failure={
+'高温':'环境高温 → 散热温差下降 → 器件/油液温度升高 → 降额、寿命衰减或过温停机','低温':'低温 → 润滑黏度升高/材料收缩 → 启动阻力和密封风险增加','凝露':'Ts ≤ Td → 表面形成水膜 → 绝缘下降/电化学迁移/腐蚀 → 电气故障','盐雾':'盐沉积 + 高湿/TOW → 湿盐膜电解质 → 点蚀/电偶腐蚀/爬电风险','粉尘积灰':'颗粒进入/沉积 → 过滤堵塞与换热热阻增加 → 风量下降/过温','沙蚀':'颗粒高速撞击 → 表面材料损失 → 风机叶片/散热芯体/叶片前缘性能衰减','强降雨':'风驱雨/强降雨 → 水侵入与雨蚀 → 密封、电气与外露结构风险','冰雪':'降雪/覆冰 → 堵塞、附加载荷与气动失衡 → 冷却与叶片性能下降','高海拔':'气压/空气密度下降 → 对流散热衰减 + 电气绝缘裕量下降','极端风':'极端风/阵风 → 瞬态与极限载荷增加 → 叶片、塔筒、偏航/变桨载荷风险'};
+const actionMap={'高温':'校核P99高温热平衡；提高散热裕量；高温满载/降额策略验证','低温':'低温润滑与启动验证；加热策略；密封与材料低温适配','凝露':'基于瞬态壁温计算Ts；配置除湿/加热；提高柜体密封；增加露点裕量监测','盐雾':'盐雾过滤+高防腐体系；控制盐沉积与TOW；关键PCB/铜排加强防护','粉尘积灰':'升级过滤等级与容尘量；压差监测；校核散热器积灰衰减','沙蚀':'风机/芯体耐蚀材料与结构优化；结合粒径谱、撞击角试验校准','强降雨':'百叶/迷宫密封/排水；风驱雨试验；外露接口防水','冰雪':'防冰/除冰；进风防雪与排水；覆冰工况控制策略','高海拔':'空气密度修正散热能力；校核风机工况；电气间隙/绝缘修正','极端风':'极限载荷与阵风工况校核；偏航/变桨策略和停机安全验证'};
+function calculate(){if(!cache)return;let b=baseStats(cache.w,cache.elev),c=condensation(cache.w.j.hourly||{}),s=saltModel(cache.w.j.hourly||{},cache.aq),d=dustModel(cache.w.j.hourly||{},cache.aq);let scores={高温:Math.round(lin(b.t99,params.hiA,params.hiB)),低温:Math.round(lin(-b.tmin,params.loA,params.loB)),凝露:Math.round(clamp(.45*lin(c.condPct,.2,8)+.25*lin(c.nearPct,2,35)+.2*lin(-c.minMargin,0,5)+.1*lin(c.maxRunHours,1,24))),盐雾:s.score,粉尘积灰:d.fouling,沙蚀:d.erosion,强降雨:Math.round(lin(b.rainMax,20,150)),冰雪:Math.round(lin(b.snowMax,1,30)),高海拔:Math.round(lin(b.elev,1500,4500)),极端风:Math.round(lin(b.gust99,params.windA,params.windB))};let vals=Object.values(scores).sort((a,b)=>b-a),severity=Math.round(params.w1*vals[0]+params.w2*(vals[1]||0)+params.w3*(vals[2]||0)+params.wavg*(vals.reduce((a,b)=>a+b,0)/vals.length));let pressure=Number.isFinite(b.pressureMean)?b.pressureMean/10:101.325*Math.pow(Math.max(.01,1-2.25577e-5*b.elev),5.25588),rhoAir=pressure*1000/(287.05*((Number.isFinite(b.tavg)?b.tavg:15)+273.15)),rho0=101325/(287.05*288.15),heatLoss=(1-rhoAir/rho0)*100;let capabilityChecks=[['高温',Number.isFinite(b.t99),b.t99<=params.capHigh],['低温',Number.isFinite(b.tmin),b.tmin>=params.capLow],['露点裕量',Number.isFinite(c.minMargin),c.minMargin>=params.capDew],['凝露小时',Number.isFinite(c.annualCondHours),c.annualCondHours<=params.capCondHours],['盐沉积',Number.isFinite(s.jcl),s.jcl<=params.capCl],['PM10',Number.isFinite(d.pm95),d.pm95<=params.capPm],['沙蚀EI',Number.isFinite(d.erosionIndex),d.erosionIndex<=params.capEi],['散热衰减',Number.isFinite(heatLoss),heatLoss<=params.capHeatLoss]];let validCaps=capabilityChecks.filter(x=>x[1]),adapt=validCaps.length?Math.round(100*validCaps.filter(x=>x[2]).length/validCaps.length):0,gap=Math.max(0,severity-adapt);let composite={corrosion:Math.round(clamp(.45*s.score+.30*scores.凝露+.15*lin(b.rh90,10,60)+.10*lin(s.so295,10,100))),thermal:Math.round(clamp(.45*scores.高温+.30*d.fouling+.25*scores.高海拔))};let matrix={},equipRisk={};Object.keys(sensitivity).forEach(env=>{matrix[env]={};Object.keys(sensitivity[env]).forEach(eq=>{let v=Math.round(scores[env]*(sensitivity[env][eq]/100)*exposure[eq]*params.protect);matrix[env][eq]=v;equipRisk[eq]=Math.max(equipRisk[eq]||0,v)})});result={project:current,base:b,condensation:c,salt:s,dust:d,marine:cache.marine||{ok:false},scores,severity,adapt,gap,matrix,equipRisk,capabilityChecks,composite};render()}
+function riskClass(v){return v>=70?'h':v>=40?'m':'l'}
+function render(){let r=result,b=r.base,c=r.condensation,s=r.salt,d=r.dust;let ro=Object.entries(r.scores).sort((a,b)=>b[1]-a[1]);$('riskList').innerHTML=ro.map(([k,v])=>`<div class="riskrow ${selected.env===k?'active':''}" onclick="selectEnv('${k}')"><div class="riskhead"><span>${k}</span><b>${v}</b></div><div class="bar"><i style="width:${v}%"></i></div></div>`).join('');$('severity').textContent=r.severity;$('adapt').textContent=r.adapt;$('gap').textContent=r.gap;$('riskBadge').textContent=r.adapt<60?'设计能力明显不足':r.adapt<85?'存在能力缺口':'设计能力基本覆盖';$('riskBadge').className='badge '+(r.gap>=20?'r':r.gap>=8?'a':'g');$('projectMeta').innerHTML=`<div><span>项目</span><b>${current.name}</b></div><div><span>海拔</span><b>${Math.round(b.elev)} m</b></div><div><span>P99高温</span><b>${Number.isFinite(b.t99)?b.t99.toFixed(1)+'℃':'--'}</b></div><div><span>最低温</span><b>${Number.isFinite(b.tmin)?b.tmin.toFixed(1)+'℃':'--'}</b></div><div><span>周期</span><b>${cache.w.start.slice(0,4)}-${cache.w.end.slice(0,4)}</b></div><div><span>数据</span><b>ERA5 + CAMS</b></div><div><span>复合腐蚀</span><b>${r.composite.corrosion}/100</b></div><div><span>复合热管理</span><b>${r.composite.thermal}/100</b></div>`;$('mapInfo').innerHTML=`<b>${current.name}</b><br>${current.lat.toFixed(4)}°, ${current.lon.toFixed(4)}°<br>海拔 ${Math.round(b.elev)} m`;renderEnvDomains();
+let envs=Object.keys(r.matrix),eqs=Object.keys(sensitivity['高温']);$('matrix').innerHTML='<tr><th></th>'+eqs.map(x=>`<th>${x}</th>`).join('')+'</tr>'+envs.map(env=>`<tr><td class="rowhead">${env}</td>`+eqs.map(eq=>{let v=r.matrix[env][eq];return`<td><div class="cell ${riskClass(v)} ${selected.env===env&&selected.equip===eq?'sel':''}" onclick="selectCell('${env}','${eq}')">${v}</div></td>`}).join('')+'</tr>').join('');
+$('topEnv').innerHTML=ro.slice(0,5).map(([k,v])=>`<li><span>${k}</span><b>${v}</b></li>`).join('');let er=Object.entries(r.equipRisk).sort((a,b)=>b[1]-a[1]);$('topEquip').innerHTML=er.slice(0,5).map(([k,v])=>`<li><span>${k}</span><b>${v}</b></li>`).join('');if(!selected.env){selected.env=ro[0][0];selected.equip=Object.entries(r.matrix[selected.env]).sort((a,b)=>b[1]-a[1])[0][0]}renderDecision();
+$('condBox').innerHTML=kv([['年凝露小时',c.annualCondHours.toFixed(0)+' h/year'],['最长连续凝露',c.maxRunHours+' h'],['最低露点裕量',c.minMargin.toFixed(2)+' K'],['年累计凝露量',c.annualCondKgM2.toFixed(2)+' kg/m²·y'],['设计判定',(c.minMargin>=params.capDew&&c.annualCondHours<=params.capCondHours)?'满足':'不满足']]);$('condFlag').textContent=r.scores.凝露>=70?'高风险':r.scores.凝露>=40?'中风险':'低风险';
+$('saltBox').innerHTML=kv([['年湿润时间TOW',(s.towPct*87.6).toFixed(0)+' h/year'],['Sea Salt P95',Number.isFinite(s.sea95)?s.sea95.toFixed(2)+' μg/m³':'N/A'],['Cl⁻沉积通量',Number.isFinite(s.jcl)?s.jcl.toFixed(2)+' mg/m²·d':'N/A'],['年Cl⁻沉积量',Number.isFinite(s.jcl)?(s.jcl*365/1000).toFixed(2)+' g/m²·y':'N/A'],['设计判定',Number.isFinite(s.jcl)&&s.jcl<=params.capCl?'满足':'不满足']]);$('saltFlag').textContent=s.score>=70?'高风险':s.score>=40?'中风险':'低风险';
+$('foulBox').innerHTML=kv([['PM10 P95',Number.isFinite(d.pm95)?d.pm95.toFixed(1)+' μg/m³':'N/A'],['Dust P95',Number.isFinite(d.dust95)?d.dust95.toFixed(1)+' μg/m³':'N/A'],['年累计空气暴露',Number.isFinite(d.annualExposure)?d.annualExposure.toFixed(1)+' mg·h/m³·y':'N/A'],['设备年吸入颗粒',Number.isFinite(d.annualIn)?d.annualIn.toFixed(1)+' kg/year':'N/A'],['设计判定',Number.isFinite(d.pm95)&&d.pm95<=params.capPm?'满足':'不满足']]);$('foulFlag').textContent=r.scores.粉尘积灰>=70?'高风险':r.scores.粉尘积灰>=40?'中风险':'低风险';
+$('erosionBox').innerHTML=kv([['年撞击颗粒量',Number.isFinite(d.impactMass)?d.impactMass.toFixed(2)+' kg/year':'N/A'],['颗粒撞击速度',Number.isFinite(d.vimpact)?d.vimpact.toFixed(1)+' m/s':'N/A'],['年冲击能量剂量',Number.isFinite(d.impactEnergyKJ)?d.impactEnergyKJ.toFixed(1)+' kJ/year':'N/A'],['年累计沙蚀剂量',Number.isFinite(d.erosionIndex)?d.erosionIndex.toFixed(2)+' EI/year':'N/A'],['设计判定',Number.isFinite(d.erosionIndex)&&d.erosionIndex<=params.capEi?'满足':'不满足']]);$('erosionFlag').textContent=r.scores.沙蚀>=70?'高风险':r.scores.沙蚀>=40?'中风险':'低风险';
+let pressure=Number.isFinite(b.pressureMean)?b.pressureMean/10:101.325*Math.pow(Math.max(.01,1-2.25577e-5*b.elev),5.25588),rho=pressure*1000/(287.05*((Number.isFinite(b.tavg)?b.tavg:15)+273.15)),rho0=101325/(287.05*288.15),rhoRatio=rho/rho0;$('altBox').innerHTML=kv([['海拔',Math.round(b.elev)+' m'],['平均表面气压',pressure.toFixed(1)+' kPa'],['空气密度',rho.toFixed(3)+' kg/m³'],['对流散热修正',((1-rhoRatio)*100).toFixed(1)+'% 衰减'],['设计判定',((1-rhoRatio)*100)<=params.capHeatLoss?'满足':'不满足']]);$('altFlag').textContent=r.scores.高海拔>=70?'高风险':r.scores.高海拔>=40?'中风险':'低风险';
+let wdr=Number.isFinite(b.rainP99h)&&Number.isFinite(b.gust99)?b.rainP99h*b.gust99:NaN;$('rainBox').innerHTML=kv([['最大日降雨',Number.isFinite(b.rainMax)?b.rainMax.toFixed(1)+' mm/day':'N/A'],['P99小时降雨',Number.isFinite(b.rainP99h)?b.rainP99h.toFixed(2)+' mm/h':'N/A'],['P99阵风',Number.isFinite(b.gust99)?b.gust99.toFixed(1)+' m/s':'N/A'],['风驱雨联合指数',Number.isFinite(wdr)?wdr.toFixed(1)+' mm·m/(h·s)':'N/A']]);$('rainFlag').textContent=Math.max(r.scores.强降雨,r.scores.极端风)>=70?'高风险':Math.max(r.scores.强降雨,r.scores.极端风)>=40?'中风险':'低风险'}
+function kv(arr){return arr.map(x=>`<div class="kv"><span>${x[0]}</span><b>${x[1]}</b></div>`).join('')}function envMetrics(arr){return arr.map(x=>`<div class="envMetric"><label>${x[0]}</label><strong>${x[1]}</strong><small>${x[2]}</small></div>`).join('')}
+function envDomains(r){
+ let b=r.base,c=r.condensation,s=r.salt,d=r.dust,aq=cache.aq?.j?.hourly||{},m=cache.marine?.ok?(cache.marine.j.current||{}):{};
+ let so2=(aq.sulphur_dioxide||[]).filter(Number.isFinite),no2=(aq.nitrogen_dioxide||[]).filter(Number.isFinite),pm25=(aq.pm2_5||[]).filter(Number.isFinite);
+ let pressure=Number.isFinite(b.pressureMean)?b.pressureMean/10:NaN,rho=Number.isFinite(pressure)?pressure*1000/(287.05*((Number.isFinite(b.tavg)?b.tavg:15)+273.15)):NaN;
+ return[
+ ['🌡 热环境',`P99 ${num(b.t99,1)}℃`,[['极端高温',num(b.t99,1)+'℃'],['极端低温',num(b.tmin,1)+'℃'],['平均温度',num(b.tavg,1)+'℃'],['日温差P95',num(b.dayRange,1)+' K'],['温变速率P95',num(b.tempRate,2)+' K/h']]],
+ ['💧 湿环境',`RH>90% ${num(b.rh90,1)}%`,[['RH均值',num(b.rhMean,1)+'%'],['绝对湿度均值',num(b.absHumMean,1)+' g/m³'],['高湿时长',num(b.rh90*87.6,0)+' h/y'],['露点裕量最低',num(c.minMargin,2)+' K']]],
+ ['💦 凝露',`${num(c.annualCondHours,0)} h/y`,[['凝露概率',num(c.condPct,2)+'%'],['凝露时长',num(c.annualCondHours,0)+' h/y'],['累计凝露量',num(c.annualCondKgM2,2)+' kg/m²·y'],['最大连续凝露',c.maxRunHours+' h']]],
+ ['🌊 盐环境',`${num(s.jcl,2)} mg/m²·d`,[['盐气溶胶P95',num(s.sea95,2)+' μg/m³'],['盐沉积',num(s.jcl,2)+' mg/m²·d'],['湿盐膜/TOW',num(s.towPct,1)+'%'],['海盐腐蚀风险',s.score+'/100']]],
+ ['🏜 沙尘',`PM10 P95 ${num(d.pm95,1)}`,[['PM10 P95',num(d.pm95,1)+' μg/m³'],['PM2.5 P95',num(q(pm25,.95),1)+' μg/m³'],['沙尘浓度P95',num(d.dust95,1)+' μg/m³'],['粒径','待接颗粒粒径谱'],['累计暴露',num(d.annualExposure,1)+' mg·h/m³·y']]],
+ ['⚡ 沙蚀',`${num(d.erosionIndex,2)} EI/y`,[['颗粒速度',num(d.vimpact,1)+' m/s'],['年撞击质量',num(d.impactMass,2)+' kg/y'],['冲击能量',num(d.impactEnergyKJ,1)+' kJ/y'],['累计侵蚀剂量',num(d.erosionIndex,2)+' EI/y']]],
+ ['❄️ 冰雪',`${num(b.snowMax,1)} cm/d`,[['降雪最大日值',num(b.snowMax,1)+' cm'],['覆冰','待接覆冰数据/模型'],['冻雨','待接冻雨数据'],['冻融',num(b.freezeThawAnnual,0)+' 次/y']]],
+ ['🌧 雨水',`${num(b.rainMax,1)} mm/d`,[['强降雨最大日值',num(b.rainMax,1)+' mm'],['P99小时降雨',num(b.rainP99h,2)+' mm/h'],['风驱雨联合指数',Number.isFinite(b.rainP99h)&&Number.isFinite(b.gust99)?num(b.rainP99h*b.gust99,1):'N/A'],['累计降雨',num(b.rainAnnual,0)+' mm/y']]],
+ ['⛰ 高海拔',`${Math.round(b.elev)} m`,[['海拔',Math.round(b.elev)+' m'],['表面气压',num(pressure,1)+' kPa'],['空气密度',num(rho,3)+' kg/m³']]],
+ ['🌪 极端环境',`阵风P99 ${num(b.gust99,1)} m/s`,[['台风','待接IBTrACS/区域台风库'],['雷电','待接全球雷电数据'],['极端风',num(b.gust99,1)+' m/s'],['极端降雨',num(b.rainMax,1)+' mm/d'],['SO₂ P95',num(q(so2,.95),1)+' μg/m³'],['NO₂ P95',num(q(no2,.95),1)+' μg/m³']]]
+ ];
+}
+function l1Data(){
+ let b=result.base,aqh=cache.aq?.j?.hourly||{},mOk=cache.marine?.ok,mc=mOk?(cache.marine.j.current||{}):{};
+ let pm10=(aqh.pm10||[]).filter(Number.isFinite),pm25=(aqh.pm2_5||[]).filter(Number.isFinite),dust=(aqh.dust||[]).filter(Number.isFinite),ss=(aqh.sea_salt_aerosol||[]).filter(Number.isFinite),so2=(aqh.sulphur_dioxide||[]).filter(Number.isFinite),no2=(aqh.nitrogen_dioxide||[]).filter(Number.isFinite);
+ let pressure=Number.isFinite(b.pressureMean)?b.pressureMean/10:NaN;
+ return[
+  ['🌦 气象','已接',`T ${num(b.tavg,1)}℃ · RH ${num(b.rhMean,0)}% · P ${num(pressure,1)}kPa`,`ERA5 | ${cache.w.start}~${cache.w.end} | 极值 ${num(b.tmin,1)}~${num(b.t99,1)}℃ · 雨 ${num(b.rainMax,1)}mm/d · 阵风P99 ${num(b.gust99,1)}m/s · 云量 ${num(b.cloudMean,0)}%`],
+  ['🗺 地理','部分',`海拔 ${Math.round(b.elev)} m`,`距海岸、地表类型、荒漠/植被：待接GIS`],
+  ['🌊 海洋',mOk?'部分':'待接',mOk?`海温 ${num(mc.sea_surface_temperature,1)}℃ · 浪高 ${num(mc.wave_height,1)}m`:'当前位置/接口暂无海洋实时值',mOk?`Open-Meteo Marine | 当前值 | 海流 ${num(mc.ocean_current_velocity,2)} km/h · 盐度/海冰待接`:'海温、盐度、浪高、海流、海冰待接'],
+  ['🌫 环境',cache.aq?.ok?'已接':'待接',`PM10 P95 ${num(q(pm10,.95),1)} · PM2.5 P95 ${num(q(pm25,.95),1)} μg/m³`,`CAMS Global | 近${params.camsDays}天 | Dust ${num(q(dust,.95),1)} · SeaSalt ${num(q(ss,.95),1)} · SO₂ ${num(q(so2,.95),1)} · NO₂ ${num(q(no2,.95),1)}`],
+  ['⚠ 灾害','部分',`极端风 ${num(b.gust99,1)}m/s · 极端雨 ${num(b.rainMax,1)}mm/d`,`极端高低温已接；雷电、台风轨迹待接专业数据库`]
+ ];
+}
+function num(v,n=1){return Number.isFinite(v)?v.toFixed(n):'N/A'}
+function renderEnvDomains(){
+ let data=envDomains(result);$('envGrid').innerHTML=data.map(x=>`<div class="envDomain"><div class="domainHead"><div class="domainName">${x[0]}</div><div class="domainSummary">${x[1]}</div></div><div class="domainSub">${x[2].map(k=>`<div class="subKV"><span>${k[0]}</span><b>${k[1]}</b></div>`).join('')}</div></div>`).join('');
+ $('l1bar').innerHTML=l1Data().map(x=>`<div class="l1item"><b><span>${x[0]}</span><span class="${x[1]==='已接'?'l1ok':'l1partial'}">${x[1]}</span></b><div class="l1value">${x[2]}</div><div class="l1desc">${x[3]}</div></div>`).join('');
+}
+function selectEnv(env){selected.env=env;selected.equip=Object.entries(result.matrix[env]).sort((a,b)=>b[1]-a[1])[0][0];render()}
+function selectCell(env,eq){selected={env,equip:eq};render()}
+function renderDecision(){let env=selected.env,eq=selected.equip,v=result.matrix[env][eq];$('selection').textContent=`${env} × ${eq} · ${v}/100`;$('failureChain').innerHTML=`<b>${env} × ${eq}</b><br>${failure[env]}<br><b>设备风险：${v}/100</b>`;$('actions').innerHTML=`<div><b>设计要求：</b>${actionMap[env]}</div><div><b>验证建议：</b>${env}专项试验 + ${eq}功能/性能验证 + 极限边界复核</div><div><b>适配判断：</b>${v>=70?'建议强制差异化配置':v>=40?'建议评估后配置':'常规设计可覆盖，保留验证'}</div><div><b>保护系数：</b>P=${params.protect.toFixed(2)}，设备风险已按 H×S×E×P 计算</div>`;let top=Object.entries(result.scores).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]).join('、'),te=Object.entries(result.equipRisk).sort((a,b)=>b[1]-a[1]).slice(0,3).map(x=>x[0]).join('、');$('aiSummary').innerHTML=`<b>AI工程结论</b><br>${current.name} 当前主要环境矛盾为 <b>${top}</b>；设备侧重点关注 <b>${te}</b>。当前选择 ${env}×${eq} 风险 ${v}/100。复合腐蚀风险 ${result.composite.corrosion}/100，复合热管理风险 ${result.composite.thermal}/100。建议以物理模型结果作为设计输入，并用现场参数/专项试验校准半经验模型。`}
+async function assess(loc){
+ $('status').textContent='正在获取真实数据…';current=loc;marker.setLatLng([loc.lat,loc.lon]);map.setView([loc.lat,loc.lon],6);
+ try{const years=+$('years').value;const w=await weather(loc.lat,loc.lon,years);const [e0,a,m]=await Promise.all([elev(loc.lat,loc.lon),air(loc.lat,loc.lon),marine(loc.lat,loc.lon)]);const e=Number.isFinite(e0)?e0:(Number.isFinite(w.j.elevation)?w.j.elevation:0);cache={elev:e,w,aq:a,marine:m};selected={env:null,equip:null};calculate();marker.bindPopup(`<b>${loc.name}</b><br>环境严酷度 ${result.severity}/100`).openPopup();$('status').textContent=`真实数据计算完成 · ERA5 ${w.start}~${w.end}`}catch(e){console.error(e);$('status').textContent='查询失败：'+(e?.message||String(e))}
+}
+$('go').onclick=async()=>{try{assess(await locate($('query').value.trim()))}catch(e){$('status').textContent=e.message}};$('years').onchange=()=>{$('go').click()};map.on('click',e=>{let l={lat:e.latlng.lat,lon:e.latlng.lng,name:`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`};$('query').value=l.name;assess(l)});setTimeout(()=>$('go').click(),300);
+
+// V2.7 PWA install + offline shell
+let deferredInstallPrompt=null;
+const installBtn=document.getElementById('installBtn');
+window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();deferredInstallPrompt=e;if(installBtn)installBtn.style.display='inline-block'});
+if(installBtn)installBtn.addEventListener('click',async()=>{if(!deferredInstallPrompt){alert('如未出现安装提示，请在浏览器菜单中选择“添加到主屏幕 / 安装应用”。');return;}deferredInstallPrompt.prompt();await deferredInstallPrompt.userChoice;deferredInstallPrompt=null;installBtn.style.display='none'});
+window.addEventListener('appinstalled',()=>{if(installBtn)installBtn.style.display='none'});
+function updateOnlineState(){const p=document.getElementById('offlinePill');if(p)p.style.display=navigator.onLine?'none':'block'}
+window.addEventListener('online',updateOnlineState);window.addEventListener('offline',updateOnlineState);updateOnlineState();
+if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
+</script>
+<div id="offlinePill" class="offlinePill">离线模式：可打开页面，实时数据查询需联网</div>
+</body></html>
