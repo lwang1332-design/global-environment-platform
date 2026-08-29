@@ -7,3 +7,4 @@ s=s.replace("gust=(h.wind_gusts_10m||[]).filter(Number.isFinite)","gust=((h.wind
 s=s.replace('阵风P99 ${num(b.gust99,1)}m/s','阵风P99(估算) ${num(b.gust99,1)}m/s')
 p.write_text(s,encoding='utf-8')
 print('fixed ERA5 supported variables and wind units')
+# trigger
