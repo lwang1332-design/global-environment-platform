@@ -13,3 +13,4 @@ async function marine(lat,lon){
     s=s.replace(anchor,aux+anchor,1)
 p.write_text(s,encoding='utf-8')
 print('air/marine restored', 'async function air(' in s, 'async function marine(' in s)
+# trigger restore workflow
