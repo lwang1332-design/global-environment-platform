@@ -1,0 +1,32 @@
+name: Run Feishu Map Fix
+on:
+  push:
+    paths:
+      - '.github/workflows/run-feishu-map-fix.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Apply patch
+        run: python3 tools/fix_feishu_map.py
+      - name: Verify
+        run: |
+          grep -q 'osmCompatMap' index.html
+          grep -q 'tile.openstreetmap.org' index.html
+          ! grep -q 'openstreetmap.org/export/embed.html' index.html
+          ! grep -q 'id="osmFrame"' index.html
+      - name: Commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html
+          git diff --cached --quiet && exit 0
+          git commit -m 'Fix Feishu mobile map compatibility'
+          git pull --rebase origin main
+          git push origin HEAD:main
