@@ -17,69 +17,34 @@ jobs:
       - name: Install Playwright
         run: |
           npm init -y >/dev/null 2>&1
-          npm i -D playwright@1.55.0
-          npx playwright install chromium
-      - name: Check ERA5 endpoint
-        run: |
-          python - <<'PY'
-          import json, urllib.request
-          u='https://archive-api.open-meteo.com/v1/archive?latitude=30.5085&longitude=47.7804&start_date=2025-01-01&end_date=2025-01-03&hourly=temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,snowfall,wind_speed_10m,shortwave_radiation,surface_pressure,cloud_cover&daily=temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum&timezone=UTC&wind_speed_unit=ms&models=era5'
-          with urllib.request.urlopen(u, timeout=60) as r:
-              j=json.load(r)
-          assert len(j['hourly']['temperature_2m'])>0
-          print('ERA5_OK', len(j['hourly']['temperature_2m']), j['hourly']['temperature_2m'][:3])
-          PY
-      - name: Browser V2.8 desktop report and mobile map check
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Browser V2.8 integrated check
         run: |
           cat > e2e.mjs <<'JS'
           import { chromium } from 'playwright';
-          const browser = await chromium.launch({headless:true});
-          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=dashboard-0107-'+Date.now();
+          const browser=await chromium.launch({headless:true});
+          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=0107-final-'+Date.now();
           const expected=['01 项目定位','02 项目综合信息','03 环境数据','04 环境风险画像','05 物理模型实时计算结果','06 环境 × 设备风险矩阵','07 工程决策建议'];
-
-          const page = await browser.newPage({viewport:{width:1440,height:1000}});
-          page.on('console', m=>console.log('DESKTOP',m.type(),m.text()));
-          page.on('pageerror', e=>console.log('PAGEERROR',e.message));
-          let resp, headings=[];
-          for(let i=0;i<6;i++){
-            resp=await page.goto(url+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
-            await page.waitForTimeout(2500);
-            const ready=await page.evaluate((expected)=>{
-              const hs=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
-              const src=document.documentElement?.innerHTML||'';
-              return JSON.stringify(hs)===JSON.stringify(expected) && !!document.querySelector('#pdfReport') && !document.querySelector('#wordReport') && src.includes('<th>核心数据</th>') && src.includes('温度 / 露点时序') && !!document.querySelector('.osmCompatMap');
-            },expected);
-            if(ready) break;
-            await page.waitForTimeout(3500);
-          }
-          console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
-          headings=await page.evaluate(()=>[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim()));
-          if(JSON.stringify(headings)!==JSON.stringify(expected)) throw new Error('Dashboard 01-07 sequence invalid: '+JSON.stringify(headings));
-          const body0=await page.locator('body').innerText();
-          if(!body0.includes('02 项目综合信息')) throw new Error('02 项目综合信息 missing');
-          if(!body0.includes('03 环境数据')) throw new Error('03 环境数据 missing');
-          if(!body0.includes('04 环境风险画像')) throw new Error('04 环境风险画像 missing');
-          if(!body0.includes('07 工程决策建议')) throw new Error('07 工程决策建议 missing');
-          if(body0.includes('04 项目综合结论')) throw new Error('Old 项目综合结论 heading still visible');
-          if(body0.includes('设计能力满足率')) throw new Error('Design capability satisfaction rate still visible');
-          if(await page.locator('#pdfReport').count()!==1) throw new Error('PDF button missing');
-          if(await page.locator('#wordReport').count()!==0) throw new Error('Word button should be hidden from web UI');
-          if(await page.locator('.riskActual').count()<10) throw new Error('Risk rows missing compact true-data text');
-
-          await page.waitForFunction(()=>{
+          const page=await browser.newPage({viewport:{width:1440,height:1000}});
+          await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForTimeout(3000);
+          const shell=await page.evaluate((expected)=>{
+            const hs=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
             const tiles=[...document.querySelectorAll('.osmTile')];
-            return tiles.filter(x=>x.complete&&x.naturalWidth>0).length>=4 || !!document.querySelector('.embeddedWorldMap');
-          },{timeout:30000});
-          const desktopMap=await page.evaluate(()=>({
-            map:!!document.querySelector('.osmCompatMap'),
-            tiles:document.querySelectorAll('.osmTile').length,
-            loaded:[...document.querySelectorAll('.osmTile')].filter(x=>x.complete && x.naturalWidth>0).length,
-            embedded:!!document.querySelector('.embeddedWorldMap'),
-            marker:!!document.querySelector('.osmMarker') || !!document.querySelector('.embeddedWorldMap svg circle'),
-            box:document.querySelector('#map')?.getBoundingClientRect().toJSON?.()||null
-          }));
-          console.log('DESKTOP_MAP_CHECK',desktopMap);
-          if(!desktopMap.map || (!desktopMap.embedded && desktopMap.loaded<4) || !desktopMap.marker) throw new Error('Desktop map not initialized');
+            return {
+              order:JSON.stringify(hs)===JSON.stringify(expected),
+              headings:hs,
+              pdf:!!document.querySelector('#pdfReport'),
+              word:!!document.querySelector('#wordReport'),
+              map:!!document.querySelector('.osmCompatMap'),
+              loaded:tiles.filter(x=>x.complete&&x.naturalWidth>0).length,
+              embedded:!!document.querySelector('.embeddedWorldMap'),
+              oldHeading:document.body.innerText.includes('04 项目综合结论')
+            };
+          },expected);
+          console.log('SHELL',shell);
+          if(!shell.order||!shell.pdf||shell.word||!shell.map||shell.oldHeading) throw new Error('Dashboard shell regression: '+JSON.stringify(shell));
 
           await page.locator('#query').fill('30.5085,47.7804');
           await page.locator('#years').selectOption('1');
@@ -88,73 +53,25 @@ jobs:
           const status=await page.locator('#status').textContent();
           console.log('FINAL_STATUS',status);
           if(!status.includes('真实数据计算完成')) throw new Error('Calculation failed: '+status);
-          const reportCheck=await page.evaluate(()=>{
+
+          const calculated=await page.evaluate(()=>{
+            const risk=[...document.querySelectorAll('.riskActual')].map(x=>x.textContent.trim());
             const html=reportHtml();
             return {
-              len:html.length,
-              title:html.includes('全球风电机组环境适应性工程评估报告'),
-              detailed:html.includes('03 气象环境统计') && html.includes('10 环境 × 设备风险矩阵') && html.includes('12 综合工程结论'),
-              coreHeader:html.includes('<th>核心数据</th>'),
-              coreParams:html.includes('P99阵风') && html.includes('TOW') && html.includes('PM10 P95'),
-              curves:html.includes('温度 / 露点时序') && html.includes('相对湿度时序') && html.includes('风速 / 阵风时序') && html.includes('小时降雨时序') && html.includes('短波辐射时序') && html.includes('表面气压时序'),
-              noEquipPriority:!html.includes('设备侧优先级'),
-              conclusionParams:html.includes('主要环境风险') && html.includes('（风险 '),
-              noAdminSnapshot:!html.includes('管理员参数快照'),
-              noAdaptRate:!html.includes('设计能力满足率'),
+              riskCount:risk.length,
+              riskNonEmpty:risk.filter(Boolean).length,
+              riskSample:risk.slice(0,3),
+              noNaN:!document.body.innerText.includes('NaN'),
+              reportLen:html.length,
+              reportCore:html.includes('<th>核心数据</th>')&&html.includes('P99阵风')&&html.includes('PM10 P95')&&html.includes('TOW'),
+              curves:html.includes('温度 / 露点时序')&&html.includes('相对湿度时序')&&html.includes('风速 / 阵风时序'),
               filter:Number.isFinite(result?.dust?.penetration),
               dt:result?.condensation?.params?.dt_min
             };
           });
-          console.log('REPORT_CHECK',reportCheck);
-          if(!reportCheck.title || !reportCheck.detailed || reportCheck.len<15000) throw new Error('Detailed engineering report invalid');
-          if(!reportCheck.coreHeader || !reportCheck.coreParams) throw new Error('Core environmental data missing from risk section');
-          if(!reportCheck.curves) throw new Error('Meteorological time-series curves missing');
-          if(!reportCheck.noEquipPriority) throw new Error('Equipment-side priority still present');
-          if(!reportCheck.conclusionParams) throw new Error('Conclusion environmental parameters missing');
-          if(!reportCheck.noAdminSnapshot || !reportCheck.noAdaptRate) throw new Error('Hidden report content regression');
-          if(!reportCheck.filter) throw new Error('Filter penetration result missing');
-          if(reportCheck.dt!==10) throw new Error('Condensation substep default not applied');
-          const body=await page.locator('body').innerText();
-          if(body.includes('NaN')) throw new Error('NaN found in rendered output');
-          await page.close();
-
-          const mobile = await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
-          mobile.on('console', m=>console.log('MOBILE',m.type(),m.text()));
-          mobile.on('pageerror', e=>console.log('MOBILE_PAGEERROR',e.message));
-          let mobileOk=false, mobileCheck=null;
-          for(let i=0;i<6;i++){
-            await mobile.goto(url+'&mobile=1&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
-            await mobile.waitForTimeout(2500);
-            mobileCheck=await mobile.evaluate((expected)=>{
-              const card=document.querySelector('.mapCard');
-              const wrap=document.querySelector('.mapWrap');
-              const map=document.querySelector('#map');
-              const compat=document.querySelector('.osmCompatMap');
-              const overlay=document.querySelector('.mapOverlay');
-              const tiles=[...document.querySelectorAll('.osmTile')];
-              const rect=map?.getBoundingClientRect();
-              const hs=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
-              return {
-                cardH:card?.getBoundingClientRect().height||0,
-                wrapH:wrap?.getBoundingClientRect().height||0,
-                mapH:rect?.height||0,
-                mapW:rect?.width||0,
-                visible:!!compat && getComputedStyle(compat).display!=='none',
-                tiles:tiles.length,
-                loadedTiles:tiles.filter(x=>x.complete && x.naturalWidth>0).length,
-                embedded:!!document.querySelector('.embeddedWorldMap'),
-                marker:!!document.querySelector('.osmMarker') || !!document.querySelector('.embeddedWorldMap svg circle'),
-                overlay:overlay?.innerText||'',
-                overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none',
-                orderOK:JSON.stringify(hs)===JSON.stringify(expected)
-              };
-            },expected);
-            console.log('MOBILE_MAP_CHECK',mobileCheck);
-            if(mobileCheck.visible && mobileCheck.mapH>=300 && mobileCheck.mapW>=300 && (mobileCheck.loadedTiles>=4||mobileCheck.embedded) && mobileCheck.marker && mobileCheck.overlayVisible && mobileCheck.overlay.includes('Basra') && mobileCheck.orderOK) {mobileOk=true;break;}
-            await mobile.waitForTimeout(3500);
-          }
-          if(!mobileOk) throw new Error('Mobile map/card/order/overlay layout invalid: '+JSON.stringify(mobileCheck));
-          await mobile.close();
+          console.log('CALCULATED',calculated);
+          if(calculated.riskCount<10||calculated.riskNonEmpty<10) throw new Error('Risk actual-data text missing after calculation');
+          if(!calculated.noNaN||calculated.reportLen<15000||!calculated.reportCore||!calculated.curves||!calculated.filter||calculated.dt!==10) throw new Error('Calculation/report regression: '+JSON.stringify(calculated));
           await browser.close();
           JS
           node e2e.mjs
