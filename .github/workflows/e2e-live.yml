@@ -29,23 +29,24 @@ jobs:
           assert len(j['hourly']['temperature_2m'])>0
           print('ERA5_OK', len(j['hourly']['temperature_2m']), j['hourly']['temperature_2m'][:3])
           PY
-      - name: Browser V2.8 report curves and toolbar check
+      - name: Browser V2.8 desktop report and mobile map check
         run: |
           cat > e2e.mjs <<'JS'
           import { chromium } from 'playwright';
           const browser = await chromium.launch({headless:true});
+          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=mobile-map-'+Date.now();
+
           const page = await browser.newPage({viewport:{width:1440,height:1000}});
-          page.on('console', m=>console.log('BROWSER',m.type(),m.text()));
+          page.on('console', m=>console.log('DESKTOP',m.type(),m.text()));
           page.on('pageerror', e=>console.log('PAGEERROR',e.message));
-          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=reportv3-final-'+Date.now();
           let resp;
           for(let i=0;i<12;i++){
             resp=await page.goto(url+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
-            await page.waitForTimeout(4000);
+            await page.waitForTimeout(3000);
             const ready=await page.evaluate(()=>{
               const body=document.body?.innerText||'';
               const src=document.documentElement?.innerHTML||'';
-              return body.includes('02 环境数据') && body.includes('07 工程决策建议') && !!document.querySelector('#pdfReport') && !document.querySelector('#wordReport') && src.includes('<th>核心数据</th>') && src.includes('温度 / 露点时序');
+              return body.includes('02 环境数据') && body.includes('07 工程决策建议') && !!document.querySelector('#pdfReport') && !document.querySelector('#wordReport') && src.includes('<th>核心数据</th>') && src.includes('温度 / 露点时序') && !!document.querySelector('.osmCompatMap');
             });
             if(ready) break;
             await page.waitForTimeout(6000);
@@ -57,9 +58,18 @@ jobs:
           if(body0.includes('设计能力满足率')) throw new Error('Design capability satisfaction rate still visible');
           if(await page.locator('#pdfReport').count()!==1) throw new Error('PDF button missing');
           if(await page.locator('#wordReport').count()!==0) throw new Error('Word button should be hidden from web UI');
-          const frame=page.locator('#osmFrame');
-          const mapSrc=await frame.getAttribute('src');
-          if(!mapSrc?.includes('openstreetmap.org/export/embed.html')) throw new Error('OSM iframe map not initialized');
+
+          await page.waitForFunction(()=>document.querySelectorAll('.osmTile').length>=4,{timeout:30000});
+          const desktopMap=await page.evaluate(()=>({
+            map:!!document.querySelector('.osmCompatMap'),
+            tiles:document.querySelectorAll('.osmTile').length,
+            loaded:[...document.querySelectorAll('.osmTile')].filter(x=>x.complete && x.naturalWidth>0).length,
+            marker:!!document.querySelector('.osmMarker'),
+            box:document.querySelector('#map')?.getBoundingClientRect().toJSON?.()||null
+          }));
+          console.log('DESKTOP_MAP_CHECK',desktopMap);
+          if(!desktopMap.map || desktopMap.tiles<4 || !desktopMap.marker) throw new Error('Desktop OSM tile map not initialized');
+
           await page.locator('#query').fill('30.5085,47.7804');
           await page.locator('#years').selectOption('1');
           await page.locator('#go').click();
@@ -95,6 +105,42 @@ jobs:
           if(reportCheck.dt!==10) throw new Error('Condensation substep default not applied');
           const body=await page.locator('body').innerText();
           if(body.includes('NaN')) throw new Error('NaN found in rendered output');
+          await page.close();
+
+          const mobile = await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
+          mobile.on('console', m=>console.log('MOBILE',m.type(),m.text()));
+          mobile.on('pageerror', e=>console.log('MOBILE_PAGEERROR',e.message));
+          let mobileOk=false, mobileCheck=null;
+          for(let i=0;i<12;i++){
+            await mobile.goto(url+'&mobile=1&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
+            await mobile.waitForTimeout(3000);
+            mobileCheck=await mobile.evaluate(()=>{
+              const card=document.querySelector('.mapCard');
+              const wrap=document.querySelector('.mapWrap');
+              const map=document.querySelector('#map');
+              const compat=document.querySelector('.osmCompatMap');
+              const overlay=document.querySelector('.mapOverlay');
+              const tiles=[...document.querySelectorAll('.osmTile')];
+              const rect=map?.getBoundingClientRect();
+              return {
+                cardH:card?.getBoundingClientRect().height||0,
+                wrapH:wrap?.getBoundingClientRect().height||0,
+                mapH:rect?.height||0,
+                mapW:rect?.width||0,
+                visible:!!compat && getComputedStyle(compat).display!=='none',
+                tiles:tiles.length,
+                loadedTiles:tiles.filter(x=>x.complete && x.naturalWidth>0).length,
+                marker:!!document.querySelector('.osmMarker'),
+                overlay:overlay?.innerText||'',
+                overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none'
+              };
+            });
+            console.log('MOBILE_MAP_CHECK',mobileCheck);
+            if(mobileCheck.visible && mobileCheck.mapH>=300 && mobileCheck.mapW>=300 && mobileCheck.tiles>=4 && mobileCheck.marker && mobileCheck.overlayVisible && mobileCheck.overlay.includes('Basra')) {mobileOk=true;break;}
+            await mobile.waitForTimeout(5000);
+          }
+          if(!mobileOk) throw new Error('Mobile map/card/overlay layout invalid: '+JSON.stringify(mobileCheck));
+          await mobile.close();
           await browser.close();
           JS
           node e2e.mjs
