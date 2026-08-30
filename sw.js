@@ -1,4 +1,4 @@
-const CACHE='global-env-v2.8-map-tier-v5';
+const CACHE='global-env-v2.8-map-tier-v6-mobilefix';
 const TILE_CACHE='global-env-map-tiles-v1';
 const SHELL=['./','./index.html','./manifest.webmanifest','./icons/app-icon.svg','./map-tier.js','./tiles/manifest.json','./assets/goldwind-logo.png'];
 self.addEventListener('install',e=>{e.waitUntil(caches.open(CACHE).then(c=>c.addAll(SHELL)));self.skipWaiting()});
