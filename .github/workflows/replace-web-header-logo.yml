@@ -55,3 +55,4 @@ jobs:
           git diff --cached --quiet && exit 0
           git commit -m 'Replace web header GE badge with Goldwind logo'
           git push
+# trigger: 2026-08-30
