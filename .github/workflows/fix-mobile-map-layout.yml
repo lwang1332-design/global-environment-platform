@@ -1,0 +1,71 @@
+name: Fix Mobile Map Layout
+on:
+  push:
+    paths:
+      - '.github/workflows/fix-mobile-map-layout.yml'
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Fix mobile map sizing and add mobile E2E
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          marker='/* mobile-map-stability-v1 */'
+          css='''\n/* mobile-map-stability-v1 */\n@media(max-width:900px){\n .mapCard{height:360px!important;min-height:360px!important}\n .mapCard .mapWrap{height:326px!important;min-height:326px!important;position:relative}\n .mapCard #map{height:326px!important;min-height:326px!important;display:block}\n .mapCard #osmFrame{width:100%!important;height:326px!important;min-height:326px!important;display:block!important}\n .mapCard .mapOverlay{display:block!important;z-index:20!important;left:8px!important;bottom:8px!important;max-width:calc(100% - 16px);white-space:normal;pointer-events:none}\n}\n'''
+          if marker not in s:
+              s=s.replace('</style>',css+'</style>',1)
+          p.write_text(s,encoding='utf-8')
+
+          e=Path('.github/workflows/e2e-live.yml')
+          t=e.read_text(encoding='utf-8')
+          test_marker="console.log('MOBILE_MAP_CHECK'"
+          if test_marker not in t:
+              needle="          const body=await page.locator('body').innerText();\n          if(body.includes('NaN')) throw new Error('NaN found in rendered output');\n          await browser.close();"
+              repl="""          const body=await page.locator('body').innerText();
+          if(body.includes('NaN')) throw new Error('NaN found in rendered output');
+
+          const mobile = await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true});
+          let mobileOk=false, mobileBox=null, overlayText='', mobileSrc='';
+          for(let i=0;i<12;i++){
+            await mobile.goto(url+'&mobile=1&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
+            await mobile.waitForTimeout(2500);
+            const f=mobile.locator('#osmFrame');
+            if(await f.count()){
+              mobileBox=await f.boundingBox();
+              overlayText=await mobile.locator('.mapOverlay').textContent().catch(()=> '');
+              mobileSrc=await f.getAttribute('src');
+              const cardH=await mobile.locator('.mapCard').evaluate(el=>getComputedStyle(el).height).catch(()=> '0px');
+              if(mobileBox && mobileBox.height>=300 && overlayText.includes('Basra') && mobileSrc?.includes('openstreetmap.org/export/embed.html') && parseFloat(cardH)>=350){mobileOk=true;break;}
+            }
+            await mobile.waitForTimeout(5000);
+          }
+          console.log('MOBILE_MAP_CHECK',{mobileOk,mobileBox,overlayText,mobileSrc});
+          if(!mobileOk) throw new Error('Mobile map iframe/overlay layout invalid');
+          await mobile.close();
+          await browser.close();"""
+              if needle not in t:
+                  raise SystemExit('E2E insertion target not found')
+              t=t.replace(needle,repl,1)
+          e.write_text(t,encoding='utf-8')
+      - name: Verify patch
+        shell: bash
+        run: |
+          grep -q 'mobile-map-stability-v1' index.html
+          grep -q 'MOBILE_MAP_CHECK' .github/workflows/e2e-live.yml
+          grep -q 'height:326px' index.html
+      - name: Commit mobile map repair
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html .github/workflows/e2e-live.yml
+          git diff --cached --quiet && exit 0
+          git commit -m 'Fix mobile OSM map height and add mobile E2E check'
+          git push
