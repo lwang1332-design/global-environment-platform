@@ -30,3 +30,4 @@ jobs:
           git commit -m 'Fix Feishu mobile map compatibility'
           git pull --rebase origin main
           git push origin HEAD:main
+# trigger: 2026-08-30 Feishu mobile map
