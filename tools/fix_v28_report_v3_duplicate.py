@@ -24,3 +24,4 @@ assert "${envCoreData[x[0]]||'N/A'}" in s
 
 p.write_text(s,encoding='utf-8')
 print('fixed',len(s))
+# trigger 2026-08-30
