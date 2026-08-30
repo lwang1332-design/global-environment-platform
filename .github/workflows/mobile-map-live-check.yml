@@ -1,0 +1,64 @@
+name: Mobile Map Live Check
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  mobile-map:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Check HTTPS map in mobile viewport
+        run: |
+          cat > mobile-map.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:390,height:844},isMobile:true,hasTouch:true,deviceScaleFactor:2});
+          await page.route('**/archive-api.open-meteo.com/**',r=>r.abort());
+          await page.route('**/air-quality-api.open-meteo.com/**',r=>r.abort());
+          const base='https://lwang1332-design.github.io/global-environment-platform/?mobilemap='+Date.now();
+          let ok=false,last=null;
+          for(let i=0;i<10;i++){
+            await page.goto(base+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
+            await page.waitForTimeout(3500);
+            last=await page.evaluate(()=>{
+              const card=document.querySelector('.mapCard');
+              const wrap=document.querySelector('.mapWrap');
+              const map=document.querySelector('#map');
+              const compat=document.querySelector('.osmCompatMap');
+              const overlay=document.querySelector('.mapOverlay');
+              const tiles=[...document.querySelectorAll('.osmTile')];
+              const logo=document.querySelector('.logo img');
+              return {
+                cardH:card?.getBoundingClientRect().height||0,
+                wrapH:wrap?.getBoundingClientRect().height||0,
+                mapH:map?.getBoundingClientRect().height||0,
+                mapW:map?.getBoundingClientRect().width||0,
+                mapVisible:!!compat && getComputedStyle(compat).display!=='none',
+                tiles:tiles.length,
+                loadedTiles:tiles.filter(x=>x.complete&&x.naturalWidth>0).length,
+                marker:!!document.querySelector('.osmMarker'),
+                overlay:overlay?.innerText||'',
+                overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none',
+                logo:!!logo
+              };
+            });
+            console.log('MOBILE_MAP',last);
+            const named=(last.overlay.includes('Basra')||last.overlay.includes('巴士拉'));
+            if(last.mapVisible&&last.cardH>=350&&last.wrapH>=315&&last.mapH>=315&&last.mapW>=300&&last.tiles>=4&&last.loadedTiles>=4&&last.marker&&last.overlayVisible&&named&&last.logo){ok=true;break;}
+            await page.waitForTimeout(6000);
+          }
+          await browser.close();
+          if(!ok) throw new Error('Mobile map HTTPS check failed: '+JSON.stringify(last));
+          JS
+          node mobile-map.mjs
