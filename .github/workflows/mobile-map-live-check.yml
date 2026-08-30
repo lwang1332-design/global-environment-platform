@@ -18,23 +18,23 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm i -D playwright@1.55.0 >/dev/null
           npx playwright install chromium >/dev/null
-      - name: Check HTTPS map with Feishu mobile WebView profile
+      - name: Check online, offline fallback and mobile section sequence
         run: |
           cat > mobile-map.mjs <<'JS'
           import { chromium } from 'playwright';
           const browser=await chromium.launch({headless:true});
-          const page=await browser.newPage({
+          const context=await browser.newContext({
             viewport:{width:390,height:844},
             isMobile:true,
             hasTouch:true,
             deviceScaleFactor:2,
             userAgent:'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 Lark/7.50.0 Feishu'
           });
-          // Map rendering is independent of ERA5/CAMS. Abort those calls so API rate limits cannot mask a map compatibility result.
+          const page=await context.newPage();
           await page.route('**/archive-api.open-meteo.com/**',r=>r.abort());
           await page.route('**/air-quality-api.open-meteo.com/**',r=>r.abort());
-          const base='https://lwang1332-design.github.io/global-environment-platform/?feishu-map='+Date.now();
-          let ok=false,last=null;
+          const base='https://lwang1332-design.github.io/global-environment-platform/?mobile-v28='+Date.now();
+          let onlineOK=false,last=null;
           for(let i=0;i<12;i++){
             await page.goto(base+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
             await page.waitForTimeout(3500);
@@ -46,6 +46,7 @@ jobs:
               const overlay=document.querySelector('.mapOverlay');
               const tiles=[...document.querySelectorAll('.osmTile')];
               const logo=document.querySelector('.logo img');
+              const headings=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
               return {
                 ua:navigator.userAgent,
                 cardH:card?.getBoundingClientRect().height||0,
@@ -59,15 +60,36 @@ jobs:
                 marker:!!document.querySelector('.osmMarker'),
                 overlay:overlay?.innerText||'',
                 overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none',
-                logo:!!logo
+                logo:!!logo,
+                headings
               };
             });
-            console.log('FEISHU_MOBILE_MAP',last);
+            console.log('FEISHU_MOBILE_ONLINE',last);
             const named=(last.overlay.includes('Basra')||last.overlay.includes('巴士拉'));
-            if(last.ua.includes('Feishu')&&last.mapVisible&&!last.iframe&&last.cardH>=340&&last.wrapH>=300&&last.mapH>=300&&last.mapW>=300&&last.tiles>=4&&last.loadedTiles>=4&&last.marker&&last.overlayVisible&&named&&last.logo){ok=true;break;}
+            const expected=['01 项目定位','02 项目综合信息','03 环境数据','04 环境风险画像','05 物理模型实时计算结果','06 环境 × 设备风险矩阵','07 工程决策建议'];
+            const orderOK=JSON.stringify(last.headings)===JSON.stringify(expected);
+            if(last.ua.includes('Feishu')&&last.mapVisible&&!last.iframe&&last.cardH>=340&&last.wrapH>=300&&last.mapH>=300&&last.mapW>=300&&last.tiles>=4&&last.loadedTiles>=4&&last.marker&&last.overlayVisible&&named&&last.logo&&orderOK){onlineOK=true;break;}
             await page.waitForTimeout(6000);
           }
+          if(!onlineOK){await browser.close();throw new Error('Feishu mobile online/order check failed: '+JSON.stringify(last));}
+
+          // Simulate losing connectivity after the app shell is loaded. renderOsmMap must switch to the embedded global base map.
+          await context.setOffline(true);
+          await page.evaluate(()=>window.renderOsmMap(30.5085,47.7804,'Basra, Iraq',3));
+          await page.waitForTimeout(600);
+          const offline=await page.evaluate(()=>({
+            online:navigator.onLine,
+            embedded:!!document.querySelector('.embeddedWorldMap'),
+            svg:!!document.querySelector('.embeddedWorldMap svg'),
+            tiles:document.querySelectorAll('.osmTile').length,
+            badge:document.querySelector('#mapSourceBadge')?.textContent||'',
+            mapH:document.querySelector('#map')?.getBoundingClientRect().height||0,
+            mapW:document.querySelector('#map')?.getBoundingClientRect().width||0
+          }));
+          console.log('FEISHU_MOBILE_OFFLINE',offline);
           await browser.close();
-          if(!ok) throw new Error('Feishu mobile map HTTPS check failed: '+JSON.stringify(last));
+          if(offline.online!==false||!offline.embedded||!offline.svg||offline.tiles!==0||!offline.badge.includes('内置全球离线底图')||offline.mapH<300||offline.mapW<300){
+            throw new Error('Embedded offline world map check failed: '+JSON.stringify(offline));
+          }
           JS
           node mobile-map.mjs
