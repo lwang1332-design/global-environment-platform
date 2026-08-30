@@ -1,0 +1,132 @@
+name: Patch V2.8 Detailed Engineering Report
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - ".github/workflows/patch-v28-report-v2.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch index.html
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+
+          # 1) UI micro updates
+          s=s.replace('<h2>02 真实环境数据</h2>','<h2>02 环境数据</h2>')
+          s=s.replace('<h2>07 工程决策</h2>','<h2>07 工程决策建议</h2>')
+          s=s.replace('.score3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px}', '.score3{display:grid;grid-template-columns:1fr 1fr;gap:6px}')
+          s=s.replace('<div class="scoreBox"><label>设计能力满足率</label><strong id="adapt">--</strong></div>', '<span id="adapt" style="display:none"></span>')
+
+          new_report = r'''function reportHtml(){
+ let {b,c,s,d,topEnv,topEq,aqh}=reportData();
+ const h=cache.w?.j?.hourly||{}, day=cache.w?.j?.daily||{};
+ const arr=k=>(h[k]||[]).filter(Number.isFinite), darr=k=>(day[k]||[]).filter(Number.isFinite);
+ const T=arr('temperature_2m'), RH=arr('relative_humidity_2m'), TD=arr('dew_point_2m'), W=arr('wind_speed_10m'), PR=arr('precipitation'), RAD=arr('shortwave_radiation'), PRES=arr('surface_pressure'), CLOUD=arr('cloud_cover');
+ const DMAX=darr('temperature_2m_max'), DMIN=darr('temperature_2m_min'), DRAIN=darr('precipitation_sum'), DSNOW=darr('snowfall_sum');
+ const pm10=(aqh.pm10||[]).filter(Number.isFinite), pm25=(aqh.pm2_5||[]).filter(Number.isFinite), dust=(aqh.dust||[]).filter(Number.isFinite), sea=(aqh.sea_salt_aerosol||[]).filter(Number.isFinite), so2=(aqh.sulphur_dioxide||[]).filter(Number.isFinite), no2=(aqh.nitrogen_dioxide||[]).filter(Number.isFinite);
+ const mean=a=>a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN, sum=a=>a.length?a.reduce((x,y)=>x+y,0):NaN, hours=(a,fn)=>a.filter(fn).length;
+ const margins=[]; for(let i=0;i<Math.min((h.temperature_2m||[]).length,(h.dew_point_2m||[]).length);i++){let a=h.temperature_2m[i],z=h.dew_point_2m[i];if(Number.isFinite(a)&&Number.isFinite(z))margins.push(a-z)}
+ const years=Math.max(0.01,(h.temperature_2m||[]).length/8760), annual=v=>Number.isFinite(v)?v/years:NaN;
+ const gust=(h.wind_gusts_10m||[]).filter(Number.isFinite).length?(h.wind_gusts_10m||[]).filter(Number.isFinite):W.map(x=>(params.gustFactor||1.5)*x);
+ const pressureKpa=Number.isFinite(b.pressureMean)?b.pressureMean/10:NaN;
+ const rhoAir=Number.isFinite(pressureKpa)?pressureKpa*1000/(287.05*((Number.isFinite(b.tavg)?b.tavg:15)+273.15)):NaN;
+ const rhoRatio=Number.isFinite(rhoAir)?rhoAir/1.225:NaN, heatLoss=Number.isFinite(rhoRatio)?100*(1-Math.pow(rhoRatio,.7)):NaN;
+ const generated=new Date().toLocaleString();
+ const level=v=>v>=70?'高':v>=40?'中':'低';
+ const lvlClass=v=>v>=70?'bad':v>=40?'mid':'ok';
+ const fmt=(v,n=1,u='')=>Number.isFinite(v)?v.toFixed(n)+u:'N/A';
+ const riskBars=topEnv.map(([k,v])=>`<div class="riskbar"><div><b>${esc(k)}</b><span>${v}/100 · ${level(v)}</span></div><i><em style="width:${v}%"></em></i></div>`).join('');
+ const scoreRows=topEnv.map(([k,v])=>`<tr><td>${esc(k)}</td><td>${v}</td><td><span class="tag ${lvlClass(v)}">${level(v)}</span></td><td>${esc(actionMap[k]||'结合设备风险进行专项复核')}</td></tr>`).join('');
+ const eqs=Object.keys(sensitivity['高温']);
+ const matrixRows=Object.entries(result.matrix).map(([env,row])=>`<tr><th>${env}</th>${eqs.map(eq=>{let v=row[eq];return `<td class="m${v>=70?'3':v>=40?'2':'1'}">${v}</td>`}).join('')}</tr>`).join('');
+ const flat=[]; Object.entries(result.matrix).forEach(([env,row])=>Object.entries(row).forEach(([eq,v])=>flat.push({env,eq,v}))); flat.sort((a,z)=>z.v-a.v);
+ const top5=flat.slice(0,5);
+ const top5Rows=top5.map((x,i)=>`<tr><td>TOP${i+1}</td><td>${x.env} × ${x.eq}</td><td>${x.v}/100</td><td>${esc(failure[x.env]||'')}</td><td>${esc(actionMap[x.env]||'')}</td></tr>`).join('');
+ const must=topEnv.filter(x=>x[1]>=70), recommend=topEnv.filter(x=>x[1]>=40&&x[1]<70), routine=topEnv.filter(x=>x[1]<40);
+ const actionCards=(title,cls,list)=>`<div class="actionGroup ${cls}"><h3>${title}</h3>${list.length?list.map(([env,v])=>`<div class="act"><b>${env} · ${v}/100</b><span>${esc(actionMap[env]||'进行专项工程复核')}</span></div>`).join(''):'<p>无。</p>'}</div>`;
+ const qualityRows=[
+  ['温度 / 湿度 / 露点 / 风 / 降雨 / 辐射 / 气压','ERA5','小时','已获取',`${cache.w?.start||''} ~ ${cache.w?.end||''}`],
+  ['日极值温度 / 日降雨 / 日降雪','ERA5','日','已获取',`${DMAX.length} 日`],
+  ['PM10 / PM2.5 / Dust / Sea Salt / SO₂ / NO₂','CAMS Global','小时',cache.aq?.ok?'已获取':'未获取',cache.aq?.ok?`近约 ${Math.round((aqh.time||[]).length/24)} 日`:'不阻断核心评估'],
+  ['海温 / 浪高 / 海流','Open-Meteo Marine','当前/近实时',cache.marine?.ok?'已获取':'未获取',cache.marine?.ok?'用于海洋环境辅助判断':'当前位置或接口暂无值'],
+  ['海拔','Open-Meteo Elevation / ERA5 fallback','点位',Number.isFinite(b.elev)?'已获取':'回退',fmt(b.elev,0,' m')]
+ ].map(r=>`<tr>${r.map(x=>`<td>${esc(x)}</td>`).join('')}</tr>`).join('');
+ const summary=`${topEnv.slice(0,4).map(x=>x[0]).join(' + ')}复合环境；重点关注${topEq.slice(0,4).map(x=>x[0]).join('、')}。`;
+ const reportConclusion=`本项目综合环境严酷度为 ${result.severity}/100，主要环境矛盾为 ${topEnv.slice(0,3).map(x=>x[0]).join('、')}；设备侧重点关注 ${topEq.slice(0,3).map(x=>x[0]).join('、')}。建议优先闭环高风险环境对应的结构防护、材料防护、热管理、密封过滤与环境控制设计，并以现场实测和专项试验对半经验模型进行校准。`;
+ return `<!doctype html><html><head><meta charset="utf-8"><title>全球风电机组环境适应性工程评估报告</title><style>
+ @page{size:A4;margin:13mm 14mm 15mm}*{box-sizing:border-box}body{font-family:Arial,'Microsoft YaHei',sans-serif;color:#16243a;font-size:9.3pt;line-height:1.5;margin:0}h1,h2,h3,p{margin-top:0}h1{font-size:24pt;color:#082b5c;letter-spacing:.5px;margin-bottom:8px}h2{font-size:15pt;color:#082b5c;border-left:5px solid #1769e0;padding-left:9px;margin:0 0 12px}h3{font-size:11pt;color:#173b6d;margin:10px 0 6px}.cover{height:250mm;display:flex;flex-direction:column;justify-content:space-between;padding:18mm 10mm 10mm}.coverTop{border-top:7px solid #0a2a59;padding-top:18mm}.coverSub{font-size:12pt;color:#667085}.coverMeta{width:78%;font-size:11pt}.coverMeta div{display:grid;grid-template-columns:100px 1fr;padding:7px 0;border-bottom:1px solid #dbe3ef}.coverMeta span{color:#667085}.coverFoot{color:#667085;border-top:1px solid #dbe3ef;padding-top:10px}.page{page-break-before:always}.section{margin-bottom:14px}.hero{background:#f2f6fc;border:1px solid #d8e3f0;border-radius:10px;padding:13px;margin-bottom:12px}.hero strong{font-size:24pt;color:#0a2a59}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.kpi{border:1px solid #d8e3f0;border-radius:8px;padding:9px;background:#fff}.kpi span{display:block;color:#667085;font-size:8.5pt}.kpi b{font-size:15pt;color:#0a2a59}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}table{width:100%;border-collapse:collapse;margin:7px 0 12px;font-size:8.7pt}th,td{border:1px solid #d3dce8;padding:5px 6px;text-align:left;vertical-align:top}th{background:#edf3fa;color:#0a2a59;font-weight:700}.small{font-size:8pt;color:#667085}.note{background:#f5f8fc;border-left:4px solid #1769e0;padding:8px 10px;margin:8px 0}.warn{background:#fff7e8;border-left:4px solid #e59b13;padding:8px 10px;margin:8px 0}.formula{font-family:'Times New Roman',serif;font-size:11pt;background:#f8fafc;border:1px solid #dfe6ef;padding:8px 10px;margin:6px 0}.tag{display:inline-block;padding:2px 7px;border-radius:10px;font-weight:700}.tag.bad{background:#feecec;color:#b42318}.tag.mid{background:#fff4d5;color:#8b6200}.tag.ok{background:#e5f7ef;color:#087a50}.riskbar{margin:7px 0}.riskbar div{display:flex;justify-content:space-between}.riskbar i{height:7px;background:#e8eef6;border-radius:10px;display:block;overflow:hidden}.riskbar em{height:100%;display:block;background:#1769e0}.matrix{font-size:7.5pt}.matrix td,.matrix th{text-align:center;padding:4px 2px}.matrix th:first-child{text-align:left}.m1{background:#edf8f3}.m2{background:#fff4d5}.m3{background:#feecee;font-weight:700}.actionGroup{border-radius:9px;padding:9px 10px;margin:8px 0;border:1px solid #dbe3ef}.actionGroup.must{border-left:5px solid #d92d20}.actionGroup.rec{border-left:5px solid #e59b13}.actionGroup.routine{border-left:5px solid #0f9d68}.act{display:grid;grid-template-columns:145px 1fr;gap:8px;padding:5px 0;border-bottom:1px dashed #dbe3ef}.act:last-child{border-bottom:0}.act span{color:#475467}.footerNote{font-size:7.7pt;color:#667085;margin-top:15px}.noBreak{page-break-inside:avoid}
+ </style></head><body>
+ <section class="cover"><div class="coverTop"><h1>全球风电机组环境适应性<br>工程评估报告</h1><div class="coverSub">Global Wind Turbine Environmental Adaptability Engineering Assessment</div></div><div class="coverMeta"><div><span>项目名称</span><b>${esc(current.name)}</b></div><div><span>项目坐标</span><b>${current.lat.toFixed(4)}, ${current.lon.toFixed(4)}</b></div><div><span>项目海拔</span><b>${Math.round(b.elev)} m</b></div><div><span>数据周期</span><b>${esc(cache.w?.start||'')} ~ ${esc(cache.w?.end||'')}</b></div><div><span>报告版本</span><b>V2.8 工程报告版</b></div><div><span>生成时间</span><b>${esc(generated)}</b></div></div><div class="coverFoot"><b>全球公开环境数据 × 物理模型 × 工程风险判定</b><br>用于项目环境适应性方案识别、风险预防与设计输入，不替代认证或现场专项试验。</div></section>
+
+ <section class="page"><h2>01 项目概况与评估结论</h2><div class="hero"><span>综合环境严酷度</span><br><strong>${result.severity}/100</strong>　<span class="tag ${lvlClass(result.severity)}">${level(result.severity)}风险</span><p style="margin:8px 0 0">${esc(summary)}</p></div><div class="kpis"><div class="kpi"><span>最高环境风险</span><b>${topEnv[0]?.[1]??'--'}</b><small>/100 · ${esc(topEnv[0]?.[0]||'')}</small></div><div class="kpi"><span>最高设备风险</span><b>${topEq[0]?.[1]??'--'}</b><small>/100 · ${esc(topEq[0]?.[0]||'')}</small></div><div class="kpi"><span>复合热管理风险</span><b>${result.composite?.thermal??'--'}</b><small>/100</small></div></div><h3>十大环境风险</h3>${riskBars}<div class="note"><b>核心工程结论：</b>${esc(reportConclusion)}</div></section>
+
+ <section class="page"><h2>02 环境数据</h2><h3>2.1 项目位置</h3><table><tr><th>项目</th><th>纬度</th><th>经度</th><th>海拔</th><th>评估时间范围</th></tr><tr><td>${esc(current.name)}</td><td>${current.lat.toFixed(4)}</td><td>${current.lon.toFixed(4)}</td><td>${Math.round(b.elev)} m</td><td>${esc(cache.w?.start||'')} ~ ${esc(cache.w?.end||'')}</td></tr></table><h3>2.2 数据源与获取状态</h3><table><tr><th>环境数据</th><th>数据源</th><th>时间粒度</th><th>状态</th><th>说明</th></tr>${qualityRows}</table><div class="note">ERA5 为全球再分析数据，用于项目级环境筛查和工程量统计；CAMS 与 Marine 为补充数据源，未获取时不阻断核心气象评估。报告将真实/再分析数据、工程估算值和半经验模型结果分开表述。</div></section>
+
+ <section class="page"><h2>03 气象环境统计</h2><h3>3.1 温度统计</h3><table><tr><th>Max</th><th>P99</th><th>P95</th><th>Mean</th><th>P5</th><th>P1</th><th>Min</th></tr><tr><td>${fmt(max(T),1,'℃')}</td><td>${fmt(q(T,.99),1,'℃')}</td><td>${fmt(q(T,.95),1,'℃')}</td><td>${fmt(mean(T),1,'℃')}</td><td>${fmt(q(T,.05),1,'℃')}</td><td>${fmt(q(T,.01),1,'℃')}</td><td>${fmt(min(T),1,'℃')}</td></tr></table><table><tr><th>高于35℃</th><th>高于40℃</th><th>高于45℃</th><th>低于0℃</th><th>低于-20℃</th><th>日温差P95</th><th>温变速率P95</th></tr><tr><td>${annual(hours(T,x=>x>35)).toFixed(0)} h/y</td><td>${annual(hours(T,x=>x>40)).toFixed(0)} h/y</td><td>${annual(hours(T,x=>x>45)).toFixed(0)} h/y</td><td>${annual(hours(T,x=>x<0)).toFixed(0)} h/y</td><td>${annual(hours(T,x=>x<-20)).toFixed(0)} h/y</td><td>${fmt(b.dayRange,1,' K')}</td><td>${fmt(b.tempRate,2,' K/h')}</td></tr></table><h3>3.2 湿度与露点</h3><table><tr><th>RH Max</th><th>RH P95</th><th>RH Mean</th><th>RH&gt;80%</th><th>RH&gt;90%</th><th>露点P95</th><th>空气-露点最小差</th></tr><tr><td>${fmt(max(RH),1,'%')}</td><td>${fmt(q(RH,.95),1,'%')}</td><td>${fmt(mean(RH),1,'%')}</td><td>${fmt(annual(hours(RH,x=>x>80)),0,' h/y')}</td><td>${fmt(annual(hours(RH,x=>x>90)),0,' h/y')}</td><td>${fmt(q(TD,.95),1,'℃')}</td><td>${fmt(min(margins),2,' K')}</td></tr></table><h3>3.3 风、降水、辐射与气压</h3><table><tr><th>平均风速</th><th>P95风速</th><th>P99风速</th><th>最大风速</th><th>P99阵风</th><th>最大阵风</th></tr><tr><td>${fmt(mean(W),1,' m/s')}</td><td>${fmt(q(W,.95),1,' m/s')}</td><td>${fmt(q(W,.99),1,' m/s')}</td><td>${fmt(max(W),1,' m/s')}</td><td>${fmt(q(gust,.99),1,' m/s')}</td><td>${fmt(max(gust),1,' m/s')}</td></tr></table><table><tr><th>年降雨</th><th>最大日降雨</th><th>P99小时降雨</th><th>最大小时降雨</th><th>年降雪</th><th>最大日降雪</th></tr><tr><td>${fmt(annual(sum(DRAIN)),0,' mm/y')}</td><td>${fmt(max(DRAIN),1,' mm/d')}</td><td>${fmt(q(PR,.99),2,' mm/h')}</td><td>${fmt(max(PR),2,' mm/h')}</td><td>${fmt(annual(sum(DSNOW)),1,' cm/y')}</td><td>${fmt(max(DSNOW),1,' cm/d')}</td></tr></table><table><tr><th>平均短波辐射</th><th>P95短波辐射</th><th>最大短波辐射</th><th>平均气压</th><th>最低气压</th><th>平均云量</th></tr><tr><td>${fmt(mean(RAD),0,' W/m²')}</td><td>${fmt(q(RAD,.95),0,' W/m²')}</td><td>${fmt(max(RAD),0,' W/m²')}</td><td>${fmt(mean(PRES)/10,1,' kPa')}</td><td>${fmt(min(PRES)/10,1,' kPa')}</td><td>${fmt(mean(CLOUD),0,'%')}</td></tr></table><div class="small">注：如数据源未提供直接阵风序列，阵风为基于10 m风速的工程估算值，并非现场实测阵风。</div></section>
+
+ <section class="page"><h2>04 十大环境风险评估</h2><table><tr><th>环境域</th><th>风险评分</th><th>等级</th><th>主要设计关注</th></tr>${scoreRows}</table><h3>风险画像</h3>${riskBars}<div class="note">风险分用于环境严酷度与工程优先级排序；工程决策应同时结合设备敏感度、暴露方式和专项物理模型结果。</div></section>
+
+ <section class="page"><h2>05 凝露风险专项分析</h2><div class="formula">金属面热容：C<sub>A</sub> = ρ · C<sub>p</sub> · δ</div><div class="formula">瞬态壁温：C<sub>A</sub> · dT<sub>s</sub>/dt = q<sub>conv</sub> + q<sub>solar</sub> − q<sub>rad</sub></div><div class="formula">凝露判定：T<sub>s</sub> ≤ T<sub>d</sub> + ΔT</div><table><tr><th>指标</th><th>结果</th><th>工程含义</th></tr><tr><td>年凝露小时</td><td>${fmt(c.annualCondHours,0,' h/y')}</td><td>金属壁面达到凝露判据的年化暴露时长</td></tr><tr><td>凝露概率</td><td>${fmt(c.condPct,2,'%')}</td><td>有效气象小时中满足凝露判据的比例</td></tr><tr><td>最大连续凝露</td><td>${fmt(c.maxRunHours,0,' h')}</td><td>单次连续湿润风险持续时间</td></tr><tr><td>最低露点裕量</td><td>${fmt(c.minMargin,2,' K')}</td><td>壁温相对露点的最不利裕量</td></tr><tr><td>年累计凝露量</td><td>${fmt(c.annualCondKgM2,2,' kg/m²·y')}</td><td>用于腐蚀/绝缘风险的相对量化输入</td></tr></table><div class="note"><b>工程影响：</b>凝露重点影响变流器、控制柜、发电机绝缘、塔筒内壁及低热惯性金属表面。建议按“监测预警—通风/除湿—密封隔离—保温/加热—验证”形成闭环。</div></section>
+
+ <section class="page"><h2>06 盐雾与腐蚀风险</h2><div class="formula">环境暴露 → 海盐气溶胶 → Cl⁻沉积 → 湿润时间 TOW → 腐蚀驱动力 → 设备风险</div><table><tr><th>指标</th><th>结果</th><th>说明</th></tr><tr><td>海盐气溶胶 P95</td><td>${fmt(s.sea95,2,' μg/m³')}</td><td>CAMS 补充环境数据</td></tr><tr><td>Cl⁻沉积速率</td><td>${fmt(s.jcl,2,' mg/m²·d')}</td><td>由气溶胶浓度与沉积模型估算</td></tr><tr><td>TOW湿润时间比例</td><td>${fmt(s.towPct,1,'%')}</td><td>反映适宜腐蚀反应的湿润暴露</td></tr><tr><td>SO₂ P95</td><td>${fmt(s.so295,1,' μg/m³')}</td><td>工业/大气腐蚀辅助因素</td></tr><tr><td>盐雾腐蚀风险</td><td>${s.score}/100</td><td>${level(s.score)}风险</td></tr></table><div class="note"><b>工程影响：</b>优先关注散热器、外露管路、紧固件、机舱/塔筒金属结构、电气连接及涂层体系。盐雾沉积结果属于工程模型值，应结合现场沉积片或专项试验校准。</div></section>
+
+ <section class="page"><h2>07 粉尘积灰与沙蚀风险</h2><div class="two"><div><h3>7.1 粉尘 / 积灰</h3><table><tr><td>PM10 平均</td><td>${fmt(d.pmMean,1,' μg/m³')}</td></tr><tr><td>PM10 P95</td><td>${fmt(d.pm95,1,' μg/m³')}</td></tr><tr><td>PM2.5 P95</td><td>${fmt(q(pm25,.95),1,' μg/m³')}</td></tr><tr><td>Dust P95</td><td>${fmt(d.dust95,1,' μg/m³')}</td></tr><tr><td>年颗粒暴露</td><td>${fmt(d.annualExposure,1,' mg·h/m³·y')}</td></tr><tr><td>过滤后年进入颗粒</td><td>${fmt(d.annualIn,2,' kg/y')}</td></tr></table></div><div><h3>7.2 沙蚀</h3><table><tr><td>叶尖/旋转特征速度</td><td>${fmt(d.vtip,1,' m/s')}</td></tr><tr><td>颗粒撞击速度</td><td>${fmt(d.vimpact,1,' m/s')}</td></tr><tr><td>年撞击质量</td><td>${fmt(d.impactMass,2,' kg/y')}</td></tr><tr><td>撞击能量</td><td>${fmt(d.impactEnergyKJ,1,' kJ/y')}</td></tr><tr><td>沙蚀指数 EI</td><td>${fmt(d.erosionIndex,2,' EI/y')}</td></tr></table></div></div><div class="warn"><b>模型边界：</b>EI 为工程半经验相对风险指标，用于项目间比较、部件筛查和试验输入，不直接等同于材料寿命。颗粒粒径谱、硬度、撞击角和材料耐蚀/耐磨性能应通过专项试验进一步校准。</div></section>
+
+ <section class="page"><h2>08 高海拔与热管理</h2><div class="formula">空气密度：ρ = p / (R · T)</div><div class="formula">对流/风冷能力按空气密度变化进行工程修正，用于识别高海拔冷却裕量损失。</div><table><tr><th>海拔</th><th>平均气压</th><th>平均空气密度</th><th>相对海平面密度</th><th>估算散热能力衰减</th><th>高海拔风险</th></tr><tr><td>${fmt(b.elev,0,' m')}</td><td>${fmt(pressureKpa,1,' kPa')}</td><td>${fmt(rhoAir,3,' kg/m³')}</td><td>${fmt(rhoRatio*100,1,'%')}</td><td>${fmt(heatLoss,1,'%')}</td><td>${result.scores['高海拔']}/100</td></tr></table><div class="note"><b>工程影响：</b>重点复核风冷散热器、发电机、变流器、变压器及电气绝缘裕量；必要时提升换热面积、风机能力或采用液冷架构。</div></section>
+
+ <section class="page"><h2>09 强降雨、冰雪与极端风</h2><table><tr><th>类别</th><th>关键数据</th><th>风险评分</th><th>主要工程影响</th></tr><tr><td>强降雨</td><td>最大日 ${fmt(b.rainMax,1,' mm/d')}；P99小时 ${fmt(b.rainP99h,2,' mm/h')}</td><td>${result.scores['强降雨']}/100</td><td>进水、防护等级、排水、风驱雨路径</td></tr><tr><td>冰雪</td><td>最大日降雪 ${fmt(b.snowMax,1,' cm/d')}；冻融 ${fmt(b.freezeThawAnnual,0,' 次/y')}</td><td>${result.scores['冰雪']}/100</td><td>叶片覆冰、冷却器堵塞、结构积雪、冻融损伤</td></tr><tr><td>极端风</td><td>P99阵风 ${fmt(b.gust99,1,' m/s')}；最大估算阵风 ${fmt(max(gust),1,' m/s')}</td><td>${result.scores['极端风']}/100</td><td>叶片、偏航、变桨、塔筒及外露设备载荷</td></tr></table><div class="small">台风轨迹、雷电、覆冰/冻雨等专业数据库尚未接入时，报告不以缺失数据替代结论，应在项目专项评审中补充。</div></section>
+
+ <section class="page"><h2>10 环境 × 设备风险矩阵</h2><table class="matrix"><tr><th>环境</th>${eqs.map(e=>`<th>${e}</th>`).join('')}</tr>${matrixRows}</table><h3>TOP 5 工程风险组合</h3><table><tr><th>排序</th><th>环境 × 设备</th><th>风险</th><th>典型失效链</th><th>设计关注</th></tr>${top5Rows}</table><div class="note">矩阵用于把“环境严酷度”转化为“具体设备风险”，优先级高于单纯环境分值排序。</div></section>
+
+ <section class="page"><h2>11 工程决策建议</h2>${actionCards('必须采取','must',must)}${actionCards('建议采取','rec',recommend)}${actionCards('常规设计 / 保留验证','routine',routine)}<h3>设备侧优先级</h3><table><tr><th>设备</th><th>综合风险</th><th>建议</th></tr>${topEq.map(([eq,v])=>`<tr><td>${eq}</td><td>${v}/100</td><td>${v>=70?'优先形成差异化设计与专项验证':v>=40?'进行环境适配复核并明确验证边界':'常规设计覆盖，保留证据链'}</td></tr>`).join('')}</table></section>
+
+ <section class="page"><h2>12 综合工程结论</h2><div class="hero"><h3>项目环境属性</h3><p>${esc(summary)}</p><h3>主要环境风险</h3><p>${topEnv.slice(0,5).map((x,i)=>`${i+1}. ${x[0]} ${x[1]}/100`).join('　')}</p><h3>重点影响设备</h3><p>${topEq.slice(0,5).map((x,i)=>`${i+1}. ${x[0]} ${x[1]}/100`).join('　')}</p><h3>总体设计建议</h3><p>${esc(reportConclusion)}</p></div><h3>模型与数据适用边界</h3><div class="warn">本报告用于工程设计前期环境识别、风险预防、差异化配置和验证策划。ERA5/CAMS 等属于公开再分析或模型数据；盐雾沉积、沙蚀 EI、阵风估算、凝露量等为工程模型结果。正式设计冻结、认证或寿命结论应结合项目现场实测、材料数据、供应商边界和专项试验进行校准。</div><div class="footerNote">报告版本：V2.8 工程报告版 · ${esc(generated)}</div></section>
+ </body></html>`
+}'''
+
+          pat=r"function reportHtml\(\)\{.*?\nfunction exportPDF\(\)"
+          if not re.search(pat,s,flags=re.S):
+              raise SystemExit('reportHtml block not found')
+          s=re.sub(pat,new_report+'\nfunction exportPDF()',s,count=1,flags=re.S)
+
+          # Static assertions
+          assert '<h2>02 环境数据</h2>' in s
+          assert '<h2>07 工程决策建议</h2>' in s
+          assert '<label>设计能力满足率</label>' not in s
+          report=s[s.index('function reportHtml()'):s.index('function exportPDF()')]
+          assert '管理员参数快照' not in report
+          assert '设计能力满足率' not in report
+          assert '12 综合工程结论' in report
+          assert 'TOP 5 工程风险组合' in report
+
+          p.write_text(s,encoding='utf-8')
+          print('PATCH_OK',len(s),len(report))
+          PY
+      - name: Commit patch
+        shell: bash
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No changes"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Refine V2.8 UI and detailed engineering report"
+          git push
