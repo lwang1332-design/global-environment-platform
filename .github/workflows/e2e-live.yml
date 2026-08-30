@@ -34,41 +34,52 @@ jobs:
           cat > e2e.mjs <<'JS'
           import { chromium } from 'playwright';
           const browser = await chromium.launch({headless:true});
-          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=mobile-map-'+Date.now();
+          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=dashboard-0107-'+Date.now();
+          const expected=['01 项目定位','02 项目综合信息','03 环境数据','04 环境风险画像','05 物理模型实时计算结果','06 环境 × 设备风险矩阵','07 工程决策建议'];
 
           const page = await browser.newPage({viewport:{width:1440,height:1000}});
           page.on('console', m=>console.log('DESKTOP',m.type(),m.text()));
           page.on('pageerror', e=>console.log('PAGEERROR',e.message));
-          let resp;
-          for(let i=0;i<12;i++){
+          let resp, headings=[];
+          for(let i=0;i<6;i++){
             resp=await page.goto(url+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
-            await page.waitForTimeout(3000);
-            const ready=await page.evaluate(()=>{
-              const body=document.body?.innerText||'';
+            await page.waitForTimeout(2500);
+            const ready=await page.evaluate((expected)=>{
+              const hs=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
               const src=document.documentElement?.innerHTML||'';
-              return body.includes('02 环境数据') && body.includes('07 工程决策建议') && !!document.querySelector('#pdfReport') && !document.querySelector('#wordReport') && src.includes('<th>核心数据</th>') && src.includes('温度 / 露点时序') && !!document.querySelector('.osmCompatMap');
-            });
+              return JSON.stringify(hs)===JSON.stringify(expected) && !!document.querySelector('#pdfReport') && !document.querySelector('#wordReport') && src.includes('<th>核心数据</th>') && src.includes('温度 / 露点时序') && !!document.querySelector('.osmCompatMap');
+            },expected);
             if(ready) break;
-            await page.waitForTimeout(6000);
+            await page.waitForTimeout(3500);
           }
           console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
+          headings=await page.evaluate(()=>[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim()));
+          if(JSON.stringify(headings)!==JSON.stringify(expected)) throw new Error('Dashboard 01-07 sequence invalid: '+JSON.stringify(headings));
           const body0=await page.locator('body').innerText();
-          if(!body0.includes('02 环境数据')) throw new Error('02 title not updated');
-          if(!body0.includes('07 工程决策建议')) throw new Error('07 title not updated');
+          if(!body0.includes('02 项目综合信息')) throw new Error('02 项目综合信息 missing');
+          if(!body0.includes('03 环境数据')) throw new Error('03 环境数据 missing');
+          if(!body0.includes('04 环境风险画像')) throw new Error('04 环境风险画像 missing');
+          if(!body0.includes('07 工程决策建议')) throw new Error('07 工程决策建议 missing');
+          if(body0.includes('04 项目综合结论')) throw new Error('Old 项目综合结论 heading still visible');
           if(body0.includes('设计能力满足率')) throw new Error('Design capability satisfaction rate still visible');
           if(await page.locator('#pdfReport').count()!==1) throw new Error('PDF button missing');
           if(await page.locator('#wordReport').count()!==0) throw new Error('Word button should be hidden from web UI');
+          if(await page.locator('.riskActual').count()<10) throw new Error('Risk rows missing compact true-data text');
 
-          await page.waitForFunction(()=>document.querySelectorAll('.osmTile').length>=4,{timeout:30000});
+          await page.waitForFunction(()=>{
+            const tiles=[...document.querySelectorAll('.osmTile')];
+            return tiles.filter(x=>x.complete&&x.naturalWidth>0).length>=4 || !!document.querySelector('.embeddedWorldMap');
+          },{timeout:30000});
           const desktopMap=await page.evaluate(()=>({
             map:!!document.querySelector('.osmCompatMap'),
             tiles:document.querySelectorAll('.osmTile').length,
             loaded:[...document.querySelectorAll('.osmTile')].filter(x=>x.complete && x.naturalWidth>0).length,
-            marker:!!document.querySelector('.osmMarker'),
+            embedded:!!document.querySelector('.embeddedWorldMap'),
+            marker:!!document.querySelector('.osmMarker') || !!document.querySelector('.embeddedWorldMap svg circle'),
             box:document.querySelector('#map')?.getBoundingClientRect().toJSON?.()||null
           }));
           console.log('DESKTOP_MAP_CHECK',desktopMap);
-          if(!desktopMap.map || desktopMap.tiles<4 || !desktopMap.marker) throw new Error('Desktop OSM tile map not initialized');
+          if(!desktopMap.map || (!desktopMap.embedded && desktopMap.loaded<4) || !desktopMap.marker) throw new Error('Desktop map not initialized');
 
           await page.locator('#query').fill('30.5085,47.7804');
           await page.locator('#years').selectOption('1');
@@ -111,10 +122,10 @@ jobs:
           mobile.on('console', m=>console.log('MOBILE',m.type(),m.text()));
           mobile.on('pageerror', e=>console.log('MOBILE_PAGEERROR',e.message));
           let mobileOk=false, mobileCheck=null;
-          for(let i=0;i<12;i++){
+          for(let i=0;i<6;i++){
             await mobile.goto(url+'&mobile=1&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
-            await mobile.waitForTimeout(3000);
-            mobileCheck=await mobile.evaluate(()=>{
+            await mobile.waitForTimeout(2500);
+            mobileCheck=await mobile.evaluate((expected)=>{
               const card=document.querySelector('.mapCard');
               const wrap=document.querySelector('.mapWrap');
               const map=document.querySelector('#map');
@@ -122,6 +133,7 @@ jobs:
               const overlay=document.querySelector('.mapOverlay');
               const tiles=[...document.querySelectorAll('.osmTile')];
               const rect=map?.getBoundingClientRect();
+              const hs=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
               return {
                 cardH:card?.getBoundingClientRect().height||0,
                 wrapH:wrap?.getBoundingClientRect().height||0,
@@ -130,16 +142,18 @@ jobs:
                 visible:!!compat && getComputedStyle(compat).display!=='none',
                 tiles:tiles.length,
                 loadedTiles:tiles.filter(x=>x.complete && x.naturalWidth>0).length,
-                marker:!!document.querySelector('.osmMarker'),
+                embedded:!!document.querySelector('.embeddedWorldMap'),
+                marker:!!document.querySelector('.osmMarker') || !!document.querySelector('.embeddedWorldMap svg circle'),
                 overlay:overlay?.innerText||'',
-                overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none'
+                overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none',
+                orderOK:JSON.stringify(hs)===JSON.stringify(expected)
               };
-            });
+            },expected);
             console.log('MOBILE_MAP_CHECK',mobileCheck);
-            if(mobileCheck.visible && mobileCheck.mapH>=300 && mobileCheck.mapW>=300 && mobileCheck.tiles>=4 && mobileCheck.marker && mobileCheck.overlayVisible && mobileCheck.overlay.includes('Basra')) {mobileOk=true;break;}
-            await mobile.waitForTimeout(5000);
+            if(mobileCheck.visible && mobileCheck.mapH>=300 && mobileCheck.mapW>=300 && (mobileCheck.loadedTiles>=4||mobileCheck.embedded) && mobileCheck.marker && mobileCheck.overlayVisible && mobileCheck.overlay.includes('Basra') && mobileCheck.orderOK) {mobileOk=true;break;}
+            await mobile.waitForTimeout(3500);
           }
-          if(!mobileOk) throw new Error('Mobile map/card/overlay layout invalid: '+JSON.stringify(mobileCheck));
+          if(!mobileOk) throw new Error('Mobile map/card/order/overlay layout invalid: '+JSON.stringify(mobileCheck));
           await mobile.close();
           await browser.close();
           JS
