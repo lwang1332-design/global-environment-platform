@@ -1,0 +1,39 @@
+{
+  "schema": 1,
+  "format": "xyz",
+  "projection": "EPSG:3857",
+  "tileSize": 256,
+  "extension": "png",
+  "tiers": {
+    "global": {
+      "id": "global",
+      "label": "全球低精度",
+      "minZoom": 2,
+      "maxZoom": 5,
+      "coverage": "world",
+      "template": "./tiles/global/{z}/{x}/{y}.png"
+    },
+    "china": {
+      "id": "china",
+      "label": "中国中精度",
+      "minZoom": 6,
+      "maxZoom": 9,
+      "bbox": [73.0, 18.0, 135.0, 54.0],
+      "template": "./tiles/china/{z}/{x}/{y}.png"
+    }
+  },
+  "projectPolicy": {
+    "label": "项目区域高精度",
+    "minZoom": 10,
+    "maxZoom": 13,
+    "recommendedRadiusKm": 100,
+    "template": "./tiles/projects/{projectId}/{z}/{x}/{y}.png"
+  },
+  "projects": [],
+  "fallback": {
+    "chinaOnline": ["tdt", "local", "osm"],
+    "globalOnline": ["local", "osm"],
+    "projectOnline": ["local", "tdt", "osm"],
+    "offline": ["local"]
+  }
+}
