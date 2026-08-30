@@ -11,6 +11,7 @@
       "minZoom": 2,
       "maxZoom": 5,
       "coverage": "world",
+      "installed": false,
       "template": "./tiles/global/{z}/{x}/{y}.png"
     },
     "china": {
@@ -19,6 +20,7 @@
       "minZoom": 6,
       "maxZoom": 9,
       "bbox": [73.0, 18.0, 135.0, 54.0],
+      "installed": false,
       "template": "./tiles/china/{z}/{x}/{y}.png"
     }
   },
@@ -31,9 +33,9 @@
   },
   "projects": [],
   "fallback": {
-    "chinaOnline": ["tdt", "local", "osm"],
-    "globalOnline": ["local", "osm"],
-    "projectOnline": ["local", "tdt", "osm"],
+    "chinaOnline": ["tdt", "osm"],
+    "globalOnline": ["osm"],
+    "projectOnline": ["tdt", "osm"],
     "offline": ["local"]
   }
 }
