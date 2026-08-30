@@ -150,38 +150,21 @@ function resetAdminParams(){params=Object.assign({},DEFAULT_PARAMS);localStorage
 
 let map={setView(){},invalidateSize(){},on(){}},marker={setLatLng(){},bindPopup(){return this},openPopup(){return this}};
 const mapEl=$('map');
-let mapReady=false, mapLoadStarted=false;
-function mapFallback(msg='地图服务暂不可用，不影响环境数据查询与计算'){
+function osmEmbedUrl(lat=20,lon=15,zoom=2){
+ const d=zoom<=2?80:zoom<=4?25:zoom<=6?8:2;
+ const left=Math.max(-180,lon-d), right=Math.min(180,lon+d), bottom=Math.max(-85,lat-d*.65), top=Math.min(85,lat+d*.65);
+ return `https://www.openstreetmap.org/export/embed.html?bbox=${encodeURIComponent(left+','+bottom+','+right+','+top)}&layer=mapnik&marker=${encodeURIComponent(lat+','+lon)}`;
+}
+function renderOsmMap(lat=20,lon=15,name='全球项目位置',zoom=2){
  if(!mapEl)return;
- mapEl.innerHTML=`<div style="height:100%;display:grid;place-items:center;background:linear-gradient(135deg,#eef4fb,#f8fbff);color:#667085;text-align:center;padding:16px;box-sizing:border-box"><div><b style="color:#0a2a59">全球项目位置</b><br><span style="font-size:11px">${msg}</span></div></div>`;
+ const src=osmEmbedUrl(lat,lon,zoom);
+ mapEl.innerHTML=`<div style="height:100%;position:relative;background:#eef4fb;overflow:hidden"><iframe id="osmFrame" title="${name}" src="${src}" style="border:0;width:100%;height:100%;display:block" loading="eager" referrerpolicy="no-referrer-when-downgrade"></iframe><div style="position:absolute;left:8px;bottom:8px;z-index:2;background:rgba(255,255,255,.92);border:1px solid #e3e8f0;border-radius:7px;padding:4px 7px;font-size:9px;color:#0a2a59;pointer-events:none"><b>${name}</b><br>${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)}</div></div>`;
 }
-function loadCss(href){return new Promise((res,rej)=>{let l=document.createElement('link');l.rel='stylesheet';l.href=href;l.onload=res;l.onerror=rej;document.head.appendChild(l)})}
-function loadJs(src){return new Promise((res,rej)=>{let x=document.createElement('script');x.src=src;x.async=true;x.onload=res;x.onerror=rej;document.head.appendChild(x)})}
-async function initMap(){
- if(mapLoadStarted||!mapEl)return; mapLoadStarted=true;
- mapFallback('正在加载 OpenStreetMap…');
- const cdns=[
-  ['https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css','https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js'],
-  ['https://unpkg.com/leaflet@1.9.4/dist/leaflet.css','https://unpkg.com/leaflet@1.9.4/dist/leaflet.js']
- ];
- let ok=false;
- for(const [css,js] of cdns){try{if(!window.L){await loadCss(css);await loadJs(js)};if(window.L){ok=true;break}}catch(e){}}
- if(!ok){mapFallback();return}
- try{
-  mapEl.innerHTML='';
-  map=L.map(mapEl,{zoomControl:true,attributionControl:true,worldCopyJump:true}).setView([20,15],2);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:18,attribution:'© OpenStreetMap contributors',crossOrigin:true}).addTo(map);
-  marker=L.circleMarker([20,15],{radius:7,weight:3,color:'#1769e0',fillColor:'#ffffff',fillOpacity:1}).addTo(map).bindPopup('项目位置');
-  mapReady=true;
-  setTimeout(()=>map.invalidateSize(),100);
- }catch(e){mapFallback()}
-}
-initMap();
 function updateMapLocation(lat,lon,name){
- if(!mapReady||!window.L)return;
- try{map.setView([lat,lon],Math.abs(lat)>70?5:6,{animate:true});marker.setLatLng([lat,lon]).bindPopup(`<b>${name||'项目位置'}</b><br>${Number(lat).toFixed(4)}, ${Number(lon).toFixed(4)}`).openPopup();setTimeout(()=>map.invalidateSize(),80)}catch(e){}
+ if(!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon)))return;
+ renderOsmMap(Number(lat),Number(lon),name||'项目位置',6);
 }
-
+renderOsmMap();
 async function locate(s){let m=s.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*$/);if(m)return{lat:+m[1],lon:+m[2],name:`${(+m[1]).toFixed(4)}, ${(+m[2]).toFixed(4)}`};let j=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(s)+'&count=1&language=zh').then(r=>r.json());if(!j.results?.length)throw Error('未找到地点');let x=j.results[0];return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}}
 async function elev(lat,lon){try{let r=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`);if(!r.ok)throw Error();let j=await r.json();return j.elevation?.[0]??NaN}catch{return NaN}}
 async function weather(lat,lon,years){
