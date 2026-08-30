@@ -1,6 +1,7 @@
 from pathlib import Path
 import re
 
+# Integration version: tiered-offline-map-v1
 idx=Path('index.html')
 s=idx.read_text(encoding='utf-8')
 
