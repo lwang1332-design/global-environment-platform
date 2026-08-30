@@ -14,6 +14,11 @@ if '.osmCompatMap{' not in s:
         raise SystemExit('CSS map anchor not found')
     s = s.replace(anchor, anchor + compat_css, 1)
 
+# A later legacy mobile rule was overriding the compatibility height to 222px.
+# Make the final mobile rule authoritative so Feishu/Lark WebView gets a stable visible map.
+s = s.replace('#map{height:222px}.mapWrap{height:222px}.mapOverlay{font-size:9px}', '#map{height:310px!important;min-height:310px}.mapWrap{height:310px!important;min-height:310px}.mapOverlay{font-size:9px}', 1)
+s = s.replace('.mapCard{order:1;height:260px;min-height:260px}', '.mapCard{order:1;height:348px;min-height:348px}', 1)
+
 if 'function osmWorldPixel' not in s:
     old_start = s.find('let map={setView')
     old_end = s.find('renderOsmMap();', old_start)
@@ -57,6 +62,8 @@ if 'openstreetmap.org/export/embed.html' in s or 'id="osmFrame"' in s:
     raise SystemExit('iframe map still present after patch')
 if 'tile.openstreetmap.org' not in s or '.osmCompatMap{' not in s:
     raise SystemExit('tile map patch incomplete')
+if '#map{height:222px}' in s:
+    raise SystemExit('legacy 222px mobile map override still present')
 
 p.write_text(s, encoding='utf-8')
 print('Feishu-compatible iframe-free map patch applied')
