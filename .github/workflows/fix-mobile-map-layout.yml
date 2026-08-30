@@ -68,4 +68,10 @@ jobs:
           git add index.html .github/workflows/e2e-live.yml
           git diff --cached --quiet && exit 0
           git commit -m 'Fix mobile OSM map height and add mobile E2E check'
-          git push
+          for i in 1 2 3 4 5; do
+            git pull --rebase origin main || { git rebase --abort || true; sleep 2; continue; }
+            git push && exit 0
+            sleep 3
+          done
+          echo 'push retry exhausted' >&2
+          exit 1
