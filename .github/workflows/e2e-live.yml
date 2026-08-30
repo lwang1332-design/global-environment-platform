@@ -29,7 +29,7 @@ jobs:
           assert len(j['hourly']['temperature_2m'])>0
           print('ERA5_OK', len(j['hourly']['temperature_2m']), j['hourly']['temperature_2m'][:3])
           PY
-      - name: Browser map and calculation check
+      - name: Browser V2.8 map calculation and report check
         run: |
           cat > e2e.mjs <<'JS'
           import { chromium } from 'playwright';
@@ -37,10 +37,20 @@ jobs:
           const page = await browser.newPage({viewport:{width:1440,height:1000}});
           page.on('console', m=>console.log('BROWSER',m.type(),m.text()));
           page.on('pageerror', e=>console.log('PAGEERROR',e.message));
-          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e='+Date.now();
-          const resp=await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=v28-'+Date.now();
+          let resp;
+          for(let i=0;i<6;i++){
+            resp=await page.goto(url+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
+            await page.waitForTimeout(4000);
+            const body=await page.locator('body').innerText();
+            if(body.includes('V2.8') && await page.locator('#pdfReport').count()) break;
+            await page.waitForTimeout(7000);
+          }
           console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
-          await page.waitForTimeout(5000);
+          const body0=await page.locator('body').innerText();
+          if(!body0.includes('V2.8')) throw new Error('V2.8 not deployed yet');
+          if(await page.locator('#pdfReport').count()!==1 || await page.locator('#wordReport').count()!==1) throw new Error('Report buttons missing');
+          if(await page.locator('#p_saltVd').count()!==1 || await page.locator('#p_filterBypass').count()!==1 || await page.locator('#p_condDtMin').count()!==1) throw new Error('V2.8 admin parameters missing');
           const frame=page.locator('#osmFrame');
           const mapCount=await frame.count();
           const mapSrc=mapCount?await frame.getAttribute('src'):'';
@@ -52,12 +62,19 @@ jobs:
           await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败');},{timeout:180000});
           const status=await page.locator('#status').textContent();
           console.log('FINAL_STATUS',status);
-          const mapSrcAfter=await page.locator('#osmFrame').getAttribute('src');
-          console.log('MAP_UPDATED',mapSrcAfter?.includes('30.5085') && mapSrcAfter?.includes('47.7804'));
-          const body=await page.locator('body').innerText();
           if(!status.includes('真实数据计算完成')) throw new Error('Calculation failed: '+status);
-          if(body.includes('NaN')) throw new Error('NaN found in rendered output');
+          const mapSrcAfter=await page.locator('#osmFrame').getAttribute('src');
           if(!(mapSrcAfter?.includes('30.5085') && mapSrcAfter?.includes('47.7804'))) throw new Error('Map did not move to project coordinates');
+          const reportCheck=await page.evaluate(()=>{
+            const html=reportHtml();
+            return {len:html.length, title:html.includes('全球风电机组环境适应性工程评估报告'), v28:html.includes('V2.8'), filter:Number.isFinite(result?.dust?.penetration), dt:result?.condensation?.params?.dt_min};
+          });
+          console.log('REPORT_CHECK',reportCheck);
+          if(!reportCheck.title || !reportCheck.v28 || reportCheck.len<5000) throw new Error('Engineering report generation invalid');
+          if(!reportCheck.filter) throw new Error('Filter penetration result missing');
+          if(reportCheck.dt!==10) throw new Error('Condensation substep default not applied');
+          const body=await page.locator('body').innerText();
+          if(body.includes('NaN')) throw new Error('NaN found in rendered output');
           await browser.close();
           JS
           node e2e.mjs
