@@ -28,3 +28,4 @@ jobs:
           git add index.html
           git commit -m "Upgrade map to Tianditu and local open-source dual source"
           git push
+# trigger: dual-map-v1
