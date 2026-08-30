@@ -15,6 +15,18 @@ jobs:
       - uses: actions/checkout@v4
       - name: Fix Feishu mobile map compatibility
         run: python tools/fix_feishu_map.py
+      - name: Repair dual-source patch regex
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('tools/upgrade_dual_map.py')
+          s=p.read_text(encoding='utf-8')
+          lines=s.splitlines()
+          for i,line in enumerate(lines):
+              if line.startswith('pattern=r"let mapState='):
+                  lines[i]=line.replace('\\\\','\\')
+          p.write_text('\n'.join(lines)+'\n',encoding='utf-8')
+          PY
       - name: Upgrade to Tianditu and local open-source dual map
         run: python tools/upgrade_dual_map.py
       - name: Remove report logo and restore compact top margin
@@ -43,6 +55,6 @@ jobs:
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add index.html
+          git add index.html tools/upgrade_dual_map.py
           git diff --cached --quiet || git commit -m 'Upgrade map to Tianditu and local open-source dual source'
           git push
