@@ -1,0 +1,35 @@
+name: Run V2.8 Report Patch
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/v28-report-trigger.txt"
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Extract and run patch
+        shell: bash
+        run: |
+          sed -n "/python - <<'PY'/,/^          PY$/p" .github/workflows/patch-v28-report-v2.yml | sed '1d;$d;s/^          //' > /tmp/v28_patch.py
+          python /tmp/v28_patch.py
+      - name: Commit patch
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if git diff --quiet -- index.html; then
+            echo "No index changes"
+            exit 0
+          fi
+          git add index.html
+          git commit -m "Refine V2.8 UI and detailed engineering report"
+          git push
