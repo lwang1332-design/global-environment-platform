@@ -1,0 +1,46 @@
+name: Upgrade Tiered Offline Map
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/upgrade_tiered_offline_map.py"
+      - ".github/workflows/upgrade-tiered-offline-map.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply three-tier offline map integration
+        run: python tools/upgrade_tiered_offline_map.py
+      - name: Validate map architecture files
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import json
+          s=Path('index.html').read_text(encoding='utf-8')
+          sw=Path('sw.js').read_text(encoding='utf-8')
+          js=Path('map-tier.js').read_text(encoding='utf-8')
+          m=json.loads(Path('tiles/manifest.json').read_text(encoding='utf-8'))
+          assert './map-tier.js' in s
+          assert '天地图 + 三级离线地图' in s
+          assert '全球低精度' in js and '中国中精度' in js and '项目区域高精度' in js
+          assert m['tiers']['global']['maxZoom']==5
+          assert m['tiers']['china']['maxZoom']==9
+          assert m['projectPolicy']['maxZoom']==13
+          assert './tiles/manifest.json' in sw
+          print('OFFLINE_MAP_ARCH_OK')
+          PY
+      - name: Commit integration
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html sw.js
+          git diff --cached --quiet || git commit -m 'Integrate global China project three-tier offline map'
+          git push
