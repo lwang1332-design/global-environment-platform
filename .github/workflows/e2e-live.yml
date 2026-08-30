@@ -40,22 +40,24 @@ jobs:
           const url='https://lwang1332-design.github.io/global-environment-platform/?e2e='+Date.now();
           const resp=await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
           console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
-          await page.waitForTimeout(3500);
-          const mapCount=await page.locator('#map .leaflet-container, #map .leaflet-pane').count();
-          console.log('MAP_READY',mapCount>0);
-          if(mapCount===0) throw new Error('Interactive map not initialized');
+          await page.waitForTimeout(5000);
+          const frame=page.locator('#osmFrame');
+          const mapCount=await frame.count();
+          const mapSrc=mapCount?await frame.getAttribute('src'):'';
+          console.log('MAP_READY',mapCount>0,'MAP_SRC',mapSrc);
+          if(mapCount===0 || !mapSrc?.includes('openstreetmap.org/export/embed.html')) throw new Error('OSM iframe map not initialized');
           await page.locator('#query').fill('30.5085,47.7804');
           await page.locator('#years').selectOption('1');
           await page.locator('#go').click();
           await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败');},{timeout:180000});
           const status=await page.locator('#status').textContent();
           console.log('FINAL_STATUS',status);
-          const markerCount=await page.locator('#map .leaflet-marker-pane, #map .leaflet-overlay-pane svg').count();
-          console.log('MAP_MARKER',markerCount>0);
+          const mapSrcAfter=await page.locator('#osmFrame').getAttribute('src');
+          console.log('MAP_UPDATED',mapSrcAfter?.includes('30.5085') && mapSrcAfter?.includes('47.7804'));
           const body=await page.locator('body').innerText();
           if(!status.includes('真实数据计算完成')) throw new Error('Calculation failed: '+status);
           if(body.includes('NaN')) throw new Error('NaN found in rendered output');
-          if(markerCount===0) throw new Error('Map marker not rendered');
+          if(!(mapSrcAfter?.includes('30.5085') && mapSrcAfter?.includes('47.7804'))) throw new Error('Map did not move to project coordinates');
           await browser.close();
           JS
           node e2e.mjs
