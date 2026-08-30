@@ -29,7 +29,7 @@ jobs:
           assert len(j['hourly']['temperature_2m'])>0
           print('ERA5_OK', len(j['hourly']['temperature_2m']), j['hourly']['temperature_2m'][:3])
           PY
-      - name: Browser V2.8 detailed report check
+      - name: Browser V2.8 report curves and toolbar check
         run: |
           cat > e2e.mjs <<'JS'
           import { chromium } from 'playwright';
@@ -37,13 +37,13 @@ jobs:
           const page = await browser.newPage({viewport:{width:1440,height:1000}});
           page.on('console', m=>console.log('BROWSER',m.type(),m.text()));
           page.on('pageerror', e=>console.log('PAGEERROR',e.message));
-          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=reportv2-'+Date.now();
+          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=reportv3-'+Date.now();
           let resp;
           for(let i=0;i<8;i++){
             resp=await page.goto(url+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
             await page.waitForTimeout(4000);
             const body=await page.locator('body').innerText();
-            if(body.includes('02 环境数据') && body.includes('07 工程决策建议') && await page.locator('#pdfReport').count()) break;
+            if(body.includes('02 环境数据') && body.includes('07 工程决策建议') && await page.locator('#pdfReport').count()===1 && await page.locator('#wordReport').count()===0) break;
             await page.waitForTimeout(6000);
           }
           console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
@@ -51,7 +51,8 @@ jobs:
           if(!body0.includes('02 环境数据')) throw new Error('02 title not updated');
           if(!body0.includes('07 工程决策建议')) throw new Error('07 title not updated');
           if(body0.includes('设计能力满足率')) throw new Error('Design capability satisfaction rate still visible');
-          if(await page.locator('#pdfReport').count()!==1 || await page.locator('#wordReport').count()!==1) throw new Error('Report buttons missing');
+          if(await page.locator('#pdfReport').count()!==1) throw new Error('PDF button missing');
+          if(await page.locator('#wordReport').count()!==0) throw new Error('Word button should be hidden from web UI');
           const frame=page.locator('#osmFrame');
           const mapSrc=await frame.getAttribute('src');
           if(!mapSrc?.includes('openstreetmap.org/export/embed.html')) throw new Error('OSM iframe map not initialized');
@@ -67,7 +68,11 @@ jobs:
             return {
               len:html.length,
               title:html.includes('全球风电机组环境适应性工程评估报告'),
-              detailed:html.includes('03 气象环境统计') && html.includes('10 环境 × 设备风险矩阵') && html.includes('TOP 5 工程风险组合') && html.includes('12 综合工程结论'),
+              detailed:html.includes('03 气象环境统计') && html.includes('10 环境 × 设备风险矩阵') && html.includes('12 综合工程结论'),
+              coreData:html.includes('核心数据') && html.includes('Cl⁻') && html.includes('P99阵风'),
+              curves:html.includes('温度 / 露点时序') && html.includes('相对湿度时序') && html.includes('风速 / 阵风时序') && html.includes('小时降雨时序') && html.includes('短波辐射时序') && html.includes('表面气压时序'),
+              noEquipPriority:!html.includes('设备侧优先级'),
+              conclusionParams:html.includes('主要环境风险') && html.includes('（风险 '),
               noAdminSnapshot:!html.includes('管理员参数快照'),
               noAdaptRate:!html.includes('设计能力满足率'),
               filter:Number.isFinite(result?.dust?.penetration),
@@ -75,9 +80,12 @@ jobs:
             };
           });
           console.log('REPORT_CHECK',reportCheck);
-          if(!reportCheck.title || !reportCheck.detailed || reportCheck.len<12000) throw new Error('Detailed engineering report invalid');
-          if(!reportCheck.noAdminSnapshot) throw new Error('Admin parameter snapshot still in report');
-          if(!reportCheck.noAdaptRate) throw new Error('Design capability satisfaction rate still in report');
+          if(!reportCheck.title || !reportCheck.detailed || reportCheck.len<15000) throw new Error('Detailed engineering report invalid');
+          if(!reportCheck.coreData) throw new Error('Core environmental data missing from risk section');
+          if(!reportCheck.curves) throw new Error('Meteorological time-series curves missing');
+          if(!reportCheck.noEquipPriority) throw new Error('Equipment-side priority still present');
+          if(!reportCheck.conclusionParams) throw new Error('Conclusion environmental parameters missing');
+          if(!reportCheck.noAdminSnapshot || !reportCheck.noAdaptRate) throw new Error('Hidden report content regression');
           if(!reportCheck.filter) throw new Error('Filter penetration result missing');
           if(reportCheck.dt!==10) throw new Error('Condensation substep default not applied');
           const body=await page.locator('body').innerText();
