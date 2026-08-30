@@ -1,0 +1,41 @@
+name: Engineering UI Runtime Check
+
+on:
+  push:
+    branches: ["main"]
+  workflow_dispatch:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static JavaScript syntax check
+        run: node --check assets/ui-engineering.js
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Live runtime diagnostic
+        run: |
+          cat > runtime.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:1440,height:900}});
+          const events=[];
+          page.on('pageerror',e=>events.push('PAGEERROR '+e.message));
+          page.on('console',m=>events.push('CONSOLE '+m.type()+' '+m.text()));
+          await page.goto('https://lwang1332-design.github.io/global-environment-platform/?runtime='+Date.now(),{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForTimeout(4000);
+          console.log('SCRIPT_TAGS',await page.locator('script[src]').evaluateAll(xs=>xs.map(x=>x.getAttribute('src'))));
+          console.log('UI_DOM',await page.evaluate(()=>({summary:!!document.querySelector('#uiDecisionSummary'),model:!!document.querySelector('#uiModelWrap'),main:document.querySelector('#mainPage')?.className,ready:document.readyState})));
+          console.log(events.join('\n'));
+          if(!await page.locator('#uiDecisionSummary').count())throw new Error('Engineering UI did not initialize');
+          await browser.close();
+          JS
+          node runtime.mjs
