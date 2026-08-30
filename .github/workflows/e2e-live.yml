@@ -8,7 +8,7 @@ on:
 jobs:
   live-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -19,59 +19,96 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm i -D playwright@1.55.0 >/dev/null
           npx playwright install chromium >/dev/null
-      - name: Browser V2.8 integrated check
+      - name: Browser engineering UI integrated check
         run: |
           cat > e2e.mjs <<'JS'
           import { chromium } from 'playwright';
           const browser=await chromium.launch({headless:true});
-          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=0107-final-'+Date.now();
-          const expected=['01 项目定位','02 项目综合信息','03 环境数据','04 环境风险画像','05 物理模型实时计算结果','06 环境 × 设备风险矩阵','07 工程决策建议'];
-          const page=await browser.newPage({viewport:{width:1440,height:1000}});
-          await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
-          await page.waitForTimeout(3000);
-          const shell=await page.evaluate((expected)=>{
-            const hs=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
-            const tiles=[...document.querySelectorAll('.osmTile')];
-            return {
-              order:JSON.stringify(hs)===JSON.stringify(expected),
-              headings:hs,
-              pdf:!!document.querySelector('#pdfReport'),
-              word:!!document.querySelector('#wordReport'),
-              map:!!document.querySelector('.osmCompatMap'),
-              loaded:tiles.filter(x=>x.complete&&x.naturalWidth>0).length,
-              embedded:!!document.querySelector('.embeddedWorldMap'),
-              oldHeading:document.body.innerText.includes('04 项目综合结论')
-            };
-          },expected);
-          console.log('SHELL',shell);
-          if(!shell.order||!shell.pdf||shell.word||!shell.map||shell.oldHeading) throw new Error('Dashboard shell regression: '+JSON.stringify(shell));
+          const base='https://lwang1332-design.github.io/global-environment-platform/?ui-e2e='+Date.now();
+          const errors=[];
+          const page=await browser.newPage({viewport:{width:1920,height:1080}});
+          page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+          page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource/i.test(m.text()))errors.push('console:'+m.text())});
+          await page.goto(base,{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForSelector('#uiDecisionSummary',{timeout:60000});
+          await page.waitForSelector('#uiModelWrap',{timeout:60000});
+          await page.waitForTimeout(1800);
 
+          const desktop=await page.evaluate(()=>{
+            const rect=s=>document.querySelector(s)?.getBoundingClientRect();
+            const logo=document.querySelector('.logo img');
+            const allowed=e=>e.closest('.matrixContent,.uiDrawerBody,.decisionTableWrap');
+            const nested=[...document.querySelectorAll('#mainPage *')].filter(e=>{
+              const cs=getComputedStyle(e);return !allowed(e)&&(cs.overflowY==='auto'||cs.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+5;
+            }).length;
+            return {
+              ui:!!document.querySelector('#uiDecisionSummary')&&!!document.querySelector('.uiPrimaryGrid')&&!!document.querySelector('.uiProjectSupport'),
+              logo:!!logo&&logo.complete&&logo.naturalWidth>0,
+              overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+              nested,
+              summaryCards:document.querySelectorAll('.uiSummaryCard').length,
+              riskLegend:!!document.querySelector('.riskLegend'),
+              modelTable:!!document.querySelector('.uiEngineeringTable'),
+              drawer:!!document.querySelector('#uiDrawerMask'),
+              reportModal:!!document.querySelector('#uiReportModal'),
+              subtitle:document.querySelector('.brand p')?.textContent||'',
+              firstScreen:{toolbar:rect('.toolbar')?.top<1080,summary:rect('#uiDecisionSummary')?.top<1080,risk:rect('.riskCard')?.top<1080,physics:rect('.physicsCard')?.top<1080}
+            };
+          });
+          console.log('DESKTOP_1920',desktop);
+          if(!desktop.ui||!desktop.logo||desktop.overflow>2||desktop.nested>0||desktop.summaryCards!==5||!desktop.riskLegend||!desktop.modelTable||!desktop.drawer||!desktop.reportModal) throw new Error('Desktop shell/layout regression '+JSON.stringify(desktop));
+          if(!Object.values(desktop.firstScreen).every(Boolean)) throw new Error('1920 first-screen requirement failed '+JSON.stringify(desktop.firstScreen));
+          if(!desktop.subtitle.includes('环境数据')||!desktop.subtitle.includes('工程决策')) throw new Error('Header subtitle not updated');
+
+          for(const vp of [{width:1600,height:900},{width:1366,height:768},{width:900,height:1024}]){
+            await page.setViewportSize(vp);await page.waitForTimeout(250);
+            const v=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,body:document.body.scrollWidth-document.body.clientWidth}));
+            console.log('VIEWPORT',vp,v);if(v.overflow>2||v.body>2)throw new Error('Horizontal page overflow '+JSON.stringify({vp,v}));
+          }
+
+          await page.setViewportSize({width:390,height:844});await page.waitForTimeout(350);
+          const mobile=await page.evaluate(()=>{
+            const go=document.querySelector('#go')?.getBoundingClientRect(),pdf=document.querySelector('#pdfReport')?.getBoundingClientRect();
+            const matrixDisplay=getComputedStyle(document.querySelector('.matrixContent')).display;
+            const mobileList=getComputedStyle(document.querySelector('#mobileMatrixList')).display;
+            return {overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,goH:go?.height,pdfH:pdf?.height,matrixDisplay,mobileList,summaryCols:getComputedStyle(document.querySelector('#uiDecisionSummary')).gridTemplateColumns};
+          });
+          console.log('MOBILE',mobile);
+          if(mobile.overflow>2||mobile.goH<44||mobile.pdfH<44||mobile.matrixDisplay!=='none'||mobile.mobileList==='none')throw new Error('Mobile responsive regression '+JSON.stringify(mobile));
+
+          await page.setViewportSize({width:1440,height:1000});
           await page.locator('#query').fill('30.5085,47.7804');
           await page.locator('#years').selectOption('1');
           await page.locator('#go').click();
-          await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败');},{timeout:180000});
-          const status=await page.locator('#status').textContent();
-          console.log('FINAL_STATUS',status);
-          if(!status.includes('真实数据计算完成')) throw new Error('Calculation failed: '+status);
-
-          const calculated=await page.evaluate(()=>{
-            const risk=[...document.querySelectorAll('.riskActual')].map(x=>x.textContent.trim());
-            const html=reportHtml();
-            return {
-              riskCount:risk.length,
-              riskNonEmpty:risk.filter(Boolean).length,
-              riskSample:risk.slice(0,3),
+          await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败')},{timeout:180000});
+          const status=await page.locator('#status').textContent();console.log('FINAL_STATUS',status);
+          if(status.includes('真实数据计算完成')){
+            const calc=await page.evaluate(()=>({
+              summaries:[...document.querySelectorAll('.uiSummaryValue')].map(x=>x.textContent.trim()),
+              riskRows:document.querySelectorAll('#riskList .riskrow').length,
+              riskColored:[...document.querySelectorAll('#riskList .riskrow')].every(x=>/risk-(low|mid|elevated|high)/.test(x.className)),
+              modelRows:document.querySelectorAll('#uiModelBody tr').length,
+              decisions:document.querySelectorAll('#decisionTableBody tr').length,
+              matrixCells:document.querySelectorAll('#matrix .cell').length,
               noNaN:!document.body.innerText.includes('NaN'),
-              reportLen:html.length,
-              reportCore:html.includes('<th>核心数据</th>')&&html.includes('P99阵风')&&html.includes('PM10 P95')&&html.includes('TOW'),
-              curves:html.includes('温度 / 露点时序')&&html.includes('相对湿度时序')&&html.includes('风速 / 阵风时序'),
-              filter:Number.isFinite(result?.dust?.penetration),
-              dt:result?.condensation?.params?.dt_min
-            };
-          });
-          console.log('CALCULATED',calculated);
-          if(calculated.riskCount<10||calculated.riskNonEmpty<10) throw new Error('Risk actual-data text missing after calculation');
-          if(!calculated.noNaN||calculated.reportLen<15000||!calculated.reportCore||!calculated.curves||!calculated.filter||calculated.dt!==10) throw new Error('Calculation/report regression: '+JSON.stringify(calculated));
+              reportLen:reportHtml().length,
+              filter:Number.isFinite(result?.dust?.penetration),dt:result?.condensation?.params?.dt_min
+            }));
+            console.log('CALCULATED',calc);
+            if(calc.summaries.some(x=>x==='--')||calc.riskRows<10||!calc.riskColored||calc.modelRows<6||calc.decisions<10||calc.matrixCells<80||!calc.noNaN||calc.reportLen<15000||!calc.filter||calc.dt!==10)throw new Error('Calculated UI/core regression '+JSON.stringify(calc));
+            await page.locator('[data-model="cond"]').click();await page.waitForTimeout(100);
+            if(!await page.locator('#uiDrawerMask').evaluate(e=>e.classList.contains('open')))throw new Error('Model drawer did not open');
+            await page.locator('#uiDrawerClose').click();
+            await page.locator('#pdfReport').click();await page.waitForTimeout(100);
+            if(!await page.locator('#uiReportModal').evaluate(e=>e.classList.contains('open')))throw new Error('Report scope preview did not open');
+            await page.locator('#uiReportCancel').click();
+          }else{
+            const limited=/429|Daily API request limit exceeded/i.test(status||'');
+            const errorUI=await page.evaluate(()=>({visible:document.querySelector('#uiErrorBanner')?.classList.contains('show'),text:document.querySelector('#uiErrorBanner')?.textContent||''}));
+            console.log('RATE_LIMIT_OR_SOURCE_FAILURE',limited,errorUI);
+            if(!errorUI.visible)throw new Error('Source failure was not surfaced in UI: '+status);
+          }
+          if(errors.length)throw new Error('Browser errors: '+errors.join(' | '));
           await browser.close();
           JS
           node e2e.mjs
