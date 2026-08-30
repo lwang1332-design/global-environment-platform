@@ -484,7 +484,7 @@ function reportHtml(){
 
  <section class="page"><h2>12 综合工程结论</h2><div class="hero"><h3>项目环境属性</h3><p>${esc(summary)}</p><h3>主要环境风险</h3><p>${topEnv.slice(0,5).map((x,i)=>`${i+1}. ${x[0]}：${envCoreData[x[0]]||'N/A'}（风险 ${x[1]}/100）`).join('<br>')}</p><h3>重点影响设备</h3><p>${topEq.slice(0,5).map((x,i)=>`${i+1}. ${x[0]} ${x[1]}/100`).join('　')}</p><h3>总体设计建议</h3><p>${esc(reportConclusion)}</p></div><h3>模型与数据适用边界</h3><div class="warn">本报告用于工程设计前期环境识别、风险预防、差异化配置和验证策划。ERA5/CAMS 等属于公开再分析或模型数据；盐雾沉积、沙蚀 EI、阵风估算、凝露量等为工程模型结果。正式设计冻结、认证或寿命结论应结合项目现场实测、材料数据、供应商边界和专项试验进行校准。</div><div class="footerNote">报告版本：V2.8 工程报告版 · ${esc(generated)}</div></section>
  
-<script src="./map-tier.js"></script>
+
 </body></html>`
 }
 function exportPDF(){try{let html=reportHtml(),w=window.open('','_blank');if(!w)throw Error('浏览器拦截了报告窗口');w.document.open();w.document.write(html);w.document.close();w.focus();setTimeout(()=>w.print(),1200)}catch(e){alert(e.message)}}
@@ -511,4 +511,5 @@ window.addEventListener('online',updateOnlineState);window.addEventListener('off
 if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.serviceWorker.register('./sw.js').catch(()=>{}));}
 </script>
 <div id="offlinePill" class="offlinePill">离线模式：可打开页面，实时数据查询需联网</div>
+<script src="./map-tier.js"></script>
 </body></html>
