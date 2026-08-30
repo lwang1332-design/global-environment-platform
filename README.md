@@ -7,3 +7,4 @@
 - 管理员参数页密码：123123。
 - ERA5、CAMS、Open-Meteo Marine 等数据查询需要联网。
 - V2.7 增加真实 ERA5 分段查询、工程计算与自动 E2E 校验。
+- 地图使用 OpenStreetMap 官方嵌入式地图，不依赖 Leaflet CDN。
