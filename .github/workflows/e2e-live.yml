@@ -8,9 +8,24 @@ on:
 jobs:
   live-check:
     runs-on: ubuntu-latest
-    timeout-minutes: 12
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+      - name: Wait for GitHub Pages engineering UI
+        run: |
+          for i in $(seq 1 36); do
+            JS_URL="https://lwang1332-design.github.io/global-environment-platform/assets/ui-engineering.js?wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            HTML_URL="https://lwang1332-design.github.io/global-environment-platform/?wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            if curl -fsSL --retry 2 --max-time 20 "$JS_URL" | grep -q "Engineering Decision UI v1.0" && \
+               curl -fsSL --retry 2 --max-time 20 "$HTML_URL" | grep -q "ui-engineering.js"; then
+              echo "Engineering UI is live on GitHub Pages"
+              exit 0
+            fi
+            echo "Waiting for Pages deployment ($i/36)..."
+            sleep 10
+          done
+          echo "Engineering UI not live after waiting"
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
