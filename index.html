@@ -62,6 +62,15 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:f
 .paramNote{font-size:8px;color:#667085;line-height:1.45;margin-top:5px}.adminCard .groupTag{display:inline-block;font-size:8px;padding:2px 6px;border-radius:10px;background:#eaf1fb;color:#0a2a59;margin-left:5px}.reportHint{font-size:8px;color:#667085;margin-top:4px}
 @media(max-width:900px){.toolbar{grid-template-columns:minmax(180px,1fr) 90px 92px 84px}.reportBtn{padding:0 6px;font-size:9px}}
 @media(max-width:620px){.toolbar{grid-template-columns:1fr 84px 88px}.toolbar .reportBtn{grid-row:2}.toolbar .status{grid-column:1/-1}}
+
+/* final-mobile-map-visible-v1 */
+@media(max-width:900px){
+ .mapCard{height:360px!important;min-height:360px!important}
+ .mapCard .mapWrap{height:322px!important;min-height:322px!important;position:relative!important}
+ .mapCard #map{height:322px!important;min-height:322px!important;width:100%!important;display:block!important;background:#eef4fb}
+ .mapCard .osmCompatMap{height:322px!important;min-height:322px!important;width:100%!important;display:block!important}
+ .mapCard .mapOverlay{display:block!important;visibility:visible!important;z-index:20!important;left:8px!important;bottom:8px!important;max-width:calc(100% - 16px)!important;white-space:normal!important;pointer-events:none}
+}
 </style>
 </head>
 <body>
