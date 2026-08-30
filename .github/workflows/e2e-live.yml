@@ -37,13 +37,17 @@ jobs:
           const page = await browser.newPage({viewport:{width:1440,height:1000}});
           page.on('console', m=>console.log('BROWSER',m.type(),m.text()));
           page.on('pageerror', e=>console.log('PAGEERROR',e.message));
-          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=reportv3-'+Date.now();
+          const url='https://lwang1332-design.github.io/global-environment-platform/?e2e=reportv3-final-'+Date.now();
           let resp;
-          for(let i=0;i<8;i++){
+          for(let i=0;i<12;i++){
             resp=await page.goto(url+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
             await page.waitForTimeout(4000);
-            const body=await page.locator('body').innerText();
-            if(body.includes('02 环境数据') && body.includes('07 工程决策建议') && await page.locator('#pdfReport').count()===1 && await page.locator('#wordReport').count()===0) break;
+            const ready=await page.evaluate(()=>{
+              const body=document.body?.innerText||'';
+              const src=document.documentElement?.innerHTML||'';
+              return body.includes('02 环境数据') && body.includes('07 工程决策建议') && !!document.querySelector('#pdfReport') && !document.querySelector('#wordReport') && src.includes('<th>核心数据</th>') && src.includes('温度 / 露点时序');
+            });
+            if(ready) break;
             await page.waitForTimeout(6000);
           }
           console.log('PAGE_STATUS',resp?.status(), 'TITLE', await page.title());
@@ -69,7 +73,8 @@ jobs:
               len:html.length,
               title:html.includes('全球风电机组环境适应性工程评估报告'),
               detailed:html.includes('03 气象环境统计') && html.includes('10 环境 × 设备风险矩阵') && html.includes('12 综合工程结论'),
-              coreData:html.includes('核心数据') && html.includes('Cl⁻') && html.includes('P99阵风'),
+              coreHeader:html.includes('<th>核心数据</th>'),
+              coreParams:html.includes('P99阵风') && html.includes('TOW') && html.includes('PM10 P95'),
               curves:html.includes('温度 / 露点时序') && html.includes('相对湿度时序') && html.includes('风速 / 阵风时序') && html.includes('小时降雨时序') && html.includes('短波辐射时序') && html.includes('表面气压时序'),
               noEquipPriority:!html.includes('设备侧优先级'),
               conclusionParams:html.includes('主要环境风险') && html.includes('（风险 '),
@@ -81,7 +86,7 @@ jobs:
           });
           console.log('REPORT_CHECK',reportCheck);
           if(!reportCheck.title || !reportCheck.detailed || reportCheck.len<15000) throw new Error('Detailed engineering report invalid');
-          if(!reportCheck.coreData) throw new Error('Core environmental data missing from risk section');
+          if(!reportCheck.coreHeader || !reportCheck.coreParams) throw new Error('Core environmental data missing from risk section');
           if(!reportCheck.curves) throw new Error('Meteorological time-series curves missing');
           if(!reportCheck.noEquipPriority) throw new Error('Equipment-side priority still present');
           if(!reportCheck.conclusionParams) throw new Error('Conclusion environmental parameters missing');
