@@ -5,14 +5,45 @@ on:
     branches: ["main"]
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   check:
     runs-on: ubuntu-latest
-    timeout-minutes: 8
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
-      - name: Static JavaScript syntax check
-        run: node --check assets/ui-engineering.js
+        with:
+          fetch-depth: 0
+      - name: Repair and statically validate JavaScript
+        run: |
+          python tools/fix_engineering_ui_syntax.py
+          node --check assets/ui-engineering.js
+      - name: Commit repair when needed
+        run: |
+          if git diff --quiet -- assets/ui-engineering.js; then
+            echo "No repair commit needed"
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add assets/ui-engineering.js
+            git commit -m "Repair engineering UI JavaScript"
+            git push
+          fi
+      - name: Wait until repaired JavaScript is live
+        run: |
+          for i in $(seq 1 36); do
+            URL="https://lwang1332-design.github.io/global-environment-platform/assets/ui-engineering.js?runtime=${GITHUB_SHA}-${i}-$(date +%s)"
+            if curl -fsSL --retry 2 --max-time 20 "$URL" -o /tmp/live-ui.js && node --check /tmp/live-ui.js >/dev/null 2>&1; then
+              echo "Live engineering UI JavaScript passes syntax check"
+              exit 0
+            fi
+            echo "Waiting for repaired Pages asset ($i/36)..."
+            sleep 10
+          done
+          echo "Repaired UI did not become live in time"
+          exit 1
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -29,13 +60,14 @@ jobs:
           const page=await browser.newPage({viewport:{width:1440,height:900}});
           const events=[];
           page.on('pageerror',e=>events.push('PAGEERROR '+e.message));
-          page.on('console',m=>events.push('CONSOLE '+m.type()+' '+m.text()));
+          page.on('console',m=>{if(m.type()==='error')events.push('CONSOLE error '+m.text())});
           await page.goto('https://lwang1332-design.github.io/global-environment-platform/?runtime='+Date.now(),{waitUntil:'domcontentloaded',timeout:60000});
-          await page.waitForTimeout(4000);
+          await page.waitForTimeout(2500);
           console.log('SCRIPT_TAGS',await page.locator('script[src]').evaluateAll(xs=>xs.map(x=>x.getAttribute('src'))));
           console.log('UI_DOM',await page.evaluate(()=>({summary:!!document.querySelector('#uiDecisionSummary'),model:!!document.querySelector('#uiModelWrap'),main:document.querySelector('#mainPage')?.className,ready:document.readyState})));
           console.log(events.join('\n'));
-          if(!await page.locator('#uiDecisionSummary').count())throw new Error('Engineering UI did not initialize');
+          if(!await page.locator('#uiDecisionSummary').count()||!await page.locator('#uiModelWrap').count())throw new Error('Engineering UI did not initialize');
+          if(events.length)throw new Error('Runtime errors: '+events.join(' | '));
           await browser.close();
           JS
           node runtime.mjs
