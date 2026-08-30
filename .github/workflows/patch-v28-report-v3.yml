@@ -2,9 +2,9 @@ name: Patch V2.8 Report Curves and Core Data
 
 on:
   push:
-    branches: ["main"]
     paths:
-      - ".github/workflows/patch-v28-report-v3.yml"
+      - 'tools/patch_v28_report_v3.py'
+      - '.github/workflows/patch-v28-report-v3.yml'
   workflow_dispatch:
 
 permissions:
@@ -15,14 +15,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-      - name: Apply patch
+      - name: Apply report patch
         run: python tools/patch_v28_report_v3.py
-      - name: Commit
+      - name: Commit report patch
         run: |
-          git config user.name github-actions[bot]
-          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          if git diff --quiet; then exit 0; fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
           git commit -m "Optimize V2.8 report data and time-series curves"
           git push
