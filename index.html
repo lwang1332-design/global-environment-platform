@@ -76,6 +76,7 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:f
  .mapCard .mapOverlay{display:block!important;visibility:visible!important;z-index:20!important;left:8px!important;bottom:8px!important;max-width:calc(100% - 16px)!important;white-space:normal!important;pointer-events:none}
 }
 </style>
+<link rel="stylesheet" href="./assets/ui-engineering.css?v=20260830-ui1">
 </head>
 <body>
 <header><div class="brand"><div class="logo"><img src="./assets/goldwind-logo.png" alt="Goldwind"></div><div><h1>全球风电机组环境适应性评估平台</h1><p>Environment → Physics → Equipment → Engineering Decision</p></div></div><div style="display:flex;align-items:center"><div class="pageNav"><button class="navBtn active" id="navMain" onclick="showPage('main')">评估主页</button><button class="navBtn" id="navAdmin" onclick="openAdmin()">管理员参数</button><button class="navBtn installBtn" id="installBtn" style="display:none">安装App</button></div><div class="ver">V2.8 · 工程报告版</div></div></header>
@@ -523,4 +524,5 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.se
 </script>
 <div id="offlinePill" class="offlinePill">离线模式：可打开页面，实时数据查询需联网</div>
 <script src="./map-tier.js"></script>
+<script src="./assets/ui-engineering.js?v=20260830-ui1"></script>
 </body></html>
