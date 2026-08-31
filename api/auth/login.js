@@ -1,5 +1,5 @@
 'use strict';
-const {verifyPassword,issueToken,setCors,json}=require('../_lib/security');
+const {verifyPassword,issueToken,setCors,json}=require('../../server/lib/security');
 module.exports=async function(req,res){
   setCors(req,res);if(req.method==='OPTIONS')return json(res,204,{});if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
   try{
