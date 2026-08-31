@@ -6,6 +6,9 @@ on:
       - '.github/workflows/cockpit-ui-e2e.yml'
       - 'assets/cockpit-v29.css'
       - 'assets/cockpit-v29.js'
+      - 'assets/cockpit-v291.css'
+      - 'assets/cockpit-v291.js'
+      - 'assets/v291-admin-gate.js'
       - 'index.html'
   workflow_dispatch:
 
@@ -24,10 +27,16 @@ jobs:
       - name: Static checks
         run: |
           node --check assets/cockpit-v29.js
+          node --check assets/cockpit-v291.js
+          node --check assets/v291-admin-gate.js
           node --check assets/v29-config.js
           node --check assets/v29-joint.js
           grep -q 'cockpit-v29.css' index.html
+          grep -q 'cockpit-v291.css' index.html
           grep -q 'cockpit-v29.js' index.html
+          grep -q 'cockpit-v291.js' index.html
+          grep -q 'v291-admin-gate.js' index.html
+          ! grep -q "adminPwd').value==='123123'" index.html
       - name: Install Playwright
         run: |
           npm init -y >/dev/null 2>&1
@@ -37,7 +46,7 @@ jobs:
         run: |
           python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/cockpit-http.log 2>&1 &
           for i in $(seq 1 20); do
-            if curl -fsS http://127.0.0.1:8765/assets/cockpit-v29.js | grep -q 'Engineering Cockpit UI adapter'; then exit 0; fi
+            if curl -fsS http://127.0.0.1:8765/assets/cockpit-v291.js | grep -q 'Scientific Engineering Cockpit interactions'; then exit 0; fi
             sleep 1
           done
           cat /tmp/cockpit-http.log || true
@@ -57,9 +66,10 @@ jobs:
             await page.route('**/air-quality-api.open-meteo.com/**',r=>r.abort());
             await page.route('**/marine-api.open-meteo.com/**',r=>r.abort());
             await page.route('**/tile.openstreetmap.org/**',r=>r.abort());
-            await page.goto(`http://127.0.0.1:8765/?v=cockpit-${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
+            await page.goto(`http://127.0.0.1:8765/?v=v291-${Date.now()}`,{waitUntil:'domcontentloaded',timeout:30000});
             await page.waitForSelector('#cockpitLayout',{timeout:15000});
-            await page.waitForTimeout(900);
+            await page.waitForSelector('#cockpitHeroDecision',{timeout:5000});
+            await page.waitForTimeout(700);
             const info=await page.evaluate(()=>{
               const rect=s=>document.querySelector(s)?.getBoundingClientRect();
               const cs=s=>document.querySelector(s)?getComputedStyle(document.querySelector(s)):null;
@@ -68,42 +78,75 @@ jobs:
                 overflow:document.documentElement.scrollWidth-window.innerWidth,
                 logo:!!logo&&logo.complete&&logo.naturalWidth>0,
                 hero:!!document.querySelector('#cockpitHero .mapCard')&&!!document.querySelector('#cockpitHero .summaryCard'),
+                heroDecision:!!document.querySelector('#cockpitHeroDecision'),
                 kpis:document.querySelectorAll('#cockpitKpiGrid .cockpitKpi').length,
                 analysis:!!document.querySelector('#cockpitAnalysis .riskCard')&&!!document.querySelector('#cockpitAnalysis #jointCard'),
                 phys:!!document.querySelector('#cockpitPhysCards'),
                 matrix:!!document.querySelector('#cockpitMatrixSection .matrixCard'),
                 decision:!!document.querySelector('#cockpitDecision #cockpitTopRisks')&&!!document.querySelector('#cockpitDecision .decisionCard'),
+                decisionCore:!!document.querySelector('#cockpitDecisionCore'),
                 sources:!!document.querySelector('#cockpitSources #sourceStatusGrid'),
+                trust:document.querySelectorAll('.cockpitTrustLine').length,
                 heroCols:cs('#cockpitHero')?.gridTemplateColumns||'',
                 kpiCols:cs('#cockpitKpiGrid')?.gridTemplateColumns||'',
                 physCols:cs('#cockpitPhysCards')?.gridTemplateColumns||'',
                 mapW:rect('.mapCard')?.width||0,
                 sumW:rect('.summaryCard')?.width||0,
+                mapH:rect('.mapCard')?.height||0,
+                summaryH:rect('.summaryCard')?.height||0,
+                analysisAlign:cs('#cockpitAnalysis')?.alignItems||'',
+                kpiFont:parseFloat(cs('.cockpitKpiValue')?.fontSize||'0'),
+                bodyFont:parseFloat(cs('body')?.fontSize||'0'),
                 goH:rect('#go')?.height||0,
-                pdfH:rect('#pdfReport')?.height||0
+                pdfH:rect('#pdfReport')?.height||0,
+                jointCanvasH:rect('.jointCanvasBox')?.height||0
               };
             });
             console.log(label,info);
             if(info.overflow>2)throw new Error(`${label} horizontal overflow ${info.overflow}`);
-            if(!info.logo||!info.hero||info.kpis!==8||!info.analysis||!info.phys||!info.matrix||!info.decision||!info.sources)throw new Error(`${label} cockpit structure incomplete ${JSON.stringify(info)}`);
-            if(width>=1280&&!(info.mapW>info.sumW))throw new Error(`${label} hero map must be wider than summary`);
-            if(width<=760&&(info.goH<44||info.pdfH<44))throw new Error(`${label} mobile touch targets under 44px`);
-            if(width<=760){
-              const kpiCols=info.kpiCols.trim().split(/\s+/).length;
-              if(kpiCols!==2)throw new Error(`${label} KPI grid is not 2 columns: ${info.kpiCols}`);
+            if(!info.logo||!info.hero||!info.heroDecision||info.kpis!==8||!info.analysis||!info.phys||!info.matrix||!info.decision||!info.decisionCore||!info.sources||info.trust<4)throw new Error(`${label} scientific cockpit incomplete ${JSON.stringify(info)}`);
+            if(info.kpiFont<17||info.kpiFont>18.5)throw new Error(`${label} core number font outside 17-18px target: ${info.kpiFont}`);
+            if(info.bodyFont<11)throw new Error(`${label} body font below readable floor: ${info.bodyFont}`);
+            if(info.analysisAlign!=='start')throw new Error(`${label} analysis columns are still forced equal-height: ${info.analysisAlign}`);
+            if(width>=1280){
+              if(!(info.mapW>info.sumW))throw new Error(`${label} hero map must be wider than summary`);
+              const pc=info.physCols.trim().split(/\s+/).filter(Boolean).length;
+              if(pc!==6)throw new Error(`${label} physics grid is not 6 columns: ${info.physCols}`);
+              if(info.mapH<390||info.mapH>410)throw new Error(`${label} map height outside 390-410 target: ${info.mapH}`);
             }
-            await page.evaluate(()=>{adminUnlocked=true;showPage('admin')});
+            if(width<=760){
+              const kc=info.kpiCols.trim().split(/\s+/).filter(Boolean).length;
+              const pc=info.physCols.trim().split(/\s+/).filter(Boolean).length;
+              if(kc!==2)throw new Error(`${label} KPI grid is not 2 columns: ${info.kpiCols}`);
+              if(pc!==1)throw new Error(`${label} physics grid is not 1 column: ${info.physCols}`);
+              if(info.goH<44||info.pdfH<44)throw new Error(`${label} mobile touch targets under 44px`);
+            }
+            if(info.jointCanvasH&& (info.jointCanvasH<250||info.jointCanvasH>320))throw new Error(`${label} Heatmap is not visually dominant/controlled: ${info.jointCanvasH}`);
+
+            // Administrator page must require the requested UI password before parameters are visible.
+            await page.evaluate(()=>{sessionStorage.clear();openAdmin()});
+            await page.waitForSelector('#loginMask.show',{timeout:3000});
+            await page.fill('#adminPwd','000000');
+            await page.evaluate(()=>verifyAdmin());
+            await page.waitForTimeout(120);
+            const wrong=await page.evaluate(()=>({mask:document.querySelector('#loginMask')?.classList.contains('show'),active:document.querySelector('#adminPage')?.classList.contains('active')}));
+            if(!wrong.mask||wrong.active)throw new Error(`${label} wrong admin password unexpectedly entered admin page`);
+            await page.fill('#adminPwd','123456');
+            await page.evaluate(()=>verifyAdmin());
+            await page.waitForFunction(()=>document.querySelector('#adminPage')?.classList.contains('active'),{timeout:5000});
             await page.waitForTimeout(150);
             const admin=await page.evaluate(()=>({
               layout:!!document.querySelector('.cockpitAdminLayout'),
               nav:document.querySelectorAll('[data-admin-tab]').length,
               state:!!document.querySelector('#v29ParamState'),
-              overflow:document.documentElement.scrollWidth-window.innerWidth
+              overflow:document.documentElement.scrollWidth-window.innerWidth,
+              helps:document.querySelectorAll('.adminHelp').length
             }));
-            if(!admin.layout||admin.nav<10||!admin.state||admin.overflow>2)throw new Error(`${label} admin layout failed ${JSON.stringify(admin)}`);
+            if(!admin.layout||admin.nav<10||!admin.state||admin.overflow>2||admin.helps<5)throw new Error(`${label} admin layout/gate failed ${JSON.stringify(admin)}`);
             await ctx.close();
           }
           await check(1920,1080,'desktop-1920');
+          await check(1600,900,'desktop-1600');
           await check(1366,768,'desktop-1366');
           await check(900,1024,'tablet');
           await check(390,844,'mobile');
@@ -113,4 +156,4 @@ jobs:
           node cockpit-check.mjs
       - name: Public Pages smoke check (non-blocking)
         run: |
-          curl -fsS --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/assets/cockpit-v29.js?v=$GITHUB_SHA" | grep -q 'Engineering Cockpit UI adapter' || echo 'Public Pages smoke check unavailable from Actions network; local browser acceptance already completed.'
+          curl -fsS --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/assets/cockpit-v291.js?v=$GITHUB_SHA" | grep -q 'Scientific Engineering Cockpit interactions' || echo 'Public Pages smoke check unavailable from Actions network; local browser acceptance already completed.'
