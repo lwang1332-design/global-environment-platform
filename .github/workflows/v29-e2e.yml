@@ -25,6 +25,8 @@ jobs:
           set -e
           node --check assets/v29-config.js
           node --check assets/v29-joint.js
+          node --check assets/report-v29.js
+          node tools/check-v29-report-template.mjs
           node --check server/lib/security.js
           node --check server/lib/validate.js
           node --check server/lib/db.js
@@ -168,10 +170,11 @@ jobs:
             const h=cache.w.j.hourly,T=h.temperature_2m||[],V=h.wind_speed_10m||[],n=Math.min(T.length,V.length,h.time?.length||Infinity);let valid=0,hl=0,hh=0;
             for(let i=0;i<n;i++){if(Number.isFinite(T[i])&&Number.isFinite(V[i])){valid++;if(T[i]>=35&&V[i]<=3)hl++;if(T[i]>=35&&V[i]>=8)hh++;}}
             const r=V29Joint.result,manualPct=valid?100*hl/valid:0,canvas=document.querySelector('#jointCanvas');
-            return{valid,hl,hh,calcValid:r.valid,calcHL:r.hl.count,calcHH:r.hh.count,calcPct:r.hl.pct,manualPct,annual:r.hl.annual,tableRows:document.querySelectorAll('#jointTableBody tr').length,canvasW:canvas.width,canvasH:canvas.height,reportJoint:reportHtml().includes('风温联合分布分析（V2.9）'),reportFormula:reportHtml().includes('Hvalid'),noNaN:!document.body.innerText.includes('NaN'),order:[...document.querySelectorAll('.physicsCard,#jointCard,.matrixCard,.decisionCard')].map(x=>x.id||x.className),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,source:V29Config.state.source};
+            const report=reportHtml();
+            return{valid,hl,hh,calcValid:r.valid,calcHL:r.hl.count,calcHH:r.hh.count,calcPct:r.hl.pct,manualPct,annual:r.hl.annual,tableRows:document.querySelectorAll('#jointTableBody tr').length,canvasW:canvas.width,canvasH:canvas.height,reportJoint:report.includes('05 风温联合分布分析'),reportFormula:report.includes('Hvalid'),reportTemplate:reportHtml.__v29DecisionTemplate===true,noNaN:!document.body.innerText.includes('NaN'),order:[...document.querySelectorAll('.physicsCard,#jointCard,.matrixCard,.decisionCard')].map(x=>x.id||x.className),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,source:V29Config.state.source};
           });
           console.log('REAL_ERA5_STATUS',status);console.log('REAL_JOINT',real);
-          if(real.valid<8000||real.calcValid!==real.valid||real.calcHL!==real.hl||real.calcHH!==real.hh||Math.abs(real.calcPct-real.manualPct)>1e-10||real.tableRows!==4||real.canvasW<300||real.canvasH<250||!real.reportJoint||!real.reportFormula||!real.noNaN||real.overflow>2) throw new Error('Joint deterministic recount failed '+JSON.stringify(real));
+          if(real.valid<8000||real.calcValid!==real.valid||real.calcHL!==real.hl||real.calcHH!==real.hh||Math.abs(real.calcPct-real.manualPct)>1e-10||real.tableRows!==4||real.canvasW<300||real.canvasH<250||!real.reportJoint||!real.reportFormula||!real.reportTemplate||!real.noNaN||real.overflow>2) throw new Error('Joint deterministic recount failed '+JSON.stringify(real));
           if(runtimeErrors.length) throw new Error('Browser runtime errors '+runtimeErrors.join(' | '));
           await ctxR.close();await browser.close();
           console.log('V29_ACCEPTANCE_OK');

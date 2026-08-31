@@ -1,5 +1,7 @@
 import fs from 'node:fs';
 const s=fs.readFileSync('assets/report-v29.js','utf8');
+const index=fs.readFileSync('index.html','utf8');
+const sw=fs.readFileSync('sw.js','utf8');
 const required=[
   'Executive Summary｜项目综合结论',
   '01 项目与计算依据',
@@ -18,4 +20,6 @@ const required=[
 for(const x of required) if(!s.includes(x)) throw new Error('Missing report section: '+x);
 for(const x of ['V29JointResult','capabilityChecks','configVersion()','heatmapImage()','reportHtml=wrapped']) if(!s.includes(x)) throw new Error('Missing report integration marker: '+x);
 if(/V2\.8 工程报告版/.test(s)) throw new Error('New report template still contains V2.8 report label');
+if(!index.includes('assets/report-v29.js?v=20260901-r2')) throw new Error('Report template is not loaded explicitly after the dashboard modules');
+if(!sw.includes("'./assets/report-v29.js'")) throw new Error('Report template is not available in the offline shell');
 console.log('V29_REPORT_TEMPLATE_OK',required.length,'sections');
