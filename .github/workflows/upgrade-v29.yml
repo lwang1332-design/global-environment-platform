@@ -22,13 +22,14 @@ jobs:
         run: |
           node --check assets/v29-config.js
           node --check assets/v29-joint.js
-          node --check api/_lib/security.js
-          node --check api/_lib/validate.js
-          node --check api/_lib/db.js
+          node --check server/lib/security.js
+          node --check server/lib/validate.js
+          node --check server/lib/db.js
           node --check api/config/latest.js
           node --check api/config/history.js
           node --check api/config/publish.js
           node --check api/auth/login.js
+          node --check api/health.js
       - name: Patch V2.9 frontend bootstrap
         run: python tools/patch_v29_frontend.py
       - name: Sanity assertions
@@ -38,6 +39,7 @@ jobs:
           grep -q "assets/v29-joint.js" index.html
           grep -q "assets/v29.css" index.html
           grep -q "global-env-v2.9-config-joint-v1" sw.js
+          ! grep -q "adminPwd').value==='123123'" index.html
       - name: Commit V2.9 bootstrap
         run: |
           if git diff --quiet -- index.html; then
