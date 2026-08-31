@@ -40,7 +40,7 @@ jobs:
           const fs=require('fs');
           const {validateParameters}=require('./server/lib/validate');
           const html=fs.readFileSync('index.html','utf8');
-          const m=html.match(/const DEFAULT_PARAMS=(\{.*?\});let params=/s);
+          const m=html.match(/const DEFAULT_PARAMS=(\{.*?\});\s*let params=/s);
           if(!m) throw new Error('DEFAULT_PARAMS not found');
           const p=Function('return ('+m[1]+')')();
           const good=validateParameters(p);
@@ -61,10 +61,15 @@ jobs:
           for i in $(seq 1 48); do
             URL="https://lwang1332-design.github.io/global-environment-platform/?v29wait=${GITHUB_SHA}-${i}-$(date +%s)"
             JS="https://lwang1332-design.github.io/global-environment-platform/assets/v29-joint.js?v29wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            REPORT="https://lwang1332-design.github.io/global-environment-platform/assets/report-v29.js?v29wait=${GITHUB_SHA}-${i}-$(date +%s)"
             if curl -fsSL --max-time 20 "$URL" -o /tmp/page.html && \
                curl -fsSL --max-time 20 "$JS" -o /tmp/joint.js && \
+               curl -fsSL --max-time 20 "$REPORT" -o /tmp/report.js && \
                grep -q "V2.9 · 参数云同步 + 风温联合版" /tmp/page.html && \
-               grep -q "风温联合分布" /tmp/joint.js && node --check /tmp/joint.js >/dev/null 2>&1; then
+               grep -q "report-v29.js?v=20260901-r2" /tmp/page.html && \
+               grep -q "风温联合分布" /tmp/joint.js && \
+               grep -q "Executive Summary｜项目综合结论" /tmp/report.js && \
+               node --check /tmp/joint.js >/dev/null 2>&1 && node --check /tmp/report.js >/dev/null 2>&1; then
               echo "V2.9 Pages is live"
               exit 0
             fi

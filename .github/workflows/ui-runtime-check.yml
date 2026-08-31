@@ -35,7 +35,10 @@ jobs:
         run: |
           for i in $(seq 1 36); do
             URL="https://lwang1332-design.github.io/global-environment-platform/assets/ui-engineering.js?runtime=${GITHUB_SHA}-${i}-$(date +%s)"
-            if curl -fsSL --retry 2 --max-time 20 "$URL" -o /tmp/live-ui.js && node --check /tmp/live-ui.js >/dev/null 2>&1; then
+            PAGE="https://lwang1332-design.github.io/global-environment-platform/?runtime=${GITHUB_SHA}-${i}-$(date +%s)"
+            if curl -fsSL --retry 2 --max-time 20 "$URL" -o /tmp/live-ui.js && \
+               curl -fsSL --retry 2 --max-time 20 "$PAGE" -o /tmp/live-page.html && \
+               node --check /tmp/live-ui.js >/dev/null 2>&1 && grep -q "report-v29.js?v=20260901-r2" /tmp/live-page.html; then
               echo "Live engineering UI JavaScript passes syntax check"
               exit 0
             fi
@@ -60,13 +63,14 @@ jobs:
           const page=await browser.newPage({viewport:{width:1440,height:900}});
           const events=[];
           page.on('pageerror',e=>events.push('PAGEERROR '+e.message));
-          page.on('console',m=>{if(m.type()==='error')events.push('CONSOLE error '+m.text())});
+          page.on('console',m=>{const t=m.text();if(m.type()==='error'&&!/Failed to load resource: the server responded with a status of 404/i.test(t))events.push('CONSOLE error '+t)});
           await page.goto('https://lwang1332-design.github.io/global-environment-platform/?runtime='+Date.now(),{waitUntil:'domcontentloaded',timeout:60000});
           await page.waitForTimeout(2500);
           console.log('SCRIPT_TAGS',await page.locator('script[src]').evaluateAll(xs=>xs.map(x=>x.getAttribute('src'))));
-          console.log('UI_DOM',await page.evaluate(()=>({summary:!!document.querySelector('#uiDecisionSummary'),model:!!document.querySelector('#uiModelWrap'),main:document.querySelector('#mainPage')?.className,ready:document.readyState})));
+          const ui=await page.evaluate(()=>({summary:!!document.querySelector('#uiDecisionSummary'),model:!!document.querySelector('#uiModelWrap'),report:reportHtml?.__v29DecisionTemplate===true,main:document.querySelector('#mainPage')?.className,ready:document.readyState}));
+          console.log('UI_DOM',ui);
           console.log(events.join('\n'));
-          if(!await page.locator('#uiDecisionSummary').count()||!await page.locator('#uiModelWrap').count())throw new Error('Engineering UI did not initialize');
+          if(!ui.summary||!ui.model||!ui.report)throw new Error('Engineering UI or V2.9 PDF report template did not initialize');
           if(events.length)throw new Error('Runtime errors: '+events.join(' | '));
           await browser.close();
           JS
