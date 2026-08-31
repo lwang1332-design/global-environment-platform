@@ -1,0 +1,57 @@
+name: Apply V2.9 Cockpit UI
+
+on:
+  push:
+    paths:
+      - '.github/workflows/apply-cockpit-ui-v29.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+      - name: Apply UI asset references
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('index.html')
+          s=p.read_text(encoding='utf-8')
+          css='<link rel="stylesheet" href="./assets/cockpit-v29.css?v=20260831-cockpit1">'
+          js='<script src="./assets/cockpit-v29.js?v=20260831-cockpit1"></script>'
+          if css not in s:
+              marker='<link rel="stylesheet" href="./assets/v29.css?v=20260831-v29">'
+              if marker not in s: raise SystemExit('v29.css marker not found')
+              s=s.replace(marker, marker+'\n'+css, 1)
+          if js not in s:
+              marker='<script src="./assets/v29-joint.js?v=20260831-v29"></script>'
+              if marker not in s: raise SystemExit('v29-joint.js marker not found')
+              s=s.replace(marker, marker+'\n'+js, 1)
+          p.write_text(s,encoding='utf-8')
+
+          p=Path('sw.js'); s=p.read_text(encoding='utf-8')
+          s=s.replace("const CACHE='global-env-v2.9-config-joint-v1';","const CACHE='global-env-v2.9-cockpit-v1';")
+          if "'./assets/cockpit-v29.css'" not in s:
+              s=s.replace("'./assets/v29-joint.js'", "'./assets/v29-joint.js','./assets/cockpit-v29.css','./assets/cockpit-v29.js'")
+          p.write_text(s,encoding='utf-8')
+          PY
+      - name: Static syntax checks
+        run: |
+          node --check assets/cockpit-v29.js
+          node --check assets/v29-config.js
+          node --check assets/v29-joint.js
+          grep -q 'cockpit-v29.css' index.html
+          grep -q 'cockpit-v29.js' index.html
+      - name: Commit changes
+        run: |
+          if git diff --quiet; then exit 0; fi
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add index.html sw.js
+          git commit -m 'Apply V2.9 engineering cockpit layout'
+          git push origin main
