@@ -140,7 +140,7 @@ jobs:
           a=await pageA.evaluate(()=>({capHigh:params.capHigh,dirty:V29Config.state.dirtyCount,debug:V29Config.state.debugActive,official:V29Config.state.official.parameters.capHigh,valid:V29Config.validate({...params,eps:1.5},false).ok}));
           if(a.capHigh!==55||a.official!==45||!a.debug||a.dirty<1||a.valid!==false||serverConfig.parameters.capHigh!==45) throw new Error('Local debug isolation failed '+JSON.stringify(a));
           await pageA.evaluate(()=>V29Config.publish());
-          await pageA.waitForFunction(()=>window.V29Config?.state?.official?.version==='V2.9-P002'&&window.params.capHigh===55);
+          await pageA.waitForFunction(()=>window.V29Config?.state?.official?.version==='V2.9-P002'&&typeof params!=='undefined'&&params.capHigh===55);
           if(publishCount!==1||serverConfig.version!=='V2.9-P002'||serverConfig.parameters.capHigh!==55) throw new Error('Formal publish failed');
 
           // Test 1: another clean browser context must receive P002 / 55 from central latest.
