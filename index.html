@@ -9,7 +9,7 @@
 <meta name="apple-mobile-web-app-title" content="全球环境评估">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
-<title>全球风电机组环境适应性评估平台 V2.8 工程报告版</title>
+<title>全球风电机组环境适应性评估平台 V2.9 参数云同步 + 风温联合分布版</title>
 <style>
 :root{--bg:#f4f7fb;--card:#fff;--navy:#0a2a59;--blue:#1769e0;--muted:#667085;--line:#e3e8f0;--green:#0f9d68;--amber:#e59b13;--red:#d92d20;--shadow:0 6px 20px rgba(10,42,89,.07)}
 *{box-sizing:border-box}html,body{margin:0;height:100%;overflow:hidden;background:var(--bg);font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;color:#1e293b;font-size:12px}
@@ -77,9 +77,10 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:f
 }
 </style>
 <link rel="stylesheet" href="./assets/ui-engineering.css?v=20260830-ui1">
+<link rel="stylesheet" href="./assets/v29.css?v=20260831-v29">
 </head>
 <body>
-<header><div class="brand"><div class="logo"><img src="./assets/goldwind-logo.png" alt="Goldwind"></div><div><h1>全球风电机组环境适应性评估平台</h1><p>Environment → Physics → Equipment → Engineering Decision</p></div></div><div style="display:flex;align-items:center"><div class="pageNav"><button class="navBtn active" id="navMain" onclick="showPage('main')">评估主页</button><button class="navBtn" id="navAdmin" onclick="openAdmin()">管理员参数</button><button class="navBtn installBtn" id="installBtn" style="display:none">安装App</button></div><div class="ver">V2.8 · 工程报告版</div></div></header>
+<header><div class="brand"><div class="logo"><img src="./assets/goldwind-logo.png" alt="Goldwind"></div><div><h1>全球风电机组环境适应性评估平台</h1><p>Environment → Physics → Equipment → Engineering Decision</p></div></div><div style="display:flex;align-items:center"><div class="pageNav"><button class="navBtn active" id="navMain" onclick="showPage('main')">评估主页</button><button class="navBtn" id="navAdmin" onclick="openAdmin()">管理员参数</button><button class="navBtn installBtn" id="installBtn" style="display:none">安装App</button></div><div class="ver">V2.9 · 参数云同步 + 风温联合版</div></div></header>
 <div class="toolbar"><input id="query" value="Basra, Iraq" placeholder="城市/国家或 纬度,经度"><select id="years"><option value="1">最近1年</option><option value="3" selected>最近3年</option><option value="5">最近5年</option></select><button id="go">开始评估</button><button class="reportBtn" id="pdfReport" onclick="exportPDF()">生成PDF</button><div class="status" id="status">点击开始评估获取真实数据</div></div>
 <div id="mainPage" class="page active"><div class="dashboard">
 <section class="card mapCard"><div class="head"><h2>01 项目定位</h2><span>在线地图 + 内置全球离线底图</span></div><div class="mapWrap"><div id="map"></div><div class="mapSourceBadge" id="mapSourceBadge">地图源：初始化</div><div class="mapOverlay" id="mapInfo">Basra, Iraq<br>等待定位...</div></div></section>
@@ -525,4 +526,7 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.se
 <div id="offlinePill" class="offlinePill">离线模式：可打开页面，实时数据查询需联网</div>
 <script src="./map-tier.js"></script>
 <script src="./assets/ui-engineering.js?v=20260830-ui1"></script>
+<script src="./assets/v29-runtime-config.js?v=20260831-v29"></script>
+<script src="./assets/v29-config.js?v=20260831-v29"></script>
+<script src="./assets/v29-joint.js?v=20260831-v29"></script>
 </body></html>
