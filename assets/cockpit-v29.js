@@ -148,7 +148,7 @@ function setupAdmin(){
 
 function hook(){
  try{if(typeof render==='function'&&!render.__cockpit){const old=render;const wrapped=function(){const x=old.apply(this,arguments);queueMicrotask(renderAll);return x};wrapped.__cockpit=true;render=wrapped}}catch(e){console.warn('Cockpit render hook skipped',e)}
- const joint=q('#jointCard');if(joint&&!joint.dataset.cockpitObserved){joint.dataset.cockpitObserved='1';new MutationObserver(()=>renderJointStats()).observe(joint,{childList:true,subtree:true,characterData:true})}
+ const joint=q('#jointCard');if(joint&&!joint.dataset.cockpitObserved){joint.dataset.cockpitObserved='1';let scheduled=false;new MutationObserver(records=>{const own=r=>{const el=r.target?.nodeType===1?r.target:r.target?.parentElement;return !!el?.closest?.('#cockpitJointStats')};if(records.length&&records.every(own))return;if(scheduled)return;scheduled=true;setTimeout(()=>{scheduled=false;renderJointStats()},0)}).observe(joint,{childList:true,subtree:true,characterData:true})}
  const admin=q('#adminPage');if(admin&&!q('#v29ParamState',admin)){new MutationObserver(()=>{if(q('#v29ParamState',admin))setupAdmin()}).observe(admin,{childList:true,subtree:true})}
 }
 function init(){ensureLayout();setupAdmin();hook();renderAll();setTimeout(()=>{ensureLayout();setupAdmin();hook();renderAll()},300);setTimeout(renderAll,1200);}
