@@ -1,0 +1,51 @@
+name: Upgrade Platform V2.9
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "tools/v29-upgrade-trigger.txt"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  upgrade:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Validate V2.9 JavaScript
+        run: |
+          node --check assets/v29-config.js
+          node --check assets/v29-joint.js
+          node --check api/_lib/security.js
+          node --check api/_lib/validate.js
+          node --check api/_lib/db.js
+          node --check api/config/latest.js
+          node --check api/config/history.js
+          node --check api/config/publish.js
+          node --check api/auth/login.js
+      - name: Patch V2.9 frontend bootstrap
+        run: python tools/patch_v29_frontend.py
+      - name: Sanity assertions
+        run: |
+          grep -q "V2.9 · 参数云同步 + 风温联合版" index.html
+          grep -q "assets/v29-config.js" index.html
+          grep -q "assets/v29-joint.js" index.html
+          grep -q "assets/v29.css" index.html
+          grep -q "global-env-v2.9-config-joint-v1" sw.js
+      - name: Commit V2.9 bootstrap
+        run: |
+          if git diff --quiet -- index.html; then
+            echo "No index changes needed"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add index.html
+          git commit -m "Enable V2.9 config sync and wind-temperature analysis"
+          git push
