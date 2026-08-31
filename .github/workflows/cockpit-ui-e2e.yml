@@ -41,7 +41,7 @@ jobs:
           exit 1
       - name: Responsive browser acceptance
         run: |
-          cat > /tmp/cockpit-check.mjs <<'EOF'
+          cat > cockpit-check.mjs <<'EOF'
           import { chromium } from 'playwright';
           const browser=await chromium.launch({headless:true});
           const errors=[];
@@ -97,4 +97,4 @@ jobs:
           await browser.close();
           if(errors.length){console.error(errors.join('\n'));process.exit(1)}
           EOF
-          node /tmp/cockpit-check.mjs
+          node cockpit-check.mjs
