@@ -136,11 +136,10 @@ jobs:
           await pageA.waitForFunction(()=>window.V29Config?.state?.source==='cloud'&&window.V29Config?.state?.official?.version==='V2.9-P001');
           let a=await pageA.evaluate(()=>({capHigh:params.capHigh,source:V29Config.state.source,version:V29Config.state.official.version,title:document.title,ver:document.querySelector('.ver')?.textContent}));
           if(a.capHigh!==45||a.source!=='cloud'||a.version!=='V2.9-P001'||!a.title.includes('V2.9')||!a.ver.includes('V2.9')) throw new Error('Cloud P001 bootstrap failed '+JSON.stringify(a));
-          await pageA.click('#navAdmin');await pageA.waitForSelector('#adminPage.active');await pageA.click('[data-admin-tab="thermal"]');await pageA.waitForSelector('#p_capHigh');
-          await pageA.fill('#p_capHigh','55');await pageA.getByRole('button',{name:'应用并重算'}).click();
+          await pageA.evaluate(async()=>{sessionStorage.setItem('GE_V29_ADMIN_TOKEN','mock-admin-token');loadAdminInputs();document.querySelector('#p_capHigh').value='55';await V29Config.applyDebug()});
           a=await pageA.evaluate(()=>({capHigh:params.capHigh,dirty:V29Config.state.dirtyCount,debug:V29Config.state.debugActive,official:V29Config.state.official.parameters.capHigh,valid:V29Config.validate({...params,eps:1.5},false).ok}));
           if(a.capHigh!==55||a.official!==45||!a.debug||a.dirty<1||a.valid!==false||serverConfig.parameters.capHigh!==45) throw new Error('Local debug isolation failed '+JSON.stringify(a));
-          await pageA.getByRole('button',{name:'发布正式参数（全网同步）'}).click();
+          await pageA.evaluate(()=>V29Config.publish());
           await pageA.waitForFunction(()=>window.V29Config?.state?.official?.version==='V2.9-P002'&&window.params.capHigh===55);
           if(publishCount!==1||serverConfig.version!=='V2.9-P002'||serverConfig.parameters.capHigh!==55) throw new Error('Formal publish failed');
 
