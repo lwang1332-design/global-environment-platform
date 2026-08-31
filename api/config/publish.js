@@ -1,7 +1,7 @@
 'use strict';
-const db=require('../_lib/db');
-const {SCHEMA_VERSION,validateParameters,normalizeConfigBody}=require('../_lib/validate');
-const {setCors,json,verifyToken,bearer}=require('../_lib/security');
+const db=require('../../server/lib/db');
+const {SCHEMA_VERSION,validateParameters,normalizeConfigBody}=require('../../server/lib/validate');
+const {setCors,json,verifyToken,bearer}=require('../../server/lib/security');
 module.exports=async function(req,res){
   setCors(req,res);if(req.method==='OPTIONS')return json(res,204,{});if(req.method!=='POST')return json(res,405,{error:'Method not allowed'});
   const session=verifyToken(bearer(req));if(!session)return json(res,401,{error:'Administrator authentication required'});
