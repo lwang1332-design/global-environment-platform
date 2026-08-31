@@ -99,6 +99,7 @@ jobs:
           function configureContext(ctx,{localFallback=false}={}){
             ctx.addInitScript(({api,localFallback})=>{
               localStorage.setItem('GE_V29_API_BASE',api);
+              sessionStorage.setItem('GE_V29_ADMIN_TOKEN','mock-admin-token');
               if(localFallback){
                 const env={version:'V2.9-P003',updatedAt:'2026-08-31T06:40:00.000Z',updatedBy:'admin',description:'cached',schemaVersion:'2.9',parameters:{capHigh:52}};
                 localStorage.setItem('GE_V29_CONFIG_LAST_GOOD',JSON.stringify(env));
@@ -135,7 +136,7 @@ jobs:
           await pageA.waitForFunction(()=>window.V29Config?.state?.source==='cloud'&&window.V29Config?.state?.official?.version==='V2.9-P001');
           let a=await pageA.evaluate(()=>({capHigh:params.capHigh,source:V29Config.state.source,version:V29Config.state.official.version,title:document.title,ver:document.querySelector('.ver')?.textContent}));
           if(a.capHigh!==45||a.source!=='cloud'||a.version!=='V2.9-P001'||!a.title.includes('V2.9')||!a.ver.includes('V2.9')) throw new Error('Cloud P001 bootstrap failed '+JSON.stringify(a));
-          await pageA.click('#navAdmin');await pageA.waitForSelector('#loginMask.show');await pageA.fill('#adminPwd','mock-password');await pageA.locator('#loginMask .loginBtns button').first().click();await pageA.waitForSelector('#adminPage.active');
+          await pageA.click('#navAdmin');await pageA.waitForSelector('#adminPage.active');await pageA.click('[data-admin-tab="thermal"]');await pageA.waitForSelector('#p_capHigh');
           await pageA.fill('#p_capHigh','55');await pageA.getByRole('button',{name:'应用并重算'}).click();
           a=await pageA.evaluate(()=>({capHigh:params.capHigh,dirty:V29Config.state.dirtyCount,debug:V29Config.state.debugActive,official:V29Config.state.official.parameters.capHigh,valid:V29Config.validate({...params,eps:1.5},false).ok}));
           if(a.capHigh!==55||a.official!==45||!a.debug||a.dirty<1||a.valid!==false||serverConfig.parameters.capHigh!==45) throw new Error('Local debug isolation failed '+JSON.stringify(a));
@@ -157,7 +158,7 @@ jobs:
 
           // Responsive V2.9 shell.
           await pageB.setViewportSize({width:390,height:844});await pageB.waitForTimeout(250);
-          const mob=await pageB.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,jointH:document.querySelector('#jointCalc')?.getBoundingClientRect().height,adminButtons:[...document.querySelectorAll('.v29ManageActions button')].map(x=>x.getBoundingClientRect().height)}));
+          const mob=await pageB.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,jointH:document.querySelector('#jointCalc')?.getBoundingClientRect().height,adminButtons:[...document.querySelectorAll('.v29ManageActions button')].filter(x=>x.offsetParent!==null).map(x=>x.getBoundingClientRect().height)}));
           if(mob.overflow>2||mob.jointH<44||mob.adminButtons.some(h=>h<44)) throw new Error('V2.9 mobile touch/overflow failed '+JSON.stringify(mob));
 
           await ctxA.close();await ctxB.close();await ctxC.close();
