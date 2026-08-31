@@ -61,7 +61,11 @@ jobs:
             const ctx=await browser.newContext({viewport:{width,height}});
             const page=await ctx.newPage();
             page.on('pageerror',e=>errors.push(`${label}: ${e.message}`));
-            page.on('console',m=>{if(m.type()==='error'&&!/429|ERR_FAILED|Failed to load resource|404 \(File not found\)/i.test(m.text()))errors.push(`${label}: console ${m.text()}`)});
+            page.on('console',m=>{
+              const text=m.text();
+              const expectedBlockedFetch=/TypeError:\s*Failed to fetch/i.test(text);
+              if(m.type()==='error'&&!expectedBlockedFetch&&!/429|ERR_FAILED|Failed to load resource|404 \(File not found\)/i.test(text))errors.push(`${label}: console ${text}`)
+            });
             await page.route('**/archive-api.open-meteo.com/**',r=>r.abort());
             await page.route('**/air-quality-api.open-meteo.com/**',r=>r.abort());
             await page.route('**/marine-api.open-meteo.com/**',r=>r.abort());
