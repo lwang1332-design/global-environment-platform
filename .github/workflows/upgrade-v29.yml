@@ -22,6 +22,8 @@ jobs:
         run: |
           node --check assets/v29-config.js
           node --check assets/v29-joint.js
+          node --check assets/cockpit-v291.js
+          node --check assets/v291-admin-gate.js
           node --check server/lib/security.js
           node --check server/lib/validate.js
           node --check server/lib/db.js
@@ -38,7 +40,11 @@ jobs:
           grep -q "assets/v29-config.js" index.html
           grep -q "assets/v29-joint.js" index.html
           grep -q "assets/v29.css" index.html
-          grep -q "global-env-v2.9-config-joint-v1" sw.js
+          grep -q "assets/cockpit-v291.css" index.html
+          grep -q "assets/cockpit-v291.js" index.html
+          grep -q "assets/v291-admin-gate.js" index.html
+          test -s sw.js
+          grep -q "const CACHE=" sw.js
           ! grep -q "adminPwd').value==='123123'" index.html
       - name: Commit V2.9 bootstrap
         run: |
@@ -49,5 +55,5 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add index.html
-          git commit -m "Enable V2.9 config sync and wind-temperature analysis"
+          git commit -m "Enable V2.9.1 scientific cockpit UI"
           git push
