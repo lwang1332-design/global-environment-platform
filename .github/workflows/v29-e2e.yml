@@ -1,0 +1,179 @@
+name: V2.9 Acceptance Check
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "index.html"
+      - "assets/v29*.js"
+      - "assets/v29*.css"
+      - "server/**"
+      - "api/**"
+      - "supabase/**"
+      - "sw.js"
+      - ".github/workflows/v29-e2e.yml"
+  workflow_dispatch:
+
+jobs:
+  v29-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static V2.9 validation
+        run: |
+          set -e
+          node --check assets/v29-config.js
+          node --check assets/v29-joint.js
+          node --check server/lib/security.js
+          node --check server/lib/validate.js
+          node --check server/lib/db.js
+          node --check api/config/latest.js
+          node --check api/config/history.js
+          node --check api/config/publish.js
+          node --check api/auth/login.js
+          node --check api/health.js
+          ! grep -q "adminPwd').value==='123123'" index.html
+          node <<'NODE'
+          const fs=require('fs');
+          const {validateParameters}=require('./server/lib/validate');
+          const html=fs.readFileSync('index.html','utf8');
+          const m=html.match(/const DEFAULT_PARAMS=(\{.*?\});let params=/s);
+          if(!m) throw new Error('DEFAULT_PARAMS not found');
+          const p=Function('return ('+m[1]+')')();
+          const good=validateParameters(p);
+          if(!good.ok) throw new Error('Inherited V2.8 defaults failed V2.9 validation: '+JSON.stringify(good.errors));
+          for(const [name,bad] of [
+            ['eps',{...p,eps:1.2}],
+            ['filterEta',{...p,filterEta:-0.1}],
+            ['filterBypass',{...p,filterBypass:1.1}],
+            ['condDtMin',{...p,condDtMin:0}],
+            ['capRange',{...p,capLow:60,capHigh:50}],
+            ['rh',{...p,capRh:101}]
+          ]) if(validateParameters(bad).ok) throw new Error('Invalid parameter accepted: '+name);
+          console.log('SERVER_PARAMETER_VALIDATION_OK');
+          NODE
+      - name: Wait for V2.9 GitHub Pages
+        run: |
+          set -e
+          for i in $(seq 1 48); do
+            URL="https://lwang1332-design.github.io/global-environment-platform/?v29wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            JS="https://lwang1332-design.github.io/global-environment-platform/assets/v29-joint.js?v29wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            if curl -fsSL --max-time 20 "$URL" -o /tmp/page.html && \
+               curl -fsSL --max-time 20 "$JS" -o /tmp/joint.js && \
+               grep -q "V2.9 · 参数云同步 + 风温联合版" /tmp/page.html && \
+               grep -q "风温联合分布" /tmp/joint.js && node --check /tmp/joint.js >/dev/null 2>&1; then
+              echo "V2.9 Pages is live"
+              exit 0
+            fi
+            echo "Waiting for Pages ($i/48)..."
+            sleep 10
+          done
+          exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Browser V2.9 acceptance
+        run: |
+          cat > v29-e2e.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const BASE='https://lwang1332-design.github.io/global-environment-platform/?v29e2e='+Date.now();
+          const API='https://config.test/api';
+          const cors={'access-control-allow-origin':'*','access-control-allow-methods':'GET,POST,OPTIONS','access-control-allow-headers':'Content-Type, Authorization','content-type':'application/json'};
+          const now='2026-08-31T06:30:00.000Z';
+          let serverConfig={version:'V2.9-P001',updatedAt:now,updatedBy:'admin',description:'initial',schemaVersion:'2.9',status:'published',parameters:{capHigh:45}};
+          let publishCount=0;
+          function configureContext(ctx,{localFallback=false}={}){
+            ctx.addInitScript(({api,localFallback})=>{
+              localStorage.setItem('GE_V29_API_BASE',api);
+              if(localFallback){
+                const env={version:'V2.9-P003',updatedAt:'2026-08-31T06:40:00.000Z',updatedBy:'admin',description:'cached',schemaVersion:'2.9',parameters:{capHigh:52}};
+                localStorage.setItem('GE_V29_CONFIG_LAST_GOOD',JSON.stringify(env));
+                localStorage.setItem('GE_V25_PARAMS',JSON.stringify(env.parameters));
+              }
+            },{api:API,localFallback});
+            ctx.route('https://config.test/**',async route=>{
+              const req=route.request(),url=new URL(req.url()),method=req.method();
+              if(method==='OPTIONS') return route.fulfill({status:204,headers:cors,body:''});
+              if(localFallback) return route.fulfill({status:503,headers:cors,body:JSON.stringify({error:'offline test'})});
+              if(url.pathname.endsWith('/config/latest')) return route.fulfill({status:200,headers:cors,body:JSON.stringify({config:serverConfig})});
+              if(url.pathname.endsWith('/config/history')) return route.fulfill({status:200,headers:cors,body:JSON.stringify({items:[serverConfig]})});
+              if(url.pathname.endsWith('/auth/login')) return route.fulfill({status:200,headers:cors,body:JSON.stringify({token:'mock-admin-token',expiresIn:3600})});
+              if(url.pathname.endsWith('/config/publish')){
+                publishCount++;
+                const auth=req.headers()['authorization']||'';
+                if(auth!=='Bearer mock-admin-token') return route.fulfill({status:401,headers:cors,body:JSON.stringify({error:'bad token'})});
+                const body=JSON.parse(req.postData()||'{}');
+                serverConfig={version:'V2.9-P002',updatedAt:'2026-08-31T06:35:00.000Z',updatedBy:'admin',description:body.description||'',schemaVersion:'2.9',status:'published',parameters:body.parameters};
+                return route.fulfill({status:201,headers:cors,body:JSON.stringify({config:serverConfig})});
+              }
+              return route.fulfill({status:404,headers:cors,body:'{}'});
+            });
+          }
+          async function waitShell(page){
+            await page.goto(BASE,{waitUntil:'domcontentloaded',timeout:60000});
+            await page.waitForSelector('#jointCard',{timeout:60000});
+            await page.waitForSelector('#v29ParamState',{timeout:60000});
+          }
+
+          // Test 1 + 3: cloud official config, local debug, then explicit publish.
+          const ctxA=await browser.newContext({viewport:{width:1600,height:900}});configureContext(ctxA);
+          const pageA=await ctxA.newPage();pageA.on('dialog',d=>d.accept());await waitShell(pageA);
+          await pageA.waitForFunction(()=>window.V29Config?.state?.source==='cloud'&&window.V29Config?.state?.official?.version==='V2.9-P001');
+          let a=await pageA.evaluate(()=>({capHigh:params.capHigh,source:V29Config.state.source,version:V29Config.state.official.version,title:document.title,ver:document.querySelector('.ver')?.textContent}));
+          if(a.capHigh!==45||a.source!=='cloud'||a.version!=='V2.9-P001'||!a.title.includes('V2.9')||!a.ver.includes('V2.9')) throw new Error('Cloud P001 bootstrap failed '+JSON.stringify(a));
+          await pageA.click('#navAdmin');await pageA.waitForSelector('#loginMask.show');await pageA.fill('#adminPwd','mock-password');await pageA.locator('#loginMask .loginBtns button').first().click();await pageA.waitForSelector('#adminPage.active');
+          await pageA.fill('#p_capHigh','55');await pageA.getByRole('button',{name:'应用并重算'}).click();
+          a=await pageA.evaluate(()=>({capHigh:params.capHigh,dirty:V29Config.state.dirtyCount,debug:V29Config.state.debugActive,official:V29Config.state.official.parameters.capHigh,valid:V29Config.validate({...params,eps:1.5},false).ok}));
+          if(a.capHigh!==55||a.official!==45||!a.debug||a.dirty<1||a.valid!==false||serverConfig.parameters.capHigh!==45) throw new Error('Local debug isolation failed '+JSON.stringify(a));
+          await pageA.getByRole('button',{name:'发布正式参数（全网同步）'}).click();
+          await pageA.waitForFunction(()=>window.V29Config?.state?.official?.version==='V2.9-P002'&&window.params.capHigh===55);
+          if(publishCount!==1||serverConfig.version!=='V2.9-P002'||serverConfig.parameters.capHigh!==55) throw new Error('Formal publish failed');
+
+          // Test 1: another clean browser context must receive P002 / 55 from central latest.
+          const ctxB=await browser.newContext({viewport:{width:1366,height:768}});configureContext(ctxB);const pageB=await ctxB.newPage();await waitShell(pageB);
+          await pageB.waitForFunction(()=>window.V29Config?.state?.source==='cloud'&&window.V29Config?.state?.official?.version==='V2.9-P002');
+          const b=await pageB.evaluate(()=>({capHigh:params.capHigh,version:V29Config.state.official.version,source:V29Config.state.source,overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}));
+          if(b.capHigh!==55||b.version!=='V2.9-P002'||b.source!=='cloud'||b.overflow>2) throw new Error('Cross-browser sync failed '+JSON.stringify(b));
+
+          // Test 2: API failure must use last-good local official snapshot instead of white-screen/default reset.
+          const ctxC=await browser.newContext({viewport:{width:900,height:1024}});configureContext(ctxC,{localFallback:true});const pageC=await ctxC.newPage();await waitShell(pageC);
+          await pageC.waitForTimeout(1200);
+          const c=await pageC.evaluate(()=>({capHigh:params.capHigh,source:V29Config.state.source,version:V29Config.state.official?.version,server:V29Config.state.server,hasJoint:!!document.querySelector('#jointCard')}));
+          if(c.capHigh!==52||c.source!=='local'||c.version!=='V2.9-P003'||!c.hasJoint) throw new Error('Local last-good fallback failed '+JSON.stringify(c));
+
+          // Responsive V2.9 shell.
+          await pageB.setViewportSize({width:390,height:844});await pageB.waitForTimeout(250);
+          const mob=await pageB.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,jointH:document.querySelector('#jointCalc')?.getBoundingClientRect().height,adminButtons:[...document.querySelectorAll('.v29ManageActions button')].map(x=>x.getBoundingClientRect().height)}));
+          if(mob.overflow>2||mob.jointH<44||mob.adminButtons.some(h=>h<44)) throw new Error('V2.9 mobile touch/overflow failed '+JSON.stringify(mob));
+
+          await ctxA.close();await ctxB.close();await ctxC.close();
+
+          // Test 4: real ERA5 data + deterministic same-hour joint recount.
+          const ctxR=await browser.newContext({viewport:{width:1920,height:1080}});const page=await ctxR.newPage();const runtimeErrors=[];
+          page.on('pageerror',e=>runtimeErrors.push(e.message));page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource/i.test(m.text()))runtimeErrors.push(m.text())});
+          await waitShell(page);
+          await page.fill('#query','30.5085,47.7804');await page.selectOption('#years','1');await page.click('#go');
+          await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败')},{timeout:180000});
+          const status=await page.locator('#status').textContent();
+          if(!status.includes('真实数据计算完成')) throw new Error('Real ERA5 acceptance failed: '+status);
+          await page.waitForFunction(()=>window.V29Joint?.result?.ok===true,{timeout:20000});
+          const real=await page.evaluate(()=>{
+            const h=cache.w.j.hourly,T=h.temperature_2m||[],V=h.wind_speed_10m||[],n=Math.min(T.length,V.length,h.time?.length||Infinity);let valid=0,hl=0,hh=0;
+            for(let i=0;i<n;i++){if(Number.isFinite(T[i])&&Number.isFinite(V[i])){valid++;if(T[i]>=35&&V[i]<=3)hl++;if(T[i]>=35&&V[i]>=8)hh++;}}
+            const r=V29Joint.result,manualPct=valid?100*hl/valid:0,canvas=document.querySelector('#jointCanvas');
+            return{valid,hl,hh,calcValid:r.valid,calcHL:r.hl.count,calcHH:r.hh.count,calcPct:r.hl.pct,manualPct,annual:r.hl.annual,tableRows:document.querySelectorAll('#jointTableBody tr').length,canvasW:canvas.width,canvasH:canvas.height,reportJoint:reportHtml().includes('风温联合分布分析（V2.9）'),reportFormula:reportHtml().includes('Hvalid'),noNaN:!document.body.innerText.includes('NaN'),order:[...document.querySelectorAll('.physicsCard,#jointCard,.matrixCard,.decisionCard')].map(x=>x.id||x.className),overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,source:V29Config.state.source};
+          });
+          console.log('REAL_ERA5_STATUS',status);console.log('REAL_JOINT',real);
+          if(real.valid<8000||real.calcValid!==real.valid||real.calcHL!==real.hl||real.calcHH!==real.hh||Math.abs(real.calcPct-real.manualPct)>1e-10||real.tableRows!==4||real.canvasW<300||real.canvasH<250||!real.reportJoint||!real.reportFormula||!real.noNaN||real.overflow>2) throw new Error('Joint deterministic recount failed '+JSON.stringify(real));
+          if(runtimeErrors.length) throw new Error('Browser runtime errors '+runtimeErrors.join(' | '));
+          await ctxR.close();await browser.close();
+          console.log('V29_ACCEPTANCE_OK');
+          JS
+          node v29-e2e.mjs
