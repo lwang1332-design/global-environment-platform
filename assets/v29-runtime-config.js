@@ -5,6 +5,9 @@ window.V29_RUNTIME_CONFIG={
 
 // Windows localhost workstation adapter. GitHub Pages behavior is unchanged.
 if(['localhost','127.0.0.1'].includes(location.hostname)){
+  // Central V2.9 parameter API is relayed server-to-server by localhost to avoid browser CORS restrictions.
+  window.V29_RUNTIME_CONFIG.configApiBase='/local-api/cloud-config';
+
   // Route only the public Open-Meteo families already used by V2.9 through the local allowlisted cache/proxy.
   // This preserves the response schema expected by locate/elev/weather/air/marine without touching model formulas.
   const nativeFetch=window.fetch.bind(window);
@@ -57,7 +60,7 @@ if(['localhost','127.0.0.1'].includes(location.hostname)){
   };
 
   const s=document.createElement('script');
-  s.src='./assets/local-workstation.js?v=20260901-local-v3-ui4';
+  s.src='./assets/local-workstation.js?v=20260901-local-v3-ui5';
   s.async=true;
   document.head.appendChild(s);
 }
