@@ -192,11 +192,13 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Cache-Control", "no-store" if self.path.startswith("/local-api/") else "no-cache")
         super().end_headers()
 
-    def sendj(self, status, obj):
+    def sendj(self, status, obj, extra_headers=None):
         b = json_bytes(obj)
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(b)))
+        for k, v in (extra_headers or {}).items():
+            self.send_header(str(k), str(v))
         self.end_headers()
         self.wfile.write(b)
 
@@ -250,19 +252,36 @@ class Handler(SimpleHTTPRequestHandler):
                 base = OPEN_METEO_BASES.get(kind)
                 if not base:
                     return self.sendj(400, {"error": True, "message": "Unsupported Open-Meteo source"})
-                forwarded = {k: vals for k, vals in q.items() if k != "_kind"}
+                offline = str(q.get("_offline", ["0"])[0]).lower() in ("1", "true", "yes")
+                forwarded = {k: vals for k, vals in q.items() if k not in ("_kind", "_offline")}
                 key = public_proxy_key(kind, forwarded)
                 cached = get_cached(key)
                 pairs = [(k, v) for k, vals in forwarded.items() for v in vals]
                 upstream = base + ("?" + urllib.parse.urlencode(pairs, doseq=True, safe=",") if pairs else "")
+                if offline:
+                    if cached:
+                        payload = dict(cached["payload"]) if isinstance(cached["payload"], dict) else {"data": cached["payload"]}
+                        payload["_local_cache"] = {
+                            "mode": "cached", "updated_at": cached["updated_at"],
+                            "expired": cached["expired"], "upstream_error": "browser_offline", "source": kind
+                        }
+                        return self.sendj(200, payload, {
+                            "X-GE-Cache-Mode": "cached", "X-GE-Cache-Updated-At": cached["updated_at"]
+                        })
+                    return self.sendj(503, {
+                        "error": True, "reason": "离线且本地无缓存", "source": f"Open-Meteo:{kind}"
+                    }, {"X-GE-Cache-Mode": "miss"})
                 try:
                     payload = fetch_json(upstream, 25)
                     if isinstance(payload, dict) and payload.get("error"):
                         raise RuntimeError(payload.get("reason", "Open-Meteo error"))
+                    queried = now()
                     if isinstance(payload, dict):
-                        payload["_local_cache"] = {"mode": "live", "queried_at": now(), "source": kind}
+                        payload["_local_cache"] = {"mode": "live", "queried_at": queried, "source": kind}
                     put_cache(key, payload, f"Open-Meteo:{kind}", OPEN_METEO_TTL.get(kind, 21600))
-                    return self.sendj(200, payload)
+                    return self.sendj(200, payload, {
+                        "X-GE-Cache-Mode": "live", "X-GE-Cache-Updated-At": queried
+                    })
                 except Exception as e:
                     if cached:
                         payload = dict(cached["payload"]) if isinstance(cached["payload"], dict) else {"data": cached["payload"]}
@@ -270,11 +289,13 @@ class Handler(SimpleHTTPRequestHandler):
                             "mode": "cached", "updated_at": cached["updated_at"],
                             "expired": cached["expired"], "upstream_error": str(e), "source": kind
                         }
-                        return self.sendj(200, payload)
+                        return self.sendj(200, payload, {
+                            "X-GE-Cache-Mode": "cached", "X-GE-Cache-Updated-At": cached["updated_at"]
+                        })
                     return self.sendj(502, {
                         "error": True, "reason": "数据源暂不可用", "detail": str(e),
                         "source": f"Open-Meteo:{kind}"
-                    })
+                    }, {"X-GE-Cache-Mode": "miss"})
 
             if path == "/local-api/sources":
                 lat = valid_coord(q.get("latitude", ["18.2528"])[0], -90, 90)
