@@ -38,7 +38,9 @@ jobs:
             PAGE="https://lwang1332-design.github.io/global-environment-platform/?runtime=${GITHUB_SHA}-${i}-$(date +%s)"
             if curl -fsSL --retry 2 --max-time 20 "$URL" -o /tmp/live-ui.js && \
                curl -fsSL --retry 2 --max-time 20 "$PAGE" -o /tmp/live-page.html && \
-               node --check /tmp/live-ui.js >/dev/null 2>&1 && grep -q "report-v29.js?v=20260901-r2" /tmp/live-page.html; then
+               node --check /tmp/live-ui.js >/dev/null 2>&1 && \
+               grep -q "report-v29.js?v=20260901-r2" /tmp/live-page.html && \
+               grep -q "cockpit-v29.js?v=20260901-summaryfix1" /tmp/live-page.html; then
               echo "Live engineering UI JavaScript passes syntax check"
               exit 0
             fi

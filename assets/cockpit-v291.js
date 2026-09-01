@@ -116,6 +116,8 @@ function addAdminHelp(){
 function refresh(){renderHero();enhanceKpis();applyRiskTop5();bindMatrix();renderDecisionCore();renderTrust();addAdminHelp()}
 function observe(){
  const list=q('#riskList');if(list&&!list.dataset.scientificObserved){list.dataset.scientificObserved='1';let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(applyRiskTop5,0)}).observe(list,{childList:true})}
+ const summary=q('#uiDecisionSummary');if(summary&&!summary.dataset.scientificObserved){summary.dataset.scientificObserved='1';let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(renderHero,0)}).observe(summary,{childList:true,subtree:true,characterData:true})}
+ const decision=q('#aiSummary');if(decision&&!decision.dataset.scientificObserved){decision.dataset.scientificObserved='1';let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(renderDecisionCore,0)}).observe(decision,{childList:true,subtree:true,characterData:true})}
  const admin=q('#adminPage');if(admin&&!admin.dataset.scientificObserved){admin.dataset.scientificObserved='1';let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(addAdminHelp,0)}).observe(admin,{childList:true,subtree:true})}
 }
 window.CockpitScientific={refresh};

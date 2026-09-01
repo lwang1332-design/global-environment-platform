@@ -129,7 +129,13 @@ function renderJointStats(){
 
 function renderSourcesMeta(){const box=q('#cockpitUpdateMeta'),ca=safeCache();if(box)box.innerHTML=ca?.w?`ERA5 <b>${esc(ca.w.start)} ~ ${esc(ca.w.end)}</b> · 最近刷新 ${esc(ca.w.end)}`:'等待真实数据评估'}
 
-function renderAll(){ensureLayout();renderKpis();renderProjectSummary();renderRadar();renderPhysicsCards();renderTopRisks();renderJointStats();renderSourcesMeta();}
+function renderAll(){
+ ensureLayout();renderKpis();renderProjectSummary();renderRadar();renderPhysicsCards();renderTopRisks();renderJointStats();renderSourcesMeta();
+ // V2.9.1 reads the completed engineering summary rendered by ui-engineering.
+ // Refresh it after the core result adapter finishes so the visible hero and
+ // Engineering Decision do not remain in their initial "waiting" state.
+ queueMicrotask(()=>window.CockpitScientific?.refresh?.());
+}
 
 function setupAdmin(){
  const admin=q('#adminPage');if(!admin||admin.dataset.cockpitAdmin)return;admin.dataset.cockpitAdmin='1';

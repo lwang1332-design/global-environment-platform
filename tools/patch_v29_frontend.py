@@ -34,9 +34,9 @@ if 'assets/v291-admin-gate.js' not in s:
     if marker not in s: raise SystemExit('v29-config.js marker not found')
     s=s.replace(marker,marker+'\n'+admin_gate)
 
-scientific_js='<script src="./assets/cockpit-v291.js?v=20260831-v291"></script>'
+scientific_js='<script src="./assets/cockpit-v291.js?v=20260901-summaryfix1"></script>'
 if 'assets/cockpit-v291.js' not in s:
-    marker='<script src="./assets/cockpit-v29.js?v=20260831-cockpit1"></script>'
+    marker='<script src="./assets/cockpit-v29.js?v=20260901-summaryfix1"></script>'
     if marker not in s: raise SystemExit('cockpit-v29.js marker not found')
     s=s.replace(marker,marker+'\n'+scientific_js)
 
