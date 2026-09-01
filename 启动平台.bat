@@ -36,7 +36,9 @@ echo [2/4] 检查本地数据库和目录...
 echo [3/4] 启动本地服务（自动寻找 8080-8090 可用端口）...
 if exist ".local_server.pid" del /q ".local_server.pid" >nul 2>nul
 if exist ".local_server.port" del /q ".local_server.port" >nul 2>nul
-start "GEPlatformLocalServer" /min "!PY_EXE!" !PY_ARGS! "%CD%\local_server.py"
+set "SERVER_SCRIPT=local_server.py"
+if exist "%CD%\local_server_v2.py" set "SERVER_SCRIPT=local_server_v2.py"
+start "GEPlatformLocalServer" /min "!PY_EXE!" !PY_ARGS! "%CD%\!SERVER_SCRIPT!"
 
 for /L %%i in (1,1,30) do (
   if exist ".local_server.port" goto :OPEN
