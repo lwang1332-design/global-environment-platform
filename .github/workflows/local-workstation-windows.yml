@@ -1,0 +1,101 @@
+name: Windows Local Workstation Acceptance
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "local_server.py"
+      - "assets/local-workstation.*"
+      - "assets/v29-runtime-config.js"
+      - "tests/local_*"
+      - "启动平台.bat"
+      - "停止平台.bat"
+      - "一键测试.bat"
+      - "VERSION.json"
+      - "config/**"
+      - ".github/workflows/local-workstation-windows.yml"
+  push:
+    branches: ["local-deployment-v3"]
+  workflow_dispatch:
+
+jobs:
+  windows-local-acceptance:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Static syntax checks
+        shell: pwsh
+        run: |
+          python -m py_compile local_server.py tests/local_workstation_smoke.py
+          node --check assets/local-workstation.js
+          node --check assets/v29-runtime-config.js
+          node --check tests/local_ui_smoke.mjs
+
+      - name: Install Playwright Chromium
+        shell: pwsh
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+
+      - name: Start localhost server
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath python -ArgumentList 'local_server.py' -PassThru -WindowStyle Hidden
+          $p.Id | Set-Content '.ci_server.pid'
+          for($i=0; $i -lt 60; $i++) {
+            if(Test-Path '.local_server.port') { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if(-not (Test-Path '.local_server.port')) { throw 'local server did not create port file' }
+          $port = Get-Content '.local_server.port'
+          Write-Host "Local server: http://127.0.0.1:$port"
+
+      - name: Python API smoke test
+        shell: pwsh
+        run: |
+          $env:REQUIRE_LIVE_DATA='0'
+          python tests/local_workstation_smoke.py
+
+      - name: Browser workstation smoke test
+        shell: pwsh
+        run: node tests/local_ui_smoke.mjs
+
+      - name: Verify Windows batch files parse and exist
+        shell: pwsh
+        run: |
+          foreach($f in @('启动平台.bat','停止平台.bat','一键测试.bat')) {
+            if(-not (Test-Path $f)) { throw "missing $f" }
+            $txt = Get-Content -Raw -Encoding UTF8 $f
+            if($txt.Length -lt 100) { throw "$f unexpectedly short" }
+          }
+          if((Get-Content -Raw -Encoding UTF8 '启动平台.bat') -notmatch '"!PY_EXE!"') { throw 'launcher missing quoted Python executable handling' }
+
+      - name: Upload local logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-workstation-logs
+          path: |
+            logs/**
+            .local_server.port
+            .local_server.pid
+          if-no-files-found: ignore
+
+      - name: Stop localhost server
+        if: always()
+        shell: pwsh
+        run: |
+          if(Test-Path '.local_server.pid') {
+            $serverPid = [int](Get-Content '.local_server.pid')
+            Stop-Process -Id $serverPid -Force -ErrorAction SilentlyContinue
+          }
