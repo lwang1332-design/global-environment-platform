@@ -16,6 +16,7 @@ if(['localhost','127.0.0.1'].includes(location.hostname)){
     'geocoding-api.open-meteo.com':'geocode'
   };
   window.__GE_NATIVE_FETCH__=nativeFetch;
+  window.GE_LOCAL_SOURCE_STATE=window.GE_LOCAL_SOURCE_STATE||{};
   window.fetch=function(input,init){
     try{
       const raw=input instanceof Request?input.url:String(input);
@@ -23,15 +24,23 @@ if(['localhost','127.0.0.1'].includes(location.hostname)){
       if(kind){
         const local=new URL('/local-api/openmeteo',location.origin);
         local.searchParams.set('_kind',kind);
+        if(!navigator.onLine)local.searchParams.set('_offline','1');
         u.searchParams.forEach((v,k)=>local.searchParams.append(k,v));
-        return nativeFetch(local.toString(),init);
+        return nativeFetch(local.toString(),init).then(r=>{
+          const mode=r.headers.get('X-GE-Cache-Mode')||'unknown';
+          const updatedAt=r.headers.get('X-GE-Cache-Updated-At')||'';
+          const detail={kind,mode,updatedAt,ok:r.ok,status:r.status,at:new Date().toISOString()};
+          window.GE_LOCAL_SOURCE_STATE[kind]=detail;
+          window.dispatchEvent(new CustomEvent('ge-local-source-state',{detail}));
+          return r;
+        });
       }
     }catch{}
     return nativeFetch(input,init);
   };
 
   const s=document.createElement('script');
-  s.src='./assets/local-workstation.js?v=20260901-local-v3-ui3';
+  s.src='./assets/local-workstation.js?v=20260901-local-v3-ui4';
   s.async=true;
   document.head.appendChild(s);
 }
