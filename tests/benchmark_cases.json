@@ -1,0 +1,60 @@
+{
+  "schema": "GE-BENCHMARK-1",
+  "description": "全球环境适应性平台固定工程回归场景。坐标与场景固定；基准输出只能由真实数据完成首次验收后固化，禁止人工编造数值。",
+  "baseline_policy": {
+    "source": "live public data or approved cached snapshot",
+    "freeze_after_engineering_review": true,
+    "numeric_baseline_file": "tests/benchmark_baseline_approved.json",
+    "rule": "若模型版本未变，核心结果变化超过已批准容差则阻止合并；模型版本升级时必须重新审批基准。"
+  },
+  "cases": [
+    {
+      "id": "CASE-001",
+      "name": "三亚",
+      "latitude": 18.2528,
+      "longitude": 109.5119,
+      "scenario": ["高温", "高湿", "凝露", "滨海盐雾", "海洋"],
+      "focus": ["ERA5小时气象", "CAMS海盐/颗粒", "Marine", "凝露模型", "盐雾腐蚀模型", "风温联合"]
+    },
+    {
+      "id": "CASE-002",
+      "name": "新疆若羌",
+      "latitude": 39.0237,
+      "longitude": 88.1688,
+      "scenario": ["沙戈荒", "粉尘", "沙蚀", "大温差", "低湿"],
+      "focus": ["ERA5温度/风", "CAMS Dust/PM10", "粉尘积灰模型", "沙蚀模型"]
+    },
+    {
+      "id": "CASE-003",
+      "name": "Basra Iraq",
+      "latitude": 30.5085,
+      "longitude": 47.7804,
+      "scenario": ["极端高温", "粉尘", "沙尘", "热管理"],
+      "focus": ["P99高温", "高温低风", "CAMS Dust", "热管理Design Gap"]
+    },
+    {
+      "id": "CASE-004",
+      "name": "拉萨",
+      "latitude": 29.6520,
+      "longitude": 91.1721,
+      "scenario": ["高海拔", "低气压", "大温差", "低温"],
+      "focus": ["Elevation/DEM", "ERA5气压", "空气密度", "高海拔散热衰减"]
+    },
+    {
+      "id": "CASE-005",
+      "name": "North Sea Offshore",
+      "latitude": 56.5000,
+      "longitude": 3.0000,
+      "scenario": ["海洋", "高湿", "盐雾", "强风", "低温"],
+      "focus": ["Marine", "CAMS Sea Salt", "盐雾腐蚀", "极端风"]
+    },
+    {
+      "id": "CASE-006",
+      "name": "吐鲁番",
+      "latitude": 42.9513,
+      "longitude": 89.1895,
+      "scenario": ["高温", "沙漠", "低湿", "粉尘", "沙蚀"],
+      "focus": ["ERA5高温", "CAMS Dust", "粉尘积灰", "沙蚀", "风温联合"]
+    }
+  ]
+}

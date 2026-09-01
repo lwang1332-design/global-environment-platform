@@ -1,0 +1,131 @@
+name: Windows Local Workstation Acceptance
+
+on:
+  pull_request:
+    branches: ["main"]
+    paths:
+      - "local_server.py"
+      - "local_server_v2.py"
+      - "assets/local-workstation.*"
+      - "assets/v29-runtime-config.js"
+      - "tests/local_*"
+      - "scripts/install-gep-windows.ps1"
+      - "安装到D盘.bat"
+      - "启动平台.bat"
+      - "停止平台.bat"
+      - "一键测试.bat"
+      - "VERSION.json"
+      - "config/**"
+      - ".github/workflows/local-workstation-windows.yml"
+  push:
+    branches: ["local-deployment-v3"]
+  workflow_dispatch:
+
+jobs:
+  windows-local-acceptance:
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Static syntax checks
+        shell: pwsh
+        run: |
+          python -m py_compile local_server.py local_server_v2.py tests/local_workstation_smoke.py
+          node --check assets/local-workstation.js
+          node --check assets/v29-runtime-config.js
+          node --check tests/local_ui_smoke.mjs
+          [void][scriptblock]::Create((Get-Content -Raw -Encoding UTF8 'scripts/install-gep-windows.ps1'))
+
+      - name: Install Playwright Chromium
+        shell: pwsh
+        run: |
+          npm install --no-save playwright@1.55.0
+          npx playwright install chromium
+
+      - name: Start localhost server
+        shell: pwsh
+        run: |
+          $p = Start-Process -FilePath python -ArgumentList 'local_server_v2.py' -PassThru -WindowStyle Hidden
+          $p.Id | Set-Content '.ci_server.pid'
+          for($i=0; $i -lt 60; $i++) {
+            if(Test-Path '.local_server.port') { break }
+            Start-Sleep -Milliseconds 500
+          }
+          if(-not (Test-Path '.local_server.port')) { throw 'local server did not create port file' }
+          $port = Get-Content '.local_server.port'
+          Write-Host "Local server: http://127.0.0.1:$port"
+
+      - name: Python API smoke test
+        shell: pwsh
+        run: |
+          $env:REQUIRE_LIVE_DATA='0'
+          python tests/local_workstation_smoke.py
+
+      - name: Central config same-origin proxy check
+        shell: pwsh
+        run: |
+          $port = Get-Content '.local_server.port'
+          try {
+            $r = Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:$port/local-api/cloud-config/config/latest" -TimeoutSec 15
+            if($r.StatusCode -ne 200) { throw "unexpected status $($r.StatusCode)" }
+            if($r.Headers['X-GE-Cloud-Proxy'] -ne 'localhost') { throw 'missing localhost proxy marker' }
+            Write-Host 'CENTRAL_CONFIG_PROXY_OK'
+          } catch {
+            throw "central config proxy failed: $($_.Exception.Message)"
+          }
+
+      - name: Browser workstation smoke test
+        shell: pwsh
+        run: node tests/local_ui_smoke.mjs
+
+      - name: Verify Windows batch files parse and exist
+        shell: pwsh
+        run: |
+          foreach($f in @('启动平台.bat','停止平台.bat','一键测试.bat','安装到D盘.bat')) {
+            if(-not (Test-Path $f)) { throw "missing $f" }
+            $txt = Get-Content -Raw -Encoding UTF8 $f
+            if($txt.Length -lt 100) { throw "$f unexpectedly short" }
+          }
+          if((Get-Content -Raw -Encoding UTF8 '启动平台.bat') -notmatch '"!PY_EXE!"') { throw 'launcher missing quoted Python executable handling' }
+          if((Get-Content -Raw -Encoding UTF8 '启动平台.bat') -notmatch 'local_server_v2.py') { throw 'launcher missing enhanced server entrypoint' }
+
+      - name: One-click installer smoke test
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'Program Files\GEP goldwind'
+          & '.\scripts\install-gep-windows.ps1' -Target $target -Branch 'local-deployment-v3' -NoStart
+          if($LASTEXITCODE -ne 0) { throw "installer exit=$LASTEXITCODE" }
+          foreach($f in @('index.html','local_server.py','local_server_v2.py','启动平台.bat','停止平台.bat','VERSION.json','LOCAL_INSTALL.json')) {
+            if(-not (Test-Path (Join-Path $target $f))) { throw "installer missing $f" }
+          }
+          if(-not (Test-Path (Join-Path $target 'data'))) { throw 'installer did not create data directory' }
+          if(-not (Test-Path (Join-Path $target 'projects'))) { throw 'installer did not create projects directory' }
+
+      - name: Upload local logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: local-workstation-logs
+          path: |
+            logs/**
+            .local_server.port
+            .local_server.pid
+          if-no-files-found: ignore
+
+      - name: Stop localhost server
+        if: always()
+        shell: pwsh
+        run: |
+          if(Test-Path '.local_server.pid') {
+            $serverPid = [int](Get-Content '.local_server.pid')
+            Stop-Process -Id $serverPid -Force -ErrorAction SilentlyContinue
+          }
