@@ -51,7 +51,7 @@ New-Item -ItemType Directory -Force -Path $tempRoot,$extractPath | Out-Null
 try {
   Write-Step "下载 GEP 本地工作站版本：$Branch"
   try {
-    Invoke-WebRequest -UseBasicParsing -Uri $archiveUrl -OutFile $zipPath -TimeoutSec 90 -Headers @{ 'User-Agent'='GEP-Goldwind-Installer/1.0' }
+    Invoke-WebRequest -UseBasicParsing -Uri $archiveUrl -OutFile $zipPath -TimeoutSec 90 -Headers @{ 'User-Agent'='GEP-Goldwind-Installer/1.6' }
   } catch {
     if (Get-Command curl.exe -ErrorAction SilentlyContinue) {
       & curl.exe -L --fail --retry 2 --connect-timeout 20 -o $zipPath $archiveUrl
@@ -73,9 +73,9 @@ try {
 
   if (Test-Path $Target) {
     Write-Step '检测到已有安装，先停止平台并保留用户数据'
-    $stopBat = Join-Path $Target '停止平台.bat'
-    if (Test-Path $stopBat) {
-      try { Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', (Quote-Arg $stopBat) -WorkingDirectory $Target -Wait -WindowStyle Hidden } catch {}
+    $stopCmd = Join-Path $Target 'GEP_STOP.cmd'
+    if (Test-Path $stopCmd) {
+      try { Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', (Quote-Arg $stopCmd) -WorkingDirectory $Target -Wait -WindowStyle Hidden } catch {}
     }
     $stamp = Get-Date -Format 'yyyyMMdd_HHmmss'
     $pre = Join-Path $Target "backup\preinstall_$stamp"
@@ -95,7 +95,6 @@ try {
   & robocopy @roboArgs | Out-Null
   $roboExit = $LASTEXITCODE
   if ($roboExit -ge 8) { throw "文件复制失败，robocopy exit=$roboExit" }
-  # Robocopy 0-7 are successful states; do not let a successful 'files copied' code leak as process failure.
   $global:LASTEXITCODE = 0
 
   foreach ($d in @('data','cache','projects','reports','logs','backup','runtime','config')) {
@@ -107,26 +106,28 @@ try {
     install_path = $Target
     repository = $repo
     branch = $Branch
-    installer_version = '1.3'
+    installer_version = '1.6'
   }
   $meta | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $Target 'LOCAL_INSTALL.json')
 
   Write-Step '创建桌面快捷方式'
-  $startBat = Join-Path $Target '启动平台.bat'
+  $startCmd = Join-Path $Target 'GEP_START.cmd'
   try {
     $cmdExe = $env:ComSpec
     if (-not $cmdExe) { $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe' }
-    $cmdArgs = '/c ""' + $startBat + '""'
+    $cmdArgs = '/c ""' + $startCmd + '""'
     $shell = New-Object -ComObject WScript.Shell
 
     $desktop = [Environment]::GetFolderPath('Desktop')
-    $shortcutPath = Join-Path $desktop 'GEP Goldwind.lnk'
-    $shortcut = $shell.CreateShortcut($shortcutPath)
-    $shortcut.TargetPath = $cmdExe
-    $shortcut.Arguments = $cmdArgs
-    $shortcut.WorkingDirectory = $Target
-    $shortcut.Description = 'Global Wind Turbine Environmental Adaptability Platform - Local Workstation'
-    $shortcut.Save()
+    if ($desktop) {
+      $shortcutPath = Join-Path $desktop 'GEP Goldwind.lnk'
+      $shortcut = $shell.CreateShortcut($shortcutPath)
+      $shortcut.TargetPath = $cmdExe
+      $shortcut.Arguments = $cmdArgs
+      $shortcut.WorkingDirectory = $Target
+      $shortcut.Description = 'Global Wind Turbine Environmental Adaptability Platform - Local Workstation'
+      $shortcut.Save()
+    }
 
     $programs = [Environment]::GetFolderPath('Programs')
     if ($programs) {
@@ -143,16 +144,16 @@ try {
   }
 
   Write-Step '检查关键文件'
-  foreach ($required in @('index.html','local_server.py','local_server_v2.py','启动平台.bat','停止平台.bat','VERSION.json')) {
+  foreach ($required in @('index.html','local_server.py','GEP_START.cmd','GEP_STOP.cmd','VERSION.json')) {
     if (-not (Test-Path (Join-Path $Target $required))) { throw "缺少关键文件：$required" }
   }
 
   if (-not $NoStart) {
     Write-Step '启动本地平台'
-    Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', (Quote-Arg $startBat) -WorkingDirectory $Target
+    Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', (Quote-Arg $startCmd) -WorkingDirectory $Target
 
     $portFile = Join-Path $Target '.local_server.port'
-    $deadline = (Get-Date).AddSeconds(45)
+    $deadline = (Get-Date).AddSeconds(60)
     while ((Get-Date) -lt $deadline -and -not (Test-Path $portFile)) { Start-Sleep -Milliseconds 500 }
     if (Test-Path $portFile) {
       $port = (Get-Content $portFile -ErrorAction SilentlyContinue | Select-Object -First 1).Trim()
@@ -166,7 +167,7 @@ try {
         }
       }
     } else {
-      Write-Warning '安装完成，但未检测到端口文件。请进入安装目录双击“启动平台.bat”，并查看 logs 目录。'
+      Write-Warning '安装完成，但未检测到端口文件。请运行 GEP_START.cmd，并查看 logs 目录。'
     }
   } else {
     Write-Host "`n部署成功：$Target" -ForegroundColor Green
