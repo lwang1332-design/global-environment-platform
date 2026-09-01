@@ -8,6 +8,8 @@ on:
       - "assets/local-workstation.*"
       - "assets/v29-runtime-config.js"
       - "tests/local_*"
+      - "scripts/install-gep-windows.ps1"
+      - "安装到D盘.bat"
       - "启动平台.bat"
       - "停止平台.bat"
       - "一键测试.bat"
@@ -40,6 +42,7 @@ jobs:
           node --check assets/local-workstation.js
           node --check assets/v29-runtime-config.js
           node --check tests/local_ui_smoke.mjs
+          [void][scriptblock]::Create((Get-Content -Raw -Encoding UTF8 'scripts/install-gep-windows.ps1'))
 
       - name: Install Playwright Chromium
         shell: pwsh
@@ -73,12 +76,23 @@ jobs:
       - name: Verify Windows batch files parse and exist
         shell: pwsh
         run: |
-          foreach($f in @('启动平台.bat','停止平台.bat','一键测试.bat')) {
+          foreach($f in @('启动平台.bat','停止平台.bat','一键测试.bat','安装到D盘.bat')) {
             if(-not (Test-Path $f)) { throw "missing $f" }
             $txt = Get-Content -Raw -Encoding UTF8 $f
             if($txt.Length -lt 100) { throw "$f unexpectedly short" }
           }
           if((Get-Content -Raw -Encoding UTF8 '启动平台.bat') -notmatch '"!PY_EXE!"') { throw 'launcher missing quoted Python executable handling' }
+
+      - name: One-click installer smoke test
+        shell: pwsh
+        run: |
+          $target = Join-Path $env:RUNNER_TEMP 'Program Files\GEP goldwind'
+          & '.\scripts\install-gep-windows.ps1' -Target $target -Branch 'local-deployment-v3' -NoStart
+          foreach($f in @('index.html','local_server.py','启动平台.bat','停止平台.bat','VERSION.json','LOCAL_INSTALL.json')) {
+            if(-not (Test-Path (Join-Path $target $f))) { throw "installer missing $f" }
+          }
+          if(-not (Test-Path (Join-Path $target 'data'))) { throw 'installer did not create data directory' }
+          if(-not (Test-Path (Join-Path $target 'projects'))) { throw 'installer did not create projects directory' }
 
       - name: Upload local logs on failure
         if: failure()
