@@ -66,8 +66,8 @@ jobs:
                curl -fsSL --max-time 20 "$JS" -o /tmp/joint.js && \
                curl -fsSL --max-time 20 "$REPORT" -o /tmp/report.js && \
                grep -q "V2.9 · 参数云同步 + 风温联合版" /tmp/page.html && \
-     grep -q "report-v29.js?v=20260901-r2" /tmp/page.html && \
-     grep -q "cockpit-v29.js?v=20260901-summaryfix1" /tmp/page.html && \
+               grep -q "report-v29.js?v=20260901-r2" /tmp/page.html && \
+               grep -q "cockpit-v29.js?v=20260901-summaryfix1" /tmp/page.html && \
                grep -q "风温联合分布" /tmp/joint.js && \
                grep -q "Executive Summary｜项目综合结论" /tmp/report.js && \
                node --check /tmp/joint.js >/dev/null 2>&1 && node --check /tmp/report.js >/dev/null 2>&1; then
