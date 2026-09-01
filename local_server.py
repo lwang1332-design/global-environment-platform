@@ -24,6 +24,14 @@ PORT_FILE = ROOT / ".local_server.port"
 VERSION_FILE = ROOT / "VERSION.json"
 USER_CONFIG = CONFIG / "user-config.json"
 REMOTE_CONFIG_BASE = "https://vzlnwrxscufkchxkdjus.supabase.co/functions/v1/v29-config"
+OPEN_METEO_BASES = {
+    "archive": "https://archive-api.open-meteo.com/v1/archive",
+    "air": "https://air-quality-api.open-meteo.com/v1/air-quality",
+    "marine": "https://marine-api.open-meteo.com/v1/marine",
+    "elevation": "https://api.open-meteo.com/v1/elevation",
+    "geocode": "https://geocoding-api.open-meteo.com/v1/search",
+}
+OPEN_METEO_TTL = {"archive": 604800, "air": 21600, "marine": 3600, "elevation": 2592000, "geocode": 2592000}
 
 for p in (DATA, CONFIG, CACHE, PROJECTS, REPORTS, LOGS, BACKUP):
     p.mkdir(parents=True, exist_ok=True)
@@ -84,6 +92,10 @@ def safe_name(value, fallback="project"):
 
 def cache_key(lat, lon, start, end):
     return f"era5:{lat:.5f}:{lon:.5f}:{start}:{end}"
+
+def public_proxy_key(kind, params):
+    pairs = sorted((str(k), str(v)) for k, vals in params.items() for v in vals)
+    return "openmeteo:" + kind + ":" + urllib.parse.urlencode(pairs)
 
 def fetch_bytes(url, timeout=15, limit=2_000_000):
     req = urllib.request.Request(
@@ -233,6 +245,37 @@ class Handler(SimpleHTTPRequestHandler):
                     "counts": counts, "time": now()
                 })
 
+            if path == "/local-api/openmeteo":
+                kind = str(q.get("_kind", [""])[0]).lower()
+                base = OPEN_METEO_BASES.get(kind)
+                if not base:
+                    return self.sendj(400, {"error": True, "message": "Unsupported Open-Meteo source"})
+                forwarded = {k: vals for k, vals in q.items() if k != "_kind"}
+                key = public_proxy_key(kind, forwarded)
+                cached = get_cached(key)
+                pairs = [(k, v) for k, vals in forwarded.items() for v in vals]
+                upstream = base + ("?" + urllib.parse.urlencode(pairs, doseq=True, safe=",") if pairs else "")
+                try:
+                    payload = fetch_json(upstream, 25)
+                    if isinstance(payload, dict) and payload.get("error"):
+                        raise RuntimeError(payload.get("reason", "Open-Meteo error"))
+                    if isinstance(payload, dict):
+                        payload["_local_cache"] = {"mode": "live", "queried_at": now(), "source": kind}
+                    put_cache(key, payload, f"Open-Meteo:{kind}", OPEN_METEO_TTL.get(kind, 21600))
+                    return self.sendj(200, payload)
+                except Exception as e:
+                    if cached:
+                        payload = dict(cached["payload"]) if isinstance(cached["payload"], dict) else {"data": cached["payload"]}
+                        payload["_local_cache"] = {
+                            "mode": "cached", "updated_at": cached["updated_at"],
+                            "expired": cached["expired"], "upstream_error": str(e), "source": kind
+                        }
+                        return self.sendj(200, payload)
+                    return self.sendj(502, {
+                        "error": True, "reason": "数据源暂不可用", "detail": str(e),
+                        "source": f"Open-Meteo:{kind}"
+                    })
+
             if path == "/local-api/sources":
                 lat = valid_coord(q.get("latitude", ["18.2528"])[0], -90, 90)
                 lon = valid_coord(q.get("longitude", ["109.5119"])[0], -180, 180)
@@ -332,7 +375,7 @@ class Handler(SimpleHTTPRequestHandler):
                 daily = "temperature_2m_max,temperature_2m_min,precipitation_sum,snowfall_sum"
                 qs = urllib.parse.urlencode({
                     "latitude": lat, "longitude": lon, "start_date": start, "end_date": end,
-                    "hourly": hourly, "daily": daily, "timezone": "auto",
+                    "hourly": hourly, "daily": daily, "timezone": "UTC",
                     "models": "era5", "wind_speed_unit": "ms"
                 }, safe=",")
                 try:
