@@ -2,8 +2,19 @@
   "platform_version": "V2.9.0-local-v3",
   "code_version": "local-deployment-v3",
   "model_version": "inherit-v2.9-no-formula-change",
+  "models": {
+    "condensation": "V2.9-inherit",
+    "salt_corrosion": "V2.9-inherit",
+    "dust_fouling": "V2.9-inherit",
+    "sand_erosion": "V2.9-inherit",
+    "high_altitude_thermal": "V2.9-inherit",
+    "rain_snow_extreme_wind": "V2.9-inherit",
+    "wind_temperature_joint": "V2.9"
+  },
   "parameter_version": "runtime-cloud-or-local-snapshot",
   "database_version": "1",
+  "local_api_version": "1",
   "build_date": "2026-09-01",
-  "deployment_mode": ["github-pages", "local-online", "local-offline-cache"]
+  "deployment_mode": ["github-pages", "local-online", "local-offline-cache"],
+  "notes": "Local workstation adds deployment/storage/cache/traceability only; engineering formulas remain inherited from V2.9."
 }
