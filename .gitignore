@@ -1,0 +1,13 @@
+# Local workstation runtime
+runtime/
+data/*.sqlite3
+data/*.sqlite3-*
+cache/*
+projects/*
+reports/*
+logs/*
+backup/*
+.local_server.pid
+.local_server.port
+.env
+!.gitkeep
