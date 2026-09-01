@@ -1,0 +1,9 @@
+{
+  "platform_version": "V2.9.0-local-v3",
+  "code_version": "local-deployment-v3",
+  "model_version": "inherit-v2.9-no-formula-change",
+  "parameter_version": "runtime-cloud-or-local-snapshot",
+  "database_version": "1",
+  "build_date": "2026-09-01",
+  "deployment_mode": ["github-pages", "local-online", "local-offline-cache"]
+}
