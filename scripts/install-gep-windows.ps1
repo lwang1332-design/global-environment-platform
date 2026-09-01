@@ -104,16 +104,22 @@ try {
     install_path = $Target
     repository = $repo
     branch = $Branch
-    installer_version = '1.0'
+    installer_version = '1.1'
   }
   $meta | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $Target 'LOCAL_INSTALL.json')
 
   Write-Step '创建桌面快捷方式'
+  $startBat = Join-Path $Target '启动平台.bat'
+  $cmdExe = $env:ComSpec
+  if (-not $cmdExe) { $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe' }
+  $cmdArgs = '/c ""' + $startBat + '""'
+  $shell = New-Object -ComObject WScript.Shell
+
   $desktop = [Environment]::GetFolderPath('Desktop')
   $shortcutPath = Join-Path $desktop '全球风电环境适应性评估平台.lnk'
-  $shell = New-Object -ComObject WScript.Shell
   $shortcut = $shell.CreateShortcut($shortcutPath)
-  $shortcut.TargetPath = Join-Path $Target '启动平台.bat'
+  $shortcut.TargetPath = $cmdExe
+  $shortcut.Arguments = $cmdArgs
   $shortcut.WorkingDirectory = $Target
   $shortcut.Description = '全球风电机组环境适应性评估平台 - 本地工作站'
   $shortcut.Save()
@@ -121,7 +127,8 @@ try {
   $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) '全球风电环境适应性评估平台.lnk'
   try {
     $s2 = $shell.CreateShortcut($startMenu)
-    $s2.TargetPath = Join-Path $Target '启动平台.bat'
+    $s2.TargetPath = $cmdExe
+    $s2.Arguments = $cmdArgs
     $s2.WorkingDirectory = $Target
     $s2.Description = '全球风电机组环境适应性评估平台 - 本地工作站'
     $s2.Save()
@@ -134,7 +141,6 @@ try {
 
   if (-not $NoStart) {
     Write-Step '启动本地平台'
-    $startBat = Join-Path $Target '启动平台.bat'
     Start-Process -FilePath 'cmd.exe' -ArgumentList '/c', (Quote-Arg $startBat) -WorkingDirectory $Target
 
     $portFile = Join-Path $Target '.local_server.port'
