@@ -93,7 +93,10 @@ try {
   $excludeFiles = @('.local_server.pid','.local_server.port','.env','user-config.json')
   $roboArgs = @($sourcePath,$Target,'/E','/COPY:DAT','/DCOPY:DAT','/R:2','/W:1','/NFL','/NDL','/NJH','/NJS','/NP','/XD') + $excludeDirs + @('/XF') + $excludeFiles
   & robocopy @roboArgs | Out-Null
-  if ($LASTEXITCODE -ge 8) { throw "文件复制失败，robocopy exit=$LASTEXITCODE" }
+  $roboExit = $LASTEXITCODE
+  if ($roboExit -ge 8) { throw "文件复制失败，robocopy exit=$roboExit" }
+  # Robocopy 0-7 are successful states; do not let a successful 'files copied' code leak as process failure.
+  $global:LASTEXITCODE = 0
 
   foreach ($d in @('data','cache','projects','reports','logs','backup','runtime','config')) {
     New-Item -ItemType Directory -Force -Path (Join-Path $Target $d) | Out-Null
@@ -104,7 +107,7 @@ try {
     install_path = $Target
     repository = $repo
     branch = $Branch
-    installer_version = '1.2'
+    installer_version = '1.3'
   }
   $meta | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $Target 'LOCAL_INSTALL.json')
 
@@ -140,7 +143,7 @@ try {
   }
 
   Write-Step '检查关键文件'
-  foreach ($required in @('index.html','local_server.py','启动平台.bat','停止平台.bat','VERSION.json')) {
+  foreach ($required in @('index.html','local_server.py','local_server_v2.py','启动平台.bat','停止平台.bat','VERSION.json')) {
     if (-not (Test-Path (Join-Path $Target $required))) { throw "缺少关键文件：$required" }
   }
 
@@ -171,6 +174,7 @@ try {
 
   Write-Host '桌面快捷方式：GEP Goldwind' -ForegroundColor Green
   Write-Host '用户数据目录在升级时会保留：data / cache / projects / reports / logs / backup / runtime' -ForegroundColor DarkGray
+  $global:LASTEXITCODE = 0
 }
 finally {
   try { Remove-Item -Recurse -Force $tempRoot -ErrorAction SilentlyContinue } catch {}
