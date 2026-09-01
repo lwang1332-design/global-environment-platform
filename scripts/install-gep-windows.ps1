@@ -104,35 +104,40 @@ try {
     install_path = $Target
     repository = $repo
     branch = $Branch
-    installer_version = '1.1'
+    installer_version = '1.2'
   }
   $meta | ConvertTo-Json -Depth 4 | Set-Content -Encoding UTF8 (Join-Path $Target 'LOCAL_INSTALL.json')
 
   Write-Step '创建桌面快捷方式'
   $startBat = Join-Path $Target '启动平台.bat'
-  $cmdExe = $env:ComSpec
-  if (-not $cmdExe) { $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe' }
-  $cmdArgs = '/c ""' + $startBat + '""'
-  $shell = New-Object -ComObject WScript.Shell
-
-  $desktop = [Environment]::GetFolderPath('Desktop')
-  $shortcutPath = Join-Path $desktop '全球风电环境适应性评估平台.lnk'
-  $shortcut = $shell.CreateShortcut($shortcutPath)
-  $shortcut.TargetPath = $cmdExe
-  $shortcut.Arguments = $cmdArgs
-  $shortcut.WorkingDirectory = $Target
-  $shortcut.Description = '全球风电机组环境适应性评估平台 - 本地工作站'
-  $shortcut.Save()
-
-  $startMenu = Join-Path ([Environment]::GetFolderPath('Programs')) '全球风电环境适应性评估平台.lnk'
   try {
-    $s2 = $shell.CreateShortcut($startMenu)
-    $s2.TargetPath = $cmdExe
-    $s2.Arguments = $cmdArgs
-    $s2.WorkingDirectory = $Target
-    $s2.Description = '全球风电机组环境适应性评估平台 - 本地工作站'
-    $s2.Save()
-  } catch {}
+    $cmdExe = $env:ComSpec
+    if (-not $cmdExe) { $cmdExe = Join-Path $env:SystemRoot 'System32\cmd.exe' }
+    $cmdArgs = '/c ""' + $startBat + '""'
+    $shell = New-Object -ComObject WScript.Shell
+
+    $desktop = [Environment]::GetFolderPath('Desktop')
+    $shortcutPath = Join-Path $desktop 'GEP Goldwind.lnk'
+    $shortcut = $shell.CreateShortcut($shortcutPath)
+    $shortcut.TargetPath = $cmdExe
+    $shortcut.Arguments = $cmdArgs
+    $shortcut.WorkingDirectory = $Target
+    $shortcut.Description = 'Global Wind Turbine Environmental Adaptability Platform - Local Workstation'
+    $shortcut.Save()
+
+    $programs = [Environment]::GetFolderPath('Programs')
+    if ($programs) {
+      $startMenu = Join-Path $programs 'GEP Goldwind.lnk'
+      $s2 = $shell.CreateShortcut($startMenu)
+      $s2.TargetPath = $cmdExe
+      $s2.Arguments = $cmdArgs
+      $s2.WorkingDirectory = $Target
+      $s2.Description = 'Global Wind Turbine Environmental Adaptability Platform - Local Workstation'
+      $s2.Save()
+    }
+  } catch {
+    Write-Warning "快捷方式创建失败，但程序已完成部署：$($_.Exception.Message)"
+  }
 
   Write-Step '检查关键文件'
   foreach ($required in @('index.html','local_server.py','启动平台.bat','停止平台.bat','VERSION.json')) {
@@ -158,13 +163,13 @@ try {
         }
       }
     } else {
-      Write-Warning '安装完成，但未检测到端口文件。请双击桌面快捷方式再次启动，并查看 logs 目录。'
+      Write-Warning '安装完成，但未检测到端口文件。请进入安装目录双击“启动平台.bat”，并查看 logs 目录。'
     }
   } else {
     Write-Host "`n部署成功：$Target" -ForegroundColor Green
   }
 
-  Write-Host '桌面快捷方式：全球风电环境适应性评估平台' -ForegroundColor Green
+  Write-Host '桌面快捷方式：GEP Goldwind' -ForegroundColor Green
   Write-Host '用户数据目录在升级时会保留：data / cache / projects / reports / logs / backup / runtime' -ForegroundColor DarkGray
 }
 finally {
