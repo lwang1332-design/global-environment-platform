@@ -49,7 +49,7 @@ exit /b 1
 :OPEN
 set /p GE_PORT=<.local_server.port
 echo [4/4] 平台已启动：http://localhost:!GE_PORT!
-start "" "http://localhost:!GE_PORT!/?mode=local"
+if /I not "%GE_NO_BROWSER%"=="1" start "" "http://localhost:!GE_PORT!/?mode=local"
 echo.
 echo 关闭本窗口不会停止平台；需要停止时双击“停止平台.bat”。
 exit /b 0
