@@ -1,0 +1,22 @@
+{
+  "schemaVersion": "local-workstation-1",
+  "network": {
+    "mode": "system",
+    "timeoutSeconds": 15,
+    "retries": 3
+  },
+  "cache": {
+    "environmentTtlSeconds": 21600,
+    "allowOfflineFallback": true
+  },
+  "server": {
+    "host": "127.0.0.1",
+    "preferredPort": 8080,
+    "maxPort": 8090
+  },
+  "dataPolicy": {
+    "neverFabricate": true,
+    "showSource": true,
+    "showTimestamp": true
+  }
+}
