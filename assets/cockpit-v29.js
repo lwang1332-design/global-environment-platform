@@ -17,7 +17,7 @@ function safeCache(){try{return cache||null}catch{return null}}
 function safeCurrent(){try{return current||{}}catch{return {}}}
 
 function renameHeads(){
- const names=[['.mapCard','项目定位','项目位置 · 经纬度 · 地图'],['.summaryCard','综合评估','严酷度 · Gap · TOP风险'],['.envCard','核心环境数据','真实环境工程量 KPI'],['.riskCard','环境风险画像','风险分布 · TOP排序'],['.physicsCard','六大物理模型','核心工程指标 · 设计判定'],['.matrixCard','环境 × 设备风险矩阵','R = H × S × E × P'],['.decisionCard','Engineering Decision','失效链 · Gap · 措施 · 验证']];
+ const names=[['.mapCard','项目定位','项目位置 · 经纬度 · 地图'],['.summaryCard','综合评估','严酷度 · Gap · TOP风险'],['.envCard','核心环境数据','原始数据 → 统计 → 工程模型 → 环境指标 → 风险'],['.riskCard','环境风险画像','风险分布 · TOP排序'],['.physicsCard','六大物理模型','核心工程指标 · 设计判定'],['.matrixCard','环境 × 设备风险矩阵','R = H × S × E × P'],['.decisionCard','Engineering Decision','失效链 · Gap · 措施 · 验证']];
  names.forEach(([sel,a,b])=>{const c=q(sel),h=q('.head h2',c),s=q('.head span',c);if(h)h.textContent=a;if(s)s.textContent=b});
  const joint=q('#jointCard');if(joint){const h=q('.head h2',joint),s=q('.head span',joint);if(h)h.textContent='风温联合分布';if(s)s.textContent='逐小时温度 × 同时刻风速'}
 }
@@ -76,24 +76,121 @@ function prepareDecision(){
  const table=q('#decisionTableWrap',dec);if(table&&!table.closest('details.cockpitDecisionDetails')){const d=document.createElement('details');d.className='cockpitDecisionDetails';const s=document.createElement('summary');s.textContent='查看完整工程措施表';table.before(d);d.append(s,table)}
 }
 
-function kpiCard(title,value,label,items,status=''){
- return `<article class="cockpitKpi"><div class="cockpitKpiTop"><span>${esc(title)}</span>${status?`<em>${esc(status)}</em>`:''}</div><div class="cockpitKpiValue">${value}</div><div class="cockpitKpiLabel">${esc(label)}</div><div class="cockpitKpiItems">${items.map(x=>`<div><span>${esc(x[0])}</span><b>${x[1]}</b></div>`).join('')}</div></article>`;
+function observed(v){return v!==null&&v!==''&&Number.isFinite(Number(v))}
+function clean(values){return Array.isArray(values)?values.filter(observed).map(Number):[]}
+function average(values){const a=clean(values);return a.length?a.reduce((x,y)=>x+y,0)/a.length:NaN}
+function maximum(values){const a=clean(values);return a.length?Math.max(...a):NaN}
+function percentile(values,p){const a=clean(values).sort((x,y)=>x-y);if(!a.length)return NaN;const i=(a.length-1)*p,l=Math.floor(i),h=Math.ceil(i);return l===h?a[l]:a[l]+(a[h]-a[l])*(i-l)}
+function deviation(values){const a=clean(values),m=average(a);return a.length&&finite(m)?Math.sqrt(a.reduce((s,v)=>s+(v-m)**2,0)/a.length):NaN}
+function yearSpan(hourly){const n=Array.isArray(hourly?.time)?hourly.time.length:Math.max(clean(hourly?.temperature_2m).length,clean(hourly?.relative_humidity_2m).length);return n?n/8760:NaN}
+function annualizedHours(hourly,test){const n=Math.max(hourly?.temperature_2m?.length||0,hourly?.relative_humidity_2m?.length||0),years=yearSpan(hourly);if(!n||!finite(years)||years<=0)return NaN;let count=0;for(let i=0;i<n;i++)if(test(i))count++;return count/years}
+function riskLevel(score,fallback='待评价'){if(!finite(score))return fallback;const name={CRITICAL:'极高风险',HIGH:'高风险',MEDIUM:'中风险',LOW:'低风险'};return name[band(score)[0]]}
+function metric(name,variable,formula,algorithm,value,metricUnit,source,risk_level,decimals=1){
+ return {name,variable,formula,algorithm,unit:metricUnit,source,risk_level,value:finite(value)?Number(value):null,decimals};
+}
+function metricHtml(m){return m.value===null?'--':unit(m.value,m.decimals,m.unit)}
+function metricTrace(m){return [m.variable,'｜公式：',m.formula,'｜算法：',m.algorithm,'｜数据源：',m.source,'｜风险等级：',m.risk_level].join('')}
+function environmentCard(moduleName,metrics,moduleRisk){
+ const first=metrics[0]||metric('状态','--','--','等待数据',NaN,'','待接入','待接入',0);
+ const items=metrics.slice(1).map(m=>'<div title="'+esc(metricTrace(m))+'"><span>'+esc(m.name)+'</span><b>'+metricHtml(m)+'</b></div>').join('');
+ return '<article class="cockpitKpi" title="'+esc(metricTrace(first))+'"><div class="cockpitKpiTop"><span>'+esc(moduleName)+'</span><em>'+esc(moduleRisk)+'</em></div><div class="cockpitKpiValue">'+metricHtml(first)+'</div><div class="cockpitKpiLabel">'+esc(first.name)+'</div><div class="cockpitKpiItems">'+items+'</div></article>';
+}
+function buildEnvironmentModules(){
+ const r=safeResult(),b=r.base||{},c=r.condensation||{},s=r.salt||{},d=r.dust||{},ca=safeCache(),h=ca?.w?.j?.hourly||{},aq=ca?.aq?.j?.hourly||{};
+ const T=clean(h.temperature_2m),gust=clean(h.wind_gusts_10m),solar=clean(h.shortwave_radiation),sea=clean(aq.sea_salt_aerosol),so2=clean(aq.sulphur_dioxide);
+ const years=yearSpan(h),tempRisk=riskLevel(Math.max(Number(r.scores?.高温)||0,Number(r.scores?.低温)||0)),humidityRisk=riskLevel(r.scores?.凝露),rainRisk=riskLevel(r.scores?.强降雨),dustRisk=riskLevel(Math.max(Number(r.scores?.粉尘积灰)||0,Number(r.scores?.沙蚀)||0)),windRisk=gust.length?riskLevel(r.scores?.极端风):'待接入',saltRisk=riskLevel(r.scores?.盐雾),altRisk=riskLevel(r.scores?.高海拔),gasRisk=riskLevel(r.composite?.corrosion),iceRisk='待接入';
+ const AH=[];for(let i=0;i<Math.max(h.temperature_2m?.length||0,h.relative_humidity_2m?.length||0);i++){const tv=h.temperature_2m?.[i],rv=h.relative_humidity_2m?.[i],t=observed(tv)?Number(tv):NaN,rh=observed(rv)?Number(rv):NaN;if(finite(t)&&finite(rh)){const es=6.112*Math.exp(17.67*t/(t+243.5));AH.push(216.7*(es*rh/100)/(t+273.15))}}
+
+ const ghi=solar.length&&finite(years)&&years>0?solar.reduce((x,y)=>x+y,0)/1000/years:NaN;
+ const mold=annualizedHours(h,i=>observed(h.temperature_2m?.[i])&&observed(h.relative_humidity_2m?.[i])&&Number(h.temperature_2m[i])>20&&Number(h.relative_humidity_2m[i])>80);
+
+ const drySalt=sea.length&&typeof params!=='undefined'&&finite(params.saltVd)?average(sea)*Number(params.saltVd)*86400/1000:NaN;
+ const modules=[
+  {module:'温度',risk_level:tempRisk,metrics:[
+   metric('极端最高温','T_max_extreme','max(T)','多年小时温度序列最大值',maximum(T),'℃','ERA5 2 m小时温度',tempRisk,1),
+   metric('极端最低温','T_min_extreme','min(T)','多年小时温度序列最小值',T.length?Math.min(...T):NaN,'℃','ERA5 2 m小时温度',tempRisk,1),
+   metric('年平均温度','T_mean','ΣT/n','多年小时温度算术平均',b.tavg,'℃','ERA5 2 m小时温度',tempRisk,1),
+   metric('日温差P95','DeltaT_day_P95','P95(Tmax−Tmin)','逐日计算最高温减最低温后取P95',b.dayRange,'K','ERA5逐日最高/最低温',tempRisk,1),
+   metric('温变速率P95','DeltaT_rate_P95','P95(|Tᵢ₊₁−Tᵢ|/Δt)','相邻小时温差绝对值取P95，Δt=1 h',b.tempRate,'K/h','ERA5 2 m小时温度',tempRisk,1),
+   metric('暴晒最高地表温度','T_surface_P99','P99(T_surface)','地表温度序列P99；当前数据源未提供',NaN,'℃','待接地表温度或表面热平衡模型','待接入',1)
+  ]},
+  {module:'湿度',risk_level:humidityRisk,metrics:[
+   metric('年平均相对湿度','RH_mean','ΣRH/n','多年小时相对湿度算术平均',b.rhMean,'%','ERA5 2 m相对湿度',humidityRisk,1),
+   metric('高湿时间比例','RH90_ratio','N(RH>90%)/N_total×100%','统计RH>90%的小时占比',b.rh90,'%','ERA5 2 m相对湿度',humidityRisk,1),
+   metric('平均绝对湿度','AH_mean','216.7e/(T+273.15)','由温度、相对湿度和饱和水汽压逐小时计算后取均值',b.absHumMean,'g/m³','ERA5温度+相对湿度',humidityRisk,1),
+   metric('最大绝对湿度','AH_max','max(AH)','逐小时绝对湿度最大值',maximum(AH),'g/m³','ERA5温度+相对湿度',humidityRisk,1),
+   metric('年凝露时间','Condensation_hour','ΣI(Ts≤Td)·Δt','沿用现有瞬态表面温度与露点判据并年化',c.annualCondHours,'h/y','ERA5温湿度+现有凝露工程模型',humidityRisk,0)
+  ]},
+  {module:'降雨',risk_level:rainRisk,metrics:[
+   metric('最大日降雨','Rain_daily_max','max(Rain_day)','多年逐日降雨最大值',b.rainMax,'mm/d','ERA5逐日降雨',rainRisk,1),
+   metric('小时强降雨P99','Rain_hour_P99','P99(Rain_hour)','小时降雨量P99',b.rainP99h,'mm/h','ERA5小时降雨',rainRisk,2),
+   metric('年降雨量','Rain_year','ΣRain/years','累计降雨量按数据年数年化',b.rainAnnual,'mm/y','ERA5逐日降雨',rainRisk,0),
+   metric('雨水pH','Rain_pH','mean(pH) / range(pH)','降水化学样本均值及范围；当前未接入',NaN,'pH','待接降水化学监测','待接入',2),
+   metric('冻雨频次','Freezing_rain_count','N(freezing-rain events)/years','冻雨事件去重并年化；当前未接入事件类型',NaN,'次/y','待接冻雨观测/天气现象编码','待接入',1),
+   metric('湿雪频次','Wet_snow_count','N(wet-snow events)/years','湿雪事件去重并年化；当前缺少液态含水量',NaN,'次/y','待接湿雪观测或液态含水量','待接入',1)
+  ]},
+  {module:'PM10 / 颗粒物',risk_level:dustRisk,metrics:[
+   metric('PM10平均','PM10_mean','ΣPM10/n','PM10小时浓度算术平均',d.pmMean,'μg/m³','CAMS Global小时PM10',dustRisk,1),
+   metric('PM10 P95','PM10_P95','P95(PM10)','PM10小时浓度P95',d.pm95,'μg/m³','CAMS Global小时PM10',dustRisk,1),
+   metric('年进入质量','Dust_mass_year','C×Q×t','沿用现有风量、过滤效率和运行时长工程模型',d.annualIn,'kg/y','CAMS PM10+现有设备参数',dustRisk,1),
+   metric('沙尘粒径D50','Dust_D50','P50(particle diameter)','粒径谱中位径；当前无原始粒径谱',NaN,'μm','待接粒径谱监测','待接入',1),
+   metric('沙蚀通量','Sand_flux','kρpCpVⁿ','颗粒浓度与冲击速度侵蚀模型；当前无可校准通量',NaN,'kg/m²·s','待接颗粒通量/粒径/撞击角数据','待接入',3),
+   metric('沙尘暴时间','DustStorm_hour','ΣI(dust-storm event)·Δt/years','事件小时累计并年化；当前无事件标识',NaN,'h/y','待接沙尘暴事件库','待接入',0),
+   metric('硅砂比例','SiO2_ratio','m(SiO₂)/m(dust)×100%','颗粒矿物化验统计；当前未接入',NaN,'%','待接颗粒化学成分监测','待接入',1),
+   metric('矿物组成','Mineral_composition','composition(dust sample)','矿物组分数据库或样品XRD分析；当前未接入',NaN,'-','待接矿物数据库/现场样品','待接入',0)
+  ]},
+  {module:'风速',risk_level:windRisk,metrics:[
+   metric('平均风速','Wind_mean','ΣV/n','多年小时风速算术平均',b.windMean,'m/s','ERA5 10 m小时风速',windRisk,1),
+   metric('设计阵风','Wind_design','V_design','设备设计能力参数，不作为气象观测值',typeof params!=='undefined'?params.capWind:NaN,'m/s','现有设备设计参数',windRisk,0),
+   metric('阵风P99','Gust_P99','P99(V_gust)','仅使用直接阵风时间序列；当前ERA5数据未提供时显示 --',percentile(gust,.99),'m/s',gust.length?'直接阵风时间序列':'未接入真实阵风数据','待接入',1),
+   metric('湍流强度P95','TI_P95','P95(σV/Vmean)×100%','需要10分钟或更高频风速及窗口标准差；当前小时数据不足',NaN,'%','未接入真实高频风速数据','待接入',1),
+   metric('极端风风险评分','Wind_risk_score','normalize(Gust_P99)','仅在获得真实阵风序列后计算；当前不使用代理值',gust.length?r.scores?.极端风:NaN,'0-100',gust.length?'真实阵风序列+既有风险模型':'未接入真实阵风数据','待接入',0)
+  ]},
+  {module:'盐雾',risk_level:saltRisk,metrics:[
+   metric('Cl⁻沉积速率','Cl_dep_rate','F_salt=F_d+F_w','沿用现有海盐气溶胶、沉降速度和海岸修正模型',s.jcl,'mg/m²·d','CAMS海盐+ERA5湿度+现有盐雾模型',saltRisk,2),
+   metric('润湿时间','TOW','N(RH>80%)/N_total×100%','RH>80%小时占比',s.towPct,'%','ERA5相对湿度',saltRisk,1),
+   metric('海盐浓度P95','SeaSalt_P95','P95(Csalt)','海盐气溶胶小时浓度P95',s.sea95,'μg/m³','CAMS Global sea_salt_aerosol',saltRisk,2),
+   metric('海盐浓度P99','SeaSalt_P99','P99(Csalt)','海盐气溶胶小时浓度P99',percentile(sea,.99),'μg/m³','CAMS Global sea_salt_aerosol',saltRisk,2),
+   metric('干盐沉降速率','Dry_dep_rate','Csalt×Vd×86400/1000','平均海盐浓度乘沉降速度并换算为日通量',drySalt,'mg/m²·d','CAMS海盐+现有沉降速度参数',saltRisk,2)
+  ]},
+  {module:'海拔',risk_level:altRisk,metrics:[
+   metric('海拔高度','Altitude','H_GIS','点位高程读取',b.elev,'m','Open-Meteo Elevation / ERA5回退',altRisk,0),
+   metric('平均气压','Pressure_mean','mean(P_surface)/10','优先使用多年表面气压均值；缺失时核心模型采用标准大气回退',finite(b.pressureMean)?b.pressureMean/10:NaN,'kPa','ERA5表面气压',altRisk,1),
+   metric('设计能力裕量','Altitude_margin','H_design−H_site','设计海拔能力上限减场址高程',(typeof params!=='undefined'?params.capAltitude:NaN)-Number(b.elev),'m','现有设计能力参数+场址高程',altRisk,0)
+  ]},
+  {module:'SO₂ / 腐蚀气体',risk_level:gasRisk,metrics:[
+   metric('SO₂ P95','SO2_P95','P95(C_SO₂)','SO₂小时浓度P95',s.so295,'μg/m³','CAMS Global sulphur_dioxide',gasRisk,1),
+   metric('SO₂ P99','SO2_P99','P99(C_SO₂)','SO₂小时浓度P99',percentile(so2,.99),'μg/m³','CAMS Global sulphur_dioxide',gasRisk,1),
+   metric('H₂S P95','H2S_P95','P95(C_H₂S)','H₂S小时浓度P95；当前未接入',NaN,'μg/m³','待接H₂S监测/再分析数据','待接入',1),
+   metric('H₂S P99','H2S_P99','P99(C_H₂S)','H₂S小时浓度P99；当前未接入',NaN,'μg/m³','待接H₂S监测/再分析数据','待接入',1)
+  ]},
+  {module:'冰雪冻雨',risk_level:iceRisk,metrics:[
+   metric('年覆冰小时数','Ice_hour','ΣI(verified icing observation)·Δt/years','仅累计真实覆冰观测；温湿条件不能替代覆冰事实',NaN,'h/y','未接入真实覆冰事件/传感器数据','待接入',0),
+   metric('覆冰厚度P95','Ice_thickness_P95','P95(Ice_thickness)','覆冰厚度序列P95；当前未接入',NaN,'mm','待接覆冰厚度监测/液态含水量模型','待接入',1),
+   metric('覆冰厚度P99','Ice_thickness_P99','P99(Ice_thickness)','覆冰厚度序列P99；当前未接入',NaN,'mm','待接覆冰厚度监测/液态含水量模型','待接入',1)
+  ]},
+  {module:'太阳辐照',risk_level:'待评价',metrics:[
+   metric('年总辐照量','Solar_year','ΣGHI·Δt/years','小时短波辐射积分并按数据年数年化',ghi,'kWh/m²·y','ERA5 shortwave_radiation','待评价',0),
+   metric('UV-B紫外剂量','UV_dose','∫E_UVB(t)dt','UV-B辐照度时间积分；当前未接入光谱数据',NaN,'J/m²','待接UV-B光谱辐照数据','待接入',0)
+  ]},
+  {module:'生物环境',risk_level:'待评价',metrics:[
+   metric('霉菌年生长小时数','Mold_hour','ΣI(T>20℃ ∧ RH>80%)·Δt/years','高温高湿潜势小时累计并年化',mold,'h/y','ERA5温度+相对湿度','待评价',0),
+   metric('飞絮/昆虫风险得分','Bio_risk_score','f(T,RH,season,vegetation,events)','环境指数模型；当前缺少物候、植被和虫情数据',NaN,'0-100','待接物候/植被/虫情数据库','待接入',0)
+  ]},
+  {module:'雷电',risk_level:'待接入',metrics:[
+   metric('地闪密度','Lightning_density','N_CG/(area·years)','GIS网格内云地闪次数按面积和年份归一化',NaN,'次/km²·y','待接全球/区域雷电定位网','待接入',2),
+   metric('年雷电小时数','Thunder_hour','ΣI(lightning event)·Δt/years','雷电事件小时去重累计并年化',NaN,'h/y','待接雷电事件时间序列','待接入',0)
+  ]}
+ ];
+ window.GE_CORE_ENVIRONMENT_DATA={chain:['原始气象数据','统计算法','工程计算模型','输出环境指标','设备设计风险评价'],modules:modules.map(x=>({module:x.module,risk_level:x.risk_level,indicators:x.metrics.map(({name,variable,formula,algorithm,unit,source,risk_level})=>({name,variable,formula,algorithm,unit,source,risk_level}))}))};
+ return modules;
 }
 function renderKpis(){
- const box=q('#cockpitKpiGrid');if(!box)return;if(!hasResult()){box.innerHTML=Array.from({length:8},(_,i)=>kpiCard(['温度','湿度','风速','降雨','海拔','盐雾','PM10','SO₂'][i],'--','等待真实数据',[['状态','等待评估']] )).join('');return}
- const r=safeResult(),b=r.base||{},c=r.condensation||{},s=r.salt||{},d=r.dust||{};
- const kpis=[
-  kpiCard('温度',unit(b.t99,1,'℃'),'Temperature P99',[['极端低温',unit(b.tmin,1,'℃')],['平均温度',unit(b.tavg,1,'℃')],['P95日温差',unit(b.dayRange,1,'K')],['P95温变',unit(b.tempRate,1,'K/h')]],band(r.scores?.高温)[0]),
-  kpiCard('湿度',unit(b.rhMean,1,'%'),'Relative Humidity Mean',[['RH>90%',unit(b.rh90,1,'%')],['绝对湿度',unit(b.absHumMean,1,'g/m³')],['凝露时间',unit(c.annualCondHours,0,'h/y')],['最低露点裕量',unit(c.minMargin,2,'K')]],band(r.scores?.凝露)[0]),
-  kpiCard('风速',unit(b.gust99,1,'m/s'),'P99 Gust / Proxy',[['平均风速',unit(b.windMean,1,'m/s')],['设计阵风',unit(typeof params!=='undefined'?params.capWind:NaN,0,'m/s')],['极端风风险',`${fmt(r.scores?.极端风,0)}<small>/100</small>`]],band(r.scores?.极端风)[0]),
-  kpiCard('降雨',unit(b.rainMax,1,'mm/d'),'Maximum Daily Rain',[['P99小时雨',unit(b.rainP99h,2,'mm/h')],['年降雨',unit(b.rainAnnual,0,'mm/y')],['强降雨风险',`${fmt(r.scores?.强降雨,0)}<small>/100</small>`]],band(r.scores?.强降雨)[0]),
-  kpiCard('海拔',unit(b.elev,0,'m'),'Elevation',[['平均气压',unit(finite(b.pressureMean)?b.pressureMean/10:NaN,1,'kPa')],['高海拔风险',`${fmt(r.scores?.高海拔,0)}<small>/100</small>`],['能力上限',unit(typeof params!=='undefined'?params.capAltitude:NaN,0,'m')]],band(r.scores?.高海拔)[0]),
-  kpiCard('盐雾',unit(s.jcl,2,'mg/m²·d'),'Cl⁻ Deposition',[['TOW',unit(s.towPct,1,'%')],['Sea Salt P95',unit(s.sea95,2,'μg/m³')],['盐雾风险',`${fmt(r.scores?.盐雾,0)}<small>/100</small>`]],band(r.scores?.盐雾)[0]),
-  kpiCard('PM10',unit(d.pm95,1,'μg/m³'),'PM10 P95',[['PM10均值',unit(d.pmMean,1,'μg/m³')],['年进入质量',unit(d.annualIn,1,'kg/y')],['积灰风险',`${fmt(r.scores?.粉尘积灰,0)}<small>/100</small>`]],band(r.scores?.粉尘积灰)[0]),
-  kpiCard('SO₂',unit(s.so295,1,'μg/m³'),'SO₂ P95',[['设计参考',unit(typeof params!=='undefined'?params.capSo2:NaN,0,'μg/m³')],['腐蚀复合风险',`${fmt(r.composite?.corrosion,0)}<small>/100</small>`],['数据源','CAMS Global']],band(r.composite?.corrosion)[0])
- ];box.innerHTML=kpis.join('');
+ const box=q('#cockpitKpiGrid');if(!box)return;
+ const names=['温度','湿度','降雨','PM10 / 颗粒物','风速','盐雾','海拔','SO₂ / 腐蚀气体','冰雪冻雨','太阳辐照','生物环境','雷电'];
+ if(!hasResult()){box.innerHTML=names.map(name=>environmentCard(name,[metric('状态','--','--','等待原始数据',NaN,'','待评估','待评估',0)],'待评估')).join('');return}
+ const modules=buildEnvironmentModules();box.innerHTML=modules.map(x=>environmentCard(x.module,x.metrics,x.risk_level)).join('');
 }
-
 function renderProjectSummary(){
  const card=q('.summaryCard'),pad=q('.pad',card);if(!pad)return;let meta=q('#cockpitProjectMeta');if(!meta){meta=document.createElement('div');meta.id='cockpitProjectMeta';meta.className='cockpitProjectMeta';pad.append(meta)}
  const cur=safeCurrent(),ca=safeCache(),parts=String(cur.name||'--').split(/\s*[·,]\s*/).filter(Boolean),region=parts.slice(1).join(' · ')||'--';

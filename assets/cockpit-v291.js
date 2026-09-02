@@ -48,16 +48,7 @@ function renderHero(){
  }
 }
 
-function enhanceKpis(){
- qa('#cockpitKpiGrid .cockpitKpi').forEach(card=>{
-   const title=q('.cockpitKpiTop>span',card)?.textContent?.trim();
-   if(title==='风速'){
-     const lab=q('.cockpitKpiLabel',card);if(lab){lab.textContent='P99 Gust · Proxy';lab.title='当前无直接阵风数据时，沿用现有模型：ERA5 10m wind × gustFactor'}
-     const items=q('.cockpitKpiItems',card);
-     if(items&&!q('.cockpitProxyNote',items)){const n=document.createElement('div');n.className='cockpitProxyNote';n.textContent='Proxy：ERA5 10m wind × gustFactor';items.append(n)}
-   }
- });
-}
+function enhanceKpis(){}
 
 let riskExpanded=false;
 function applyRiskTop5(){

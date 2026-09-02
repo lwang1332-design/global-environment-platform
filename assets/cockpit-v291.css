@@ -33,7 +33,7 @@
 /* Environment Data Strip: one module with dividers, not nested cards. */
 .cockpit-v29 .cockpitKpiGrid{grid-template-columns:repeat(4,minmax(0,1fr))!important;gap:0!important}
 .cockpit-v29 .cockpitKpi{border:0!important;border-radius:0!important;min-height:0!important;height:auto!important;padding:13px 14px!important;background:transparent!important}
-.cockpit-v29 .cockpitKpi:nth-child(-n+4){border-bottom:1px solid var(--cockpit-line)!important}
+.cockpit-v29 .cockpitKpi:nth-child(-n+8){border-bottom:1px solid var(--cockpit-line)!important}
 .cockpit-v29 .cockpitKpi:not(:nth-child(4n)){border-right:1px solid var(--cockpit-line)!important}
 .cockpit-v29 .cockpitKpiTop>span{font-size:14px!important;font-weight:600!important}
 .cockpit-v29 .cockpitKpiTop em{font-size:11px!important;border:0!important;padding:0!important;background:none!important}
@@ -160,6 +160,7 @@
  .cockpit-v29 .cockpitKpi{padding:10px!important}
  .cockpit-v29 .cockpitKpiValue{font-size:18px!important}
  .cockpit-v29 .cockpitKpiItems{grid-template-columns:1fr!important}
+ .cockpit-v29 .cockpitKpiItems div:nth-child(n){display:flex!important}
  .cockpit-v29 .cockpitRiskBody{grid-template-columns:1fr!important}
  .cockpit-v29 .cockpitRadar{border-right:0!important;border-bottom:1px solid var(--cockpit-line)!important;padding:0 0 8px!important}
  .cockpit-v29 .cockpitJointStats{grid-template-columns:1fr!important}

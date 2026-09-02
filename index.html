@@ -75,17 +75,45 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:f
  .mapCard .osmCompatMap{height:322px!important;min-height:322px!important;width:100%!important;display:block!important}
  .mapCard .mapOverlay{display:block!important;visibility:visible!important;z-index:20!important;left:8px!important;bottom:8px!important;max-width:calc(100% - 16px)!important;white-space:normal!important;pointer-events:none}
 }
+
+/* project-location-input-v1 */
+body .toolbar{height:80px;grid-template-columns:minmax(420px,560px) 88px 112px 96px 96px minmax(170px,1fr);align-items:center}
+body .dashboard,body .adminPage{height:calc(100vh - 138px)}
+.locationField{display:block;min-width:0;align-self:stretch;padding:3px 0;position:relative}
+.locationFieldHead{display:flex;align-items:center;justify-content:space-between;gap:8px;height:22px}
+.locationModeSwitch{display:flex;border:1px solid var(--line);border-radius:999px;overflow:hidden;background:#fff}
+.locationModeSwitch button{height:20px!important;min-width:54px;padding:0 9px!important;border:0!important;border-radius:0!important;background:#fff!important;color:var(--muted)!important;font-size:9px!important;box-shadow:none!important}
+.locationModeSwitch button.active{background:var(--navy)!important;color:#fff!important}
+.locationPanel{height:34px}.locationPanel>input{width:100%;height:34px}
+.coordinatePanel{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+.coordinatePanel label{display:grid;grid-template-columns:34px 1fr;align-items:center;gap:4px;color:var(--muted);font-size:9px}
+.coordinatePanel input{width:100%;height:34px;min-width:0}
+.coordinateHint{position:absolute;margin-top:3px;padding:4px 7px;border:1px solid #d7e5ff;border-radius:6px;background:#f6f9ff;color:#526173;font-size:8px;line-height:1.35;z-index:40;box-shadow:0 3px 10px rgba(10,42,89,.08)}
+.locationPanel[hidden],.coordinateHint[hidden]{display:none!important}
+.locateBtn{background:#eaf1fb!important;color:var(--navy)!important;border:1px solid #bfd1e8!important}
+@media(max-width:1200px) and (min-width:901px){body .toolbar{grid-template-columns:minmax(330px,1fr) 78px 96px 88px 88px;grid-auto-rows:auto}.toolbar .status{display:none}.locationModeSwitch button{min-width:46px;padding:0 6px!important}}
+@media(max-width:900px){body .toolbar{top:62px;grid-template-columns:minmax(0,1fr) 88px 88px;align-items:end}.locationField{grid-column:1/-1;min-height:60px}.toolbar .locateBtn{grid-column:1}.toolbar #years{grid-column:2}.toolbar #go{grid-column:3}.toolbar .reportBtn{grid-column:1}.toolbar .status{grid-column:2/-1}.coordinateHint{position:static;margin-top:4px}.coordinatePanel label{grid-template-columns:32px 1fr}body .dashboard,body .adminPage{height:auto}}
+@media(max-width:520px){body .toolbar{grid-template-columns:1fr 82px 82px}.locationModeSwitch button{min-width:50px}.coordinatePanel{grid-template-columns:1fr}.locationField{min-height:60px}.locationField:has(.coordinatePanel:not([hidden])){min-height:102px}}
 </style>
-<link rel="stylesheet" href="./assets/ui-engineering.css?v=20260830-ui1">
+<link rel="stylesheet" href="./assets/ui-engineering.css?v=20260902-location-offline-map-v2">
 <link rel="stylesheet" href="./assets/v29.css?v=20260831-v29">
-<link rel="stylesheet" href="./assets/cockpit-v29.css?v=20260831-cockpit1">
-<link rel="stylesheet" href="./assets/cockpit-v291.css?v=20260831-v291">
+<link rel="stylesheet" href="./assets/cockpit-v29.css?v=20260902-core-env-4x3-r4">
+<link rel="stylesheet" href="./assets/cockpit-v291.css?v=20260902-core-env-4x3-r4">
 </head>
 <body>
 <header><div class="brand"><div class="logo"><img src="./assets/goldwind-logo.png" alt="Goldwind"></div><div><h1>全球风电机组环境适应性评估平台</h1><p>Environment → Physics → Equipment → Engineering Decision</p></div></div><div style="display:flex;align-items:center"><div class="pageNav"><button class="navBtn active" id="navMain" onclick="showPage('main')">评估主页</button><button class="navBtn" id="navAdmin" onclick="openAdmin()">管理员参数</button><button class="navBtn installBtn" id="installBtn" style="display:none">安装App</button></div><div class="ver">V2.9 · 参数云同步 + 风温联合版</div></div></header>
-<div class="toolbar"><input id="query" value="Basra, Iraq" placeholder="城市/国家或 纬度,经度"><select id="years"><option value="1">最近1年</option><option value="3" selected>最近3年</option><option value="5">最近5年</option></select><button id="go">开始评估</button><button class="reportBtn" id="pdfReport" onclick="exportPDF()">生成PDF</button><div class="status" id="status">点击开始评估获取真实数据</div></div>
+<div class="toolbar">
+  <div class="locationField uiField" id="locationField">
+    <div class="locationFieldHead"><span class="uiFieldLabel">项目地点</span><div class="locationModeSwitch" role="group" aria-label="项目地点输入方式"><button type="button" id="locationModeName" class="active" aria-pressed="true">地名</button><button type="button" id="locationModeCoords" aria-pressed="false">经纬度</button></div></div>
+    <div class="locationPanel" id="locationNamePanel"><input id="query" value="北京" placeholder="输入城市、地区或国家，例如：北京"></div>
+    <div class="locationPanel coordinatePanel" id="locationCoordinatePanel" hidden><label><span>经度</span><input id="longitude" type="number" min="-180" max="180" step="any" inputmode="decimal" value="116.4074" placeholder="-180 ～ 180"></label><label><span>纬度</span><input id="latitude" type="number" min="-90" max="90" step="any" inputmode="decimal" value="39.9042" placeholder="-90 ～ 90"></label></div>
+    <div class="coordinateHint" id="coordinateHint" hidden>格式：十进制度；东经、北纬为正，西经、南纬为负。例：北京 经度 116.4074，纬度 39.9042。</div>
+  </div>
+  <button type="button" class="locateBtn" id="locateMap">定位地图</button>
+  <select id="years" aria-label="评估时间范围"><option value="1">最近1年</option><option value="3" selected>最近3年</option><option value="5">最近5年</option></select><button id="go">开始评估</button><button class="reportBtn" id="pdfReport" onclick="exportPDF()">生成PDF</button><div class="status" id="status">点击“定位地图”可快速预览，点击“开始评估”获取真实数据</div>
+</div>
 <div id="mainPage" class="page active"><div class="dashboard">
-<section class="card mapCard"><div class="head"><h2>01 项目定位</h2><span>在线地图 + 内置全球离线底图</span></div><div class="mapWrap"><div id="map"></div><div class="mapSourceBadge" id="mapSourceBadge">地图源：初始化</div><div class="mapOverlay" id="mapInfo">Basra, Iraq<br>等待定位...</div></div></section>
+<section class="card mapCard"><div class="head"><h2>01 项目定位</h2><span>内置全球离线地图 · 在线瓦片增强</span></div><div class="mapWrap"><div id="map"></div><div class="mapSourceBadge" id="mapSourceBadge">地图源：初始化</div><div class="mapOverlay" id="mapInfo">北京<br>39.9042°N, 116.4074°E</div></div></section>
 <section class="card summaryCard"><div class="head"><h2>02 项目综合信息</h2><span>项目环境与综合风险概览</span></div><div class="pad"><div class="score3"><div class="scoreBox"><label>环境严酷度</label><strong id="severity">--</strong></div><span id="adapt" style="display:none"></span><div class="scoreBox"><label>风险 Gap</label><strong id="gap">--</strong></div></div><div style="margin-top:7px"><span id="riskBadge" class="badge gray">等待</span></div><div class="projectMeta" id="projectMeta"></div></div></section>
 <section class="card envCard"><div class="head"><h2>03 环境数据</h2><span>上方：L1真实数据库；下方：一级环境域直接显示二级真实数据</span></div><div class="pad"><div class="l1bar" id="l1bar"></div><div class="envGrid" id="envGrid"></div></div></section>
 <section class="card riskCard"><div class="head"><h2>04 环境风险画像</h2><span>小号文字：真实环境 / 物理模型关键量</span></div><div class="pad"><div class="riskGrid" id="riskList"></div></div></section>
@@ -211,7 +239,8 @@ header{height:58px;background:#fff;border-bottom:1px solid var(--line);display:f
 <div class="modalMask" id="loginMask"><div class="loginBox"><h3>管理员验证</h3><p>输入管理员密码后进入关键变量调试页面。</p><input id="adminPwd" type="password" placeholder="管理员密码"><div class="loginBtns"><button onclick="verifyAdmin()">进入</button><button class="ghost" onclick="closeLogin()">取消</button></div><div id="loginMsg" style="font-size:9px;color:var(--red);margin-top:6px"></div></div></div>
 <script>
 const $=id=>document.getElementById(id),clamp=(x,a=0,b=100)=>Math.max(a,Math.min(b,x)),lin=(x,a,b)=>clamp((x-a)/(b-a)*100);const q=(a,p)=>{let x=a.filter(Number.isFinite).sort((m,n)=>m-n);if(!x.length)return NaN;let k=(x.length-1)*p,i=Math.floor(k),r=k-i;return x[i]+(x[i+1]!==undefined?r*(x[i+1]-x[i]):0)};const pct=(a,f)=>a.length?100*a.filter(f).length/a.length:0,max=a=>a.length?Math.max(...a.filter(Number.isFinite)):NaN,min=a=>a.length?Math.min(...a.filter(Number.isFinite)):NaN,iso=d=>d.toISOString().slice(0,10);
-let current={lat:30.5085,lon:47.7804,name:'Basra, Iraq'},cache=null,result={},selected={env:null,equip:null};
+const BEIJING={lat:39.9042,lon:116.4074,name:'北京'};
+let current={...BEIJING},cache=null,result={},selected={env:null,equip:null};
 const DEFAULT_PARAMS={delta:10,rho:7850,cp:500,eps:.85,alpha:.6,sky:6,dewMargin:3,Q:100000,D:1.5,rpm:900,impactEta:.5,filterEta:.9,ne:2.5,eiMass:10,eiVel:50,capHigh:45,capLow:-40,capDew:3,capCondHours:0,capCl:10,capPm:150,capEi:1,capHeatLoss:20,hiA:35,hiB:50,loA:10,loB:40,windA:20,windB:55,w1:.4,w2:.25,w3:.15,wavg:.2,protect:1,marineKm:20,coastalKm:100,camsDays:90,saltVd:.005,saltClFrac:.55,towRh:80,towTmin:0,towTmax:40,saltWSea:.55,saltWTow:.30,saltWSo2:.15,filterBypass:.03,opHours:8760,particleD50:50,particleRho:2650,impactAngle:45,materialK:1,condDtMin:10,condFilmMargin:0,condMassK:1,gustFactor:1.5,rainA:20,rainB:150,snowA:1,snowB:30,altA:1500,altB:4500,capRh:100,capDayRange:25,capTempRate:8,capRainDay:150,capRainHour:50,capWind:55,capSnow:30,capAltitude:4500,capSo2:100,capNo2:100,capTow:60};
 let params=Object.assign({},DEFAULT_PARAMS,JSON.parse(localStorage.getItem('GE_V25_PARAMS')||'{}'));let adminUnlocked=false;
 const MAP_DEFAULTS={tdtKey:'',localTemplate:'./tiles/{z}/{x}/{y}.png',chinaMode:'tdt',globalMode:'local',osmFallback:true};
@@ -273,9 +302,21 @@ function renderOsmMap(lat=20,lon=15,name='全球项目位置',zoom=2){
  mapEl.innerHTML=`<div class="osmCompatMap" role="img" aria-label="项目位置地图"><div class="osmTileLayer" style="left:calc(50% - ${centerPxX}px);top:calc(50% - ${centerPxY}px)">${tiles}</div><div class="osmMarker" aria-hidden="true"></div><div class="osmZoom"><button type="button" aria-label="放大地图" onclick="mapZoom(1)">+</button><button type="button" aria-label="缩小地图" onclick="mapZoom(-1)">−</button></div><div class="osmAttrib">${choice.primary==='tdt'?'天地图':choice.primary==='local'?'本地 XYZ':'© OpenStreetMap'}</div></div>`;
  let extra=choice.china&&mapConfig.chinaMode==='tdt'&&!mapConfig.tdtKey?'天地图 Key 未配置':'';setMapSourceBadge(choice.primary,extra);
 }
-function updateMapLocation(lat,lon,name){if(!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon)))return;renderOsmMap(Number(lat),Number(lon),name||'项目位置',6)}
-renderOsmMap();
-async function locate(s){let m=s.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*$/);if(m)return{lat:+m[1],lon:+m[2],name:`${(+m[1]).toFixed(4)}, ${(+m[2]).toFixed(4)}`};let j=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(s)+'&count=1&language=zh').then(r=>r.json());if(!j.results?.length)throw Error('未找到地点');let x=j.results[0];return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}}
+function coordinateText(lat,lon){const ns=lat>=0?'N':'S',ew=lon>=0?'E':'W';return `${Math.abs(lat).toFixed(4)}°${ns}, ${Math.abs(lon).toFixed(4)}°${ew}`}
+function updateMapLocation(lat,lon,name){if(!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon)))return;lat=Number(lat);lon=Number(lon);renderOsmMap(lat,lon,name||'项目位置',6);if($('mapInfo'))$('mapInfo').innerHTML=`${String(name||'项目位置').replaceAll('<','&lt;').replaceAll('>','&gt;')}<br>${coordinateText(lat,lon)}`}
+renderOsmMap(BEIJING.lat,BEIJING.lon,BEIJING.name,6);
+const LOCAL_PLACES=new Map([
+ ['北京',BEIJING],['北京市',BEIJING],['beijing',BEIJING],
+ ['上海',{lat:31.2304,lon:121.4737,name:'上海'}],['广州',{lat:23.1291,lon:113.2644,name:'广州'}],['深圳',{lat:22.5431,lon:114.0579,name:'深圳'}],
+ ['乌鲁木齐',{lat:43.8256,lon:87.6168,name:'乌鲁木齐'}],['呼和浩特',{lat:40.8426,lon:111.7492,name:'呼和浩特'}],['兰州',{lat:36.0611,lon:103.8343,name:'兰州'}],
+ ['basra',{lat:30.5085,lon:47.7804,name:'Basra · Iraq'}],['巴士拉',{lat:30.5085,lon:47.7804,name:'巴士拉 · 伊拉克'}],['dubai',{lat:25.2048,lon:55.2708,name:'Dubai · UAE'}]
+]);
+let locationInputMode='name';
+function setLocationMode(mode){locationInputMode=mode==='coords'?'coords':'name';const coords=locationInputMode==='coords';$('locationNamePanel').hidden=coords;$('locationCoordinatePanel').hidden=!coords;$('coordinateHint').hidden=!coords;$('locationModeName').classList.toggle('active',!coords);$('locationModeCoords').classList.toggle('active',coords);$('locationModeName').setAttribute('aria-pressed',String(!coords));$('locationModeCoords').setAttribute('aria-pressed',String(coords));setTimeout(()=>$(coords?'longitude':'query')?.focus(),0)}
+function coordinateLocation(){const lon=Number($('longitude').value),lat=Number($('latitude').value);if(!Number.isFinite(lon)||lon< -180||lon>180)throw Error('经度请输入 -180 ～ 180 之间的十进制度');if(!Number.isFinite(lat)||lat< -90||lat>90)throw Error('纬度请输入 -90 ～ 90 之间的十进制度');return{lat,lon,name:`坐标 ${coordinateText(lat,lon)}`}}
+async function locate(s){s=String(s||'').trim();if(!s)throw Error('请输入项目地名');const local=LOCAL_PLACES.get(s.toLowerCase())||LOCAL_PLACES.get(s);if(local)return{...local};let m=s.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,，]\s*(-?\d+(?:\.\d+)?)\s*$/);if(m){const lat=+m[1],lon=+m[2];if(lat< -90||lat>90||lon< -180||lon>180)throw Error('坐标超出范围：纬度 -90～90，经度 -180～180');return{lat,lon,name:`坐标 ${coordinateText(lat,lon)}`}}if(navigator.onLine===false)throw Error('当前离线：可切换到“经纬度”输入，或使用内置城市名称');let r=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(s)+'&count=1&language=zh');if(!r.ok)throw Error('地名解析服务暂不可用');let j=await r.json();if(!j.results?.length)throw Error('未找到该地点，请换用更完整的地名或直接输入经纬度');let x=j.results[0];return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}}
+async function readLocationInput(){return locationInputMode==='coords'?coordinateLocation():locate($('query').value)}
+async function quickLocate(){try{$('status').textContent='正在定位项目地点…';const loc=await readLocationInput();updateMapLocation(loc.lat,loc.lon,loc.name);$('status').textContent=`地图已定位：${loc.name} · ${coordinateText(loc.lat,loc.lon)}（尚未开始评估）`}catch(e){$('status').textContent=e?.message||String(e)}}
 async function elev(lat,lon){try{let r=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`);if(!r.ok)throw Error();let j=await r.json();return j.elevation?.[0]??NaN}catch{return NaN}}
 async function weather(lat,lon,years){
  let end=new Date();end.setUTCDate(end.getUTCDate()-10);let start=new Date(end);start.setUTCFullYear(start.getUTCFullYear()-years);
@@ -472,7 +513,8 @@ function reportHtml(){
  const reportConclusion=`本项目综合环境严酷度为 ${result.severity}/100，主要环境矛盾为 ${topEnv.slice(0,3).map(x=>x[0]).join('、')}；设备侧重点关注 ${topEq.slice(0,3).map(x=>x[0]).join('、')}。建议优先闭环高风险环境对应的结构防护、材料防护、热管理、密封过滤与环境控制设计，并以现场实测和专项试验对半经验模型进行校准。`;
  return `<!doctype html><html><head><meta charset="utf-8"><title>全球风电机组环境适应性工程评估报告</title><style>
  @page{size:A4;margin:13mm 13mm 13mm}*{box-sizing:border-box}body{font-family:Arial,'Microsoft YaHei',sans-serif;color:#16243a;font-size:9.3pt;line-height:1.5;margin:0}h1,h2,h3,p{margin-top:0}h1{font-size:24pt;color:#082b5c;letter-spacing:.5px;margin-bottom:8px}h2{font-size:15pt;color:#082b5c;border-left:5px solid #1769e0;padding-left:9px;margin:0 0 12px}h3{font-size:11pt;color:#173b6d;margin:10px 0 6px}.cover{min-height:246mm;display:flex;flex-direction:column;justify-content:space-between;padding:18mm 10mm 10mm;page-break-after:always;break-after:page}.coverTop{border-top:7px solid #0a2a59;padding-top:18mm}.coverSub{font-size:12pt;color:#667085}.coverMeta{width:78%;font-size:11pt}.coverMeta div{display:grid;grid-template-columns:100px 1fr;padding:7px 0;border-bottom:1px solid #dbe3ef}.coverMeta span{color:#667085}.coverFoot{color:#667085;border-top:1px solid #dbe3ef;padding-top:10px}.page{page-break-before:auto;break-before:auto;margin-bottom:8mm}.section{margin-bottom:14px}.hero{background:#f2f6fc;border:1px solid #d8e3f0;border-radius:10px;padding:13px;margin-bottom:12px}.hero strong{font-size:24pt;color:#0a2a59}.kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin:10px 0}.kpi{border:1px solid #d8e3f0;border-radius:8px;padding:9px;background:#fff}.kpi span{display:block;color:#667085;font-size:8.5pt}.kpi b{font-size:15pt;color:#0a2a59}.two{display:grid;grid-template-columns:1fr 1fr;gap:10px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}table{width:100%;border-collapse:collapse;margin:7px 0 12px;font-size:8.7pt}th,td{border:1px solid #d3dce8;padding:5px 6px;text-align:left;vertical-align:top}th{background:#edf3fa;color:#0a2a59;font-weight:700}.small{font-size:8pt;color:#667085}.note{background:#f5f8fc;border-left:4px solid #1769e0;padding:8px 10px;margin:8px 0}.warn{background:#fff7e8;border-left:4px solid #e59b13;padding:8px 10px;margin:8px 0}.formula{font-family:'Times New Roman',serif;font-size:11pt;background:#f8fafc;border:1px solid #dfe6ef;padding:8px 10px;margin:6px 0}.tag{display:inline-block;padding:2px 7px;border-radius:10px;font-weight:700}.tag.bad{background:#feecec;color:#b42318}.tag.mid{background:#fff4d5;color:#8b6200}.tag.ok{background:#e5f7ef;color:#087a50}.riskbar{margin:7px 0}.riskbar div{display:flex;justify-content:space-between}.riskbar i{height:7px;background:#e8eef6;border-radius:10px;display:block;overflow:hidden}.riskbar em{height:100%;display:block;background:#1769e0}.riskbar small{display:block;color:#667085;font-size:7.8pt;margin:1px 0 3px}.chart{border:1px solid #d8e3f0;border-radius:8px;padding:7px 8px;margin:8px 0 12px;background:#fff}.chartTitle{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px;color:#0a2a59}.chartTitle div{display:flex;gap:10px;font-size:7.5pt;color:#667085}.chartTitle span i{display:inline-block;width:9px;height:2px;margin:0 4px 2px 0}.chart svg{width:100%;height:auto;display:block}.chartAxis{display:flex;justify-content:space-between;font-size:7.2pt;color:#667085;margin-top:-4px}.matrix{font-size:7.5pt}.matrix td,.matrix th{text-align:center;padding:4px 2px}.matrix th:first-child{text-align:left}.m1{background:#edf8f3}.m2{background:#fff4d5}.m3{background:#feecee;font-weight:700}.actionGroup{border-radius:9px;padding:9px 10px;margin:8px 0;border:1px solid #dbe3ef}.actionGroup.must{border-left:5px solid #d92d20}.actionGroup.rec{border-left:5px solid #e59b13}.actionGroup.routine{border-left:5px solid #0f9d68}.act{display:grid;grid-template-columns:145px 1fr;gap:8px;padding:5px 0;border-bottom:1px dashed #dbe3ef}.act:last-child{border-bottom:0}.act span{color:#475467}.footerNote{font-size:7.7pt;color:#667085;margin-top:15px}.noBreak{page-break-inside:avoid}h2{page-break-after:avoid;break-after:avoid-page}h3{page-break-after:avoid;break-after:avoid-page}tr{page-break-inside:avoid;break-inside:avoid}.hero,.note,.warn,.formula,.chart,.actionGroup{page-break-inside:avoid;break-inside:avoid}
- </style></head><body>
+
+</style></head><body>
  <section class="cover"><div class="coverTop"><h1>全球风电机组环境适应性<br>工程评估报告</h1><div class="coverSub">Global Wind Turbine Environmental Adaptability Engineering Assessment</div></div><div class="coverMeta"><div><span>项目名称</span><b>${esc(current.name)}</b></div><div><span>项目坐标</span><b>${current.lat.toFixed(4)}, ${current.lon.toFixed(4)}</b></div><div><span>项目海拔</span><b>${Math.round(b.elev)} m</b></div><div><span>数据周期</span><b>${esc(cache.w?.start||'')} ~ ${esc(cache.w?.end||'')}</b></div><div><span>报告版本</span><b>V2.8 工程报告版</b></div><div><span>生成时间</span><b>${esc(generated)}</b></div></div><div class="coverFoot"><b>全球公开环境数据 × 物理模型 × 工程风险判定</b><br>用于项目环境适应性方案识别、风险预防与设计输入，不替代认证或现场专项试验。</div></section>
 
  <section class="page"><h2>01 项目概况与评估结论</h2><div class="hero"><span>综合环境严酷度</span><br><strong>${result.severity}/100</strong>　<span class="tag ${lvlClass(result.severity)}">${level(result.severity)}风险</span><p style="margin:8px 0 0">${esc(summary)}</p></div><div class="kpis"><div class="kpi"><span>最高环境风险</span><b>${topEnv[0]?.[1]??'--'}</b><small>/100 · ${esc(topEnv[0]?.[0]||'')}</small></div><div class="kpi"><span>最高设备风险</span><b>${topEq[0]?.[1]??'--'}</b><small>/100 · ${esc(topEq[0]?.[0]||'')}</small></div><div class="kpi"><span>复合热管理风险</span><b>${result.composite?.thermal??'--'}</b><small>/100</small></div></div><h3>十大环境风险</h3>${riskBars}<div class="note"><b>核心工程结论：</b>${esc(reportConclusion)}</div></section>
@@ -513,7 +555,9 @@ async function assess(loc){updateMapLocation(loc.lat,loc.lon,loc.name);
  $('status').textContent='正在获取真实数据…';current=loc;marker.setLatLng([loc.lat,loc.lon]);map.setView([loc.lat,loc.lon],6);
  try{const years=+$('years').value;const w=await weather(loc.lat,loc.lon,years);const [e0,a,m]=await Promise.all([elev(loc.lat,loc.lon),air(loc.lat,loc.lon),marine(loc.lat,loc.lon)]);const e=Number.isFinite(e0)?e0:(Number.isFinite(w.j.elevation)?w.j.elevation:0);cache={elev:e,w,aq:a,marine:m};selected={env:null,equip:null};calculate();marker.bindPopup(`<b>${loc.name}</b><br>环境严酷度 ${result.severity}/100`).openPopup();$('status').textContent=`真实数据计算完成 · ERA5 ${w.start}~${w.end}`}catch(e){console.error(e);$('status').textContent='查询失败：'+(e?.message||String(e))}
 }
-$('go').onclick=async()=>{try{assess(await locate($('query').value.trim()))}catch(e){$('status').textContent=e.message}};$('years').onchange=()=>{$('go').click()};map.on('click',e=>{let l={lat:e.latlng.lat,lon:e.latlng.lng,name:`${e.latlng.lat.toFixed(4)}, ${e.latlng.lng.toFixed(4)}`};$('query').value=l.name;assess(l)});setTimeout(()=>$('go').click(),300);
+$('locationModeName').onclick=()=>setLocationMode('name');$('locationModeCoords').onclick=()=>setLocationMode('coords');$('locateMap').onclick=quickLocate;
+['query','longitude','latitude'].forEach(id=>$(id)?.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();quickLocate()}}));
+$('go').onclick=async()=>{try{assess(await readLocationInput())}catch(e){$('status').textContent=e?.message||String(e)}};$('years').onchange=()=>{$('go').click()};map.on('click',e=>{let l={lat:e.latlng.lat,lon:e.latlng.lng,name:`坐标 ${coordinateText(e.latlng.lat,e.latlng.lng)}`};$('longitude').value=e.latlng.lng.toFixed(6);$('latitude').value=e.latlng.lat.toFixed(6);setLocationMode('coords');updateMapLocation(l.lat,l.lon,l.name)});setLocationMode('name');setTimeout(()=>$('go').click(),300);
 
 // V2.8 工程报告版 install + offline shell
 let deferredInstallPrompt=null;
@@ -527,12 +571,12 @@ if('serviceWorker' in navigator){window.addEventListener('load',()=>navigator.se
 </script>
 <div id="offlinePill" class="offlinePill">离线模式：可打开页面，实时数据查询需联网</div>
 <script src="./map-tier.js"></script>
-<script src="./assets/ui-engineering.js?v=20260830-ui1"></script>
+<script src="./assets/ui-engineering.js?v=20260902-location-offline-map-v2"></script>
 <script src="./assets/v29-runtime-config.js?v=20260831-v29"></script>
 <script src="./assets/v29-config.js?v=20260831-v29"></script>
 <script src="./assets/v291-admin-gate.js?v=20260831-v291"></script>
 <script src="./assets/v29-joint.js?v=20260831-v29"></script>
-<script src="./assets/cockpit-v29.js?v=20260901-summaryfix1"></script>
-<script src="./assets/cockpit-v291.js?v=20260901-summaryfix1"></script>
+<script src="./assets/cockpit-v29.js?v=20260902-core-env-4x3-r3"></script>
+<script src="./assets/cockpit-v291.js?v=20260902-no-proxy-r1"></script>
 <script src="./assets/report-v29.js?v=20260901-r2"></script>
 </body></html>
