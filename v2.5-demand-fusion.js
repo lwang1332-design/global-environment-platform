@@ -30,7 +30,7 @@
     topTwoSceneContext().forEach(ctx=>{
       (ctx.data.demands||[]).forEach((x,i)=>{
         const key=ctx.name+'#'+i;
-        if(!(key in demandManual))demandManual[key]=true;
+        if(!(key in demandManual))demandManual[key]=false;
         if(includeUnchecked||demandManual[key])out.push({
           scene:ctx.name,role:ctx.role,score:ctx.score,index:i,key,demand:x,data:ctx.data
         });
@@ -62,7 +62,7 @@
     const rows=ctx.data.demands||[];
     const selected=rows.reduce((n,x,i)=>{
       const key=ctx.name+'#'+i;
-      if(!(key in demandManual))demandManual[key]=true;
+      if(!(key in demandManual))demandManual[key]=false;
       return n+(demandManual[key]?1:0);
     },0);
     const open=!!demandPanelOpen[ctx.role];
