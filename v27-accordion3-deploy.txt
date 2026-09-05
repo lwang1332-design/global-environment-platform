@@ -1,0 +1,6 @@
+V2.7 Scheme B fixed UI baseline deployment marker
+2026-09-05
+- selected demand summary
+- primary scene expanded by default
+- secondary scene collapsed by default
+- canonical route: v2.7.html?v=20260905-accordion3
