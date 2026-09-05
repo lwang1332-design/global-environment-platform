@@ -1,0 +1,49 @@
+name: V2.7 Demand Fusion Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v2.7.html'
+      - 'v2.5-demand-fusion.js'
+      - '.github/workflows/v27-demand-fusion-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  demand-fusion-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Static and syntax checks
+        shell: bash
+        run: |
+          set -euo pipefail
+          node --check v2.5-demand-fusion.js
+          grep -q 'v2.5-demand-fusion.js' v2.7.html
+          grep -q 'topTwoSceneContext' v2.5-demand-fusion.js
+          grep -q "slice(0,2)" v2.5-demand-fusion.js
+          grep -q 'PRIMARY_SECONDARY_UNION' v2.5-demand-fusion.js
+          grep -q 'merged=new Map' v2.5-demand-fusion.js
+          grep -q 'window.selectScene=function' v2.5-demand-fusion.js
+          grep -q '主场景与次场景的客户核心诉求叠加展示' v2.7.html
+          grep -q '重复需求自动合并' v2.7.html
+      - name: Wait for Pages demand fusion assets
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            HTML=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.7.html?fusion=${GITHUB_SHA}-${i}-$(date +%s)" || true)
+            JS=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.5-demand-fusion.js?fusion=${GITHUB_SHA}-${i}-$(date +%s)" || true)
+            printf '%s' "$JS" > /tmp/v2.5-demand-fusion.js
+            if echo "$HTML" | grep -q 'v2.5-demand-fusion.js' \
+              && echo "$HTML" | grep -q '主场景与次场景的客户核心诉求叠加展示' \
+              && echo "$JS" | grep -q 'PRIMARY_SECONDARY_UNION' \
+              && echo "$JS" | grep -q 'merged=new Map' \
+              && echo "$JS" | grep -q 'window.selectScene=function' \
+              && node --check /tmp/v2.5-demand-fusion.js; then
+              echo 'V2.7 primary-secondary demand fusion is live'
+              exit 0
+            fi
+            sleep 10
+          done
+          exit 1
