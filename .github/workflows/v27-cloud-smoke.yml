@@ -15,19 +15,21 @@ jobs:
   cloud-smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify cloud API
+      - name: Verify cloud API and scenario model
         shell: bash
         run: |
           set -euo pipefail
           API='https://vzlnwrxscufkchxkdjus.supabase.co/functions/v1/v27-shelf'
           curl -fsSL -H 'Origin: https://lwang1332-design.github.io' "$API/health" | grep -q '2.7-cloud-1'
           LATEST=$(curl -fsSL -H 'Origin: https://lwang1332-design.github.io' "$API/config/latest")
-          echo "$LATEST" | grep -q 'V2.7-S001'
+          echo "$LATEST" | grep -q 'V2.7-S002'
+          echo "$LATEST" | grep -q 'V2.8-SCENE-1'
+          echo "$LATEST" | grep -q 'scenarioModel'
           echo "$LATEST" | grep -q '常温内陆气候'
           echo "$LATEST" | grep -q '海洋强化包'
           LOGIN=$(curl -fsSL -X POST -H 'Origin: https://lwang1332-design.github.io' -H 'Content-Type: application/json' -d '{"password":"123123"}' "$API/auth/login")
           echo "$LOGIN" | grep -q 'expiresIn'
-      - name: Wait for GitHub Pages V2.7 Cloud
+      - name: Wait for GitHub Pages V2.7 scenario model
         shell: bash
         run: |
           set -euo pipefail
@@ -35,12 +37,19 @@ jobs:
             HTML=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.7.html?smoke=${GITHUB_SHA}-${i}-$(date +%s)" || true)
             JS=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.5-cloud.js?smoke=${GITHUB_SHA}-${i}-$(date +%s)" || true)
             ADMIN=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.5-admin-cloud.html?smoke=${GITHUB_SHA}-${i}-$(date +%s)" || true)
-            if echo "$HTML" | grep -q 'V2.7 · Cloud' && echo "$HTML" | grep -q 'v2.5-cloud.js' && echo "$JS" | grep -q 'SHELF_CLOUD_API' && echo "$ADMIN" | grep -q '发布到云端'; then
-              echo 'V2.7 Cloud page, loader and admin are live'
+            if echo "$HTML" | grep -q 'V2.7 · Cloud' \
+              && echo "$HTML" | grep -q 'v2.5-cloud.js' \
+              && echo "$JS" | grep -q 'V2.8-SCENE-1' \
+              && echo "$JS" | grep -q 'sigmoidEvidence' \
+              && echo "$JS" | grep -q 'primaryScene' \
+              && echo "$JS" | grep -q 'secondaryScene' \
+              && echo "$JS" | grep -q 'deploymentType' \
+              && echo "$ADMIN" | grep -q '发布到云端'; then
+              echo 'V2.7 constrained scenario model, cloud config and admin are live'
               exit 0
             fi
             echo "Waiting for Pages deployment ($i/36)..."
             sleep 10
           done
-          echo 'V2.7 cloud artifacts not live after waiting'
+          echo 'V2.7 scenario model artifacts not live after waiting'
           exit 1
