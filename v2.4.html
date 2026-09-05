@@ -29,7 +29,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;borde
 <body>
 <aside>
 <h2>EA · 环境适应性</h2><div class="ver">WORKING DATA LOGIC · V2.4</div>
-<div class="nav"><a href="#project">01 项目与地图</a><a href="#status">02 数据状态</a><a href="#env">03 环境体检</a><a href="#models">04 工程模型</a><a href="#lang">05 客户语言</a><a href="#req">06 设计需求</a><a href="#scene">07 场景方案</a><a href="#pkg">08 升级包</a><a href="#gap">09 Design Gap</a></div>
+<div class="nav"><a href="#project">01 项目与地图</a><a href="#status">02 数据状态</a><a href="#env">03 环境体检</a><a href="#lang">04 客户语言</a><a href="#req">05 设计需求</a><a href="#scene">07 场景方案</a><a href="#pkg">08 升级包</a><a href="#gap">08 Design Gap</a></div>
 </aside>
 <div class="main">
 <header><h1>全球风电环境适应性智能决策平台 V2.4 修复版</h1><button class="pri" id="runBtn">查询真实数据并计算</button></header>
@@ -55,19 +55,11 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;borde
 
 <section id="env"><div class="title"><div><h3>03 机组环境体检报告</h3><p>只读，不可编辑</p></div><span class="pill">SYSTEM OUTPUT</span></div><div class="metrics" id="metrics"></div></section>
 
-<section id="models"><div class="title"><div><h3>04 工程模型结果</h3><p>凝露 / 盐雾 / 腐蚀 / 沙蚀均基于本次真实输入</p></div></div>
-<div class="models">
-<div class="card model"><h4>凝露模型</h4><div class="formula">金属热惯性 + 对流 + 太阳辐射 + 长波辐射；当 Ts ≤ Td 判为凝露。</div><div class="out" id="dewOut">等待计算</div></div>
-<div class="card model"><h4>盐雾 / Cl⁻沉降</h4><div class="formula">Sea Salt Aerosol P95 × Vd × 86400 × Cl⁻质量分数。</div><div class="out" id="saltOut">等待计算</div></div>
-<div class="card model"><h4>腐蚀模型</h4><div class="formula">ISO 9223 框架：温度、RH、SO₂沉降、Cl⁻沉降 → 碳钢首年腐蚀率。</div><div class="out" id="corrOut">等待计算</div></div>
-<div class="card model"><h4>沙蚀模型</h4><div class="formula">Dust/PM10 + P95 风速 → 相对沙蚀工程指数。</div><div class="out" id="erosionOut">等待计算</div></div>
-</div></section>
-
-<section id="lang"><div class="title"><div><h3>05 客户语言</h3><p>系统自动建议，工程师勾选确认</p></div></div><div id="langs" class="langs"></div></section>
-<section id="req"><div class="title"><div><h3>06 设计需求</h3><p>环境体检 + 勾选客户语言联合生成</p></div></div><div id="requirements" class="card"></div></section>
-<section id="scene"><div class="title"><div><h3>07 推荐场景主方案</h3><p>9 类气候自动评分</p></div><span id="sceneRec" class="pill"></span></div><div id="scenes" class="scenes"></div><div id="solutions" class="solutions" style="margin-top:10px"></div></section>
-<section id="pkg"><div class="title"><div><h3>08 12 个环控升级包</h3><p>环境参数自动触发，允许人工覆盖</p></div></div><div id="packages" class="pkggrid"></div></section>
-<section id="gap"><div class="title"><div><h3>09 Design Gap</h3><p>环境要求 − 当前能力 − 主方案 − 升级包</p></div><span id="residual" class="pill"></span></div><div class="card"><table><thead><tr><th>能力域</th><th>环境要求</th><th>当前能力</th><th>方案补偿</th><th>剩余风险</th></tr></thead><tbody id="gapBody"></tbody></table></div></section>
+<section id="lang"><div class="title"><div><h3>04 客户语言</h3><p>系统自动建议，工程师勾选确认</p></div></div><div id="langs" class="langs"></div></section>
+<section id="req"><div class="title"><div><h3>05 设计需求</h3><p>环境体检 + 勾选客户语言联合生成</p></div></div><div id="requirements" class="card"></div></section>
+<section id="scene"><div class="title"><div><h3>06 推荐场景主方案</h3><p>9 类气候自动评分</p></div><span id="sceneRec" class="pill"></span></div><div id="scenes" class="scenes"></div><div id="solutions" class="solutions" style="margin-top:10px"></div></section>
+<section id="pkg"><div class="title"><div><h3>07 12 个环控升级包</h3><p>环境参数自动触发，允许人工覆盖</p></div></div><div id="packages" class="pkggrid"></div></section>
+<section id="gap"><div class="title"><div><h3>08 Design Gap</h3><p>环境要求 − 当前能力 − 主方案 − 升级包</p></div><span id="residual" class="pill"></span></div><div class="card"><table><thead><tr><th>能力域</th><th>环境要求</th><th>当前能力</th><th>方案补偿</th><th>剩余风险</th></tr></thead><tbody id="gapBody"></tbody></table></div></section>
 <section><div class="card summary"><h2 id="reportTitle">项目</h2><div id="summary" class="chips"></div></div></section>
 </div>
 
@@ -125,10 +117,10 @@ function compute(h,aq,alt){
  let avgT=avg(T),avgRH=avg(RH),so295=q(so2,.95),Pd=Number.isFinite(so295)?so295*.005*86400/1000:.0001,Sd=Number.isFinite(state.salt)?Math.max(state.salt,.0001):.0001,fst=avgT<=10?.150*(avgT-10):-.054*(avgT-10);
  let rc=1.77*Math.pow(Math.max(Pd,.0001),.52)*Math.exp(.020*avgRH+fst)+.102*Math.pow(Sd,.62)*Math.exp(.033*avgRH+.040*avgT);state.corrRate=+rc.toFixed(1);state.corr=corrClass(rc);
  raw={sea95,so295,wind95,pmMean:avg(pm),dustMean:avg(dust)};
- $('dewOut').textContent='凝露风险小时：'+state.dew+' h/y';
- $('saltOut').textContent=Number.isFinite(state.salt)?'Cl⁻沉降：'+state.salt+' mg/(m²·d)':'Sea Salt Aerosol 无有效值，盐沉降不计算';
- $('corrOut').textContent='碳钢首年腐蚀：'+state.corrRate+' μm/y → '+state.corr;
- $('erosionOut').textContent='沙蚀工程指数：'+state.erosion+'（相对指标）';
+ 
+ 
+ 
+ 
 }
 async function assess(byPlace){
  $('msg').className='msg';$('msg').textContent='开始查询…';let lat=Number($('lat').value),lon=Number($('lon').value);
@@ -161,6 +153,6 @@ function renderAll(){
  let cap={Standard:1,Pro:2,Plus:3},base={基础型:0,标准型:1,强化型:2},sel=pkgs.filter((p,i)=>pstate(i).sel),rows=[],max=0;defs.forEach(d=>{let need=score(d[0]),b=base[$('machine').value]||0,m=cap[selectedMain]-1,p=sel.some(x=>x[2].includes(d[6]))?2:0,rem=Math.max(0,need-Math.min(3,b+m+p));max=Math.max(max,rem);rows.push('<tr><td>'+d[6]+'</td><td>'+need+'/3</td><td>'+b+'/3</td><td>主+'+m+'；包+'+p+'</td><td class="'+(rem>=2?'hi':rem===1?'med':'low')+'">'+(rem>=2?'高':rem===1?'中':'低')+'</td></tr>')});$('gapBody').innerHTML=rows.join('');$('residual').textContent='综合剩余风险：'+(max>=2?'高':max===1?'中':'低');$('reportTitle').textContent=$('projectName').value;$('summary').innerHTML='<span>主方案：'+selectedMain+'</span><span>升级包：'+sel.map(x=>x[0]).join(' / ')+'</span><span>腐蚀：'+(state.corr||'—')+'</span>';
 }
 $('runBtn').onclick=()=>assess(false);$('coordBtn').onclick=()=>{updateMap();assess(false)};$('placeBtn').onclick=()=>assess(true);$('machine').onchange=renderAll;$('projectName').oninput=renderAll;$('lat').onchange=updateMap;$('lon').onchange=updateMap;
-updateMap();renderStatus();renderAll();setTimeout(()=>assess(false),500);
+updateMap();renderStatus();renderAll();
 </script>
 </body></html>
