@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>全球风电环境适应性智能决策平台 V2.4 修复版</title>
+<style>
+:root{--b:#1456d9;--n:#0b2548;--bg:#f5f7fb;--l:#dde4ee;--m:#667085;--r:#c83d3d;--o:#bd6a0b;--g:#07875f}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,"Microsoft YaHei",sans-serif;color:#1f2937}
+aside{position:fixed;left:0;top:0;bottom:0;width:220px;background:var(--n);padding:22px 14px;color:#fff;overflow:auto}
+aside h2{font-size:17px;margin:0}.ver{font-size:10px;color:#85a8e5;margin:5px 0 22px}.nav a{display:block;color:#bdc9dc;text-decoration:none;padding:9px;border-radius:8px;font-size:12px}.nav a:hover{background:#ffffff12;color:#fff}
+.main{margin-left:220px}header{position:sticky;top:0;z-index:8;background:#fffffff4;border-bottom:1px solid var(--l);padding:15px 26px;display:flex;justify-content:space-between;align-items:center}
+header h1{font-size:20px;color:var(--n);margin:0}button{border:0;border-radius:8px;padding:9px 13px;font-weight:700;cursor:pointer}.pri{background:var(--b);color:#fff}.ghost{background:#fff;border:1px solid var(--l)}
+section{padding:27px;border-bottom:1px solid #e6ebf1}.title{display:flex;justify-content:space-between;align-items:end;gap:15px;margin-bottom:14px}.title h3{margin:0;color:var(--n);font-size:22px}.title p{font-size:11px;color:var(--m);margin:5px 0 0}.pill{display:inline-block;background:#eaf2ff;color:var(--b);font-size:10px;font-weight:700;border-radius:99px;padding:6px 9px}
+.hero{display:grid;grid-template-columns:1fr 1fr;gap:13px;background:linear-gradient(135deg,#fcfdff,#edf4ff)}.card{background:#fff;border:1px solid var(--l);border-radius:13px;padding:14px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:10px}label{font-size:10px;color:var(--m)}input,select{width:100%;padding:8px;margin-top:5px;border:1px solid var(--l);border-radius:8px;background:#fff}
+#mapFrame{width:100%;height:340px;border:0;background:#e8eef5}.msg{margin-top:10px;padding:9px;border-radius:8px;background:#eef5ff;color:#164a99;font-size:11px}.msg.err{background:#fdecec;color:var(--r)}
+table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;border-bottom:1px solid #edf0f4;text-align:left}th{background:#f6f8fb}.ok{color:var(--g);font-weight:700}.bad{color:var(--r);font-weight:700}.wait{color:#7d8796;font-weight:700}
+.metrics{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.metric{background:#fff;border:1px solid var(--l);border-radius:11px;padding:11px}.metric small{font-size:10px;color:var(--m)}.metric b{display:block;color:var(--n);font-size:18px;margin-top:6px}.risk{font-size:9px;margin-top:5px}.hi{color:var(--r)}.med{color:var(--o)}.low{color:var(--g)}
+.models{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.model h4{margin:0 0 7px;color:var(--n)}.formula{font:10px/1.55 Consolas,monospace;background:#f7faff;border:1px solid #e3eaf5;padding:8px;border-radius:8px}.out{margin-top:8px;padding:8px;border-radius:8px;background:#eef5ff;color:#164a99;font-size:11px;font-weight:700}
+.langs{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.lang{display:grid;grid-template-columns:20px 1fr;gap:7px;background:#fff;border:1px solid var(--l);border-radius:10px;padding:11px;font-size:11px;line-height:1.5}.lang input{width:auto;margin:2px 0}.req{border-left:3px solid var(--b);background:#f7faff;padding:9px 11px;margin:7px 0;font-size:11px}
+.scenes,.solutions{display:grid;grid-template-columns:repeat(3,1fr);gap:9px}.scene,.sol{background:#fff;border:1px solid var(--l);border-radius:11px;padding:11px}.scene.sel,.sol.sel{border:2px solid var(--b)}.bar{height:5px;background:#edf1f6;border-radius:9px}.bar i{display:block;height:100%;background:var(--b);border-radius:9px}
+.pkggrid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px}.pkg{position:relative;background:#fff;border:1px solid var(--l);border-radius:11px;padding:11px}.pkg.sel{border:2px solid var(--b)}.pkg input{position:absolute;right:9px;top:8px;width:auto}.pkg h4{margin:6px 0}.pkg p{font-size:10px;color:var(--m)}
+.summary{background:linear-gradient(135deg,#0b2548,#174a89);color:#fff}.chips{display:flex;gap:7px;flex-wrap:wrap}.chips span{font-size:10px;background:#ffffff18;padding:7px 9px;border-radius:99px}
+@media(max-width:950px){aside{display:none}.main{margin:0}.hero,.models{grid-template-columns:1fr}.metrics{grid-template-columns:repeat(2,1fr)}.pkggrid{grid-template-columns:repeat(2,1fr)}.scenes,.solutions{grid-template-columns:1fr}section{padding:22px 16px}}
+@media(max-width:560px){.grid2,.metrics,.pkggrid,.langs{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<aside>
+<h2>EA · 环境适应性</h2><div class="ver">WORKING DATA LOGIC · V2.4</div>
+<div class="nav"><a href="#project">01 项目与地图</a><a href="#status">02 数据状态</a><a href="#env">03 环境体检</a><a href="#models">04 工程模型</a><a href="#lang">05 客户语言</a><a href="#req">06 设计需求</a><a href="#scene">07 场景方案</a><a href="#pkg">08 升级包</a><a href="#gap">09 Design Gap</a></div>
+</aside>
+<div class="main">
+<header><h1>全球风电环境适应性智能决策平台 V2.4 修复版</h1><button class="pri" id="runBtn">查询真实数据并计算</button></header>
+
+<section id="project" class="hero">
+<div class="card"><div class="title"><div><h3>01 项目输入</h3><p>直接复用原平台已验证的 Open-Meteo / ERA5 / CAMS 取数逻辑</p></div><span class="pill">GITHUB PAGES</span></div>
+<div class="grid2">
+<label>项目名称<input id="projectName" value="新疆若羌示范项目"></label>
+<label>地名<input id="place" value="若羌县"></label>
+<label>纬度<input id="lat" value="39.02"></label>
+<label>经度<input id="lon" value="88.17"></label>
+<label>机组当前环境配置<select id="machine"><option>基础型</option><option selected>标准型</option><option>强化型</option></select></label>
+<label>统计周期<input value="2021–2025" disabled></label>
+</div>
+<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:11px"><button class="pri" id="placeBtn">地名检索并计算</button><button class="ghost" id="coordBtn">按经纬度计算</button></div>
+<div id="msg" class="msg">页面加载完成。点击“查询真实数据并计算”开始。</div>
+</div>
+<div class="card" style="padding:0;overflow:hidden"><iframe id="mapFrame"></iframe></div>
+</section>
+
+<section id="status"><div class="title"><div><h3>02 真实数据接入状态</h3><p>这里不是装饰，而是用于判断本次计算是否真正取到数据</p></div></div>
+<div class="card"><table><thead><tr><th>数据源</th><th>用途</th><th>状态</th><th>实际返回</th></tr></thead><tbody id="statusBody"></tbody></table></div></section>
+
+<section id="env"><div class="title"><div><h3>03 机组环境体检报告</h3><p>只读，不可编辑</p></div><span class="pill">SYSTEM OUTPUT</span></div><div class="metrics" id="metrics"></div></section>
+
+<section id="models"><div class="title"><div><h3>04 工程模型结果</h3><p>凝露 / 盐雾 / 腐蚀 / 沙蚀均基于本次真实输入</p></div></div>
+<div class="models">
+<div class="card model"><h4>凝露模型</h4><div class="formula">金属热惯性 + 对流 + 太阳辐射 + 长波辐射；当 Ts ≤ Td 判为凝露。</div><div class="out" id="dewOut">等待计算</div></div>
+<div class="card model"><h4>盐雾 / Cl⁻沉降</h4><div class="formula">Sea Salt Aerosol P95 × Vd × 86400 × Cl⁻质量分数。</div><div class="out" id="saltOut">等待计算</div></div>
+<div class="card model"><h4>腐蚀模型</h4><div class="formula">ISO 9223 框架：温度、RH、SO₂沉降、Cl⁻沉降 → 碳钢首年腐蚀率。</div><div class="out" id="corrOut">等待计算</div></div>
+<div class="card model"><h4>沙蚀模型</h4><div class="formula">Dust/PM10 + P95 风速 → 相对沙蚀工程指数。</div><div class="out" id="erosionOut">等待计算</div></div>
+</div></section>
+
+<section id="lang"><div class="title"><div><h3>05 客户语言</h3><p>系统自动建议，工程师勾选确认</p></div></div><div id="langs" class="langs"></div></section>
+<section id="req"><div class="title"><div><h3>06 设计需求</h3><p>环境体检 + 勾选客户语言联合生成</p></div></div><div id="requirements" class="card"></div></section>
+<section id="scene"><div class="title"><div><h3>07 推荐场景主方案</h3><p>9 类气候自动评分</p></div><span id="sceneRec" class="pill"></span></div><div id="scenes" class="scenes"></div><div id="solutions" class="solutions" style="margin-top:10px"></div></section>
+<section id="pkg"><div class="title"><div><h3>08 12 个环控升级包</h3><p>环境参数自动触发，允许人工覆盖</p></div></div><div id="packages" class="pkggrid"></div></section>
+<section id="gap"><div class="title"><div><h3>09 Design Gap</h3><p>环境要求 − 当前能力 − 主方案 − 升级包</p></div><span id="residual" class="pill"></span></div><div class="card"><table><thead><tr><th>能力域</th><th>环境要求</th><th>当前能力</th><th>方案补偿</th><th>剩余风险</th></tr></thead><tbody id="gapBody"></tbody></table></div></section>
+<section><div class="card summary"><h2 id="reportTitle">项目</h2><div id="summary" class="chips"></div></div></section>
+</div>
+
+<script>
+const $=id=>document.getElementById(id),iso=d=>d.toISOString().slice(0,10);
+let state={},raw={},langOn={},pkgManual={},selectedMain='Pro',mainTouched=false;
+let statusState={
+weather:['ERA5 / Open-Meteo','温度、湿度、露点、降雨、风、辐射、云量、降雪','未查询','—'],
+elev:['Open-Meteo Elevation','海拔','未查询','—'],
+aq:['CAMS Global','PM10 / Dust / SO₂ / Sea Salt Aerosol','未查询','—']
+};
+const defs=[['tmax','P99最高气温','℃',45,40,1,'高温'],['tmin','极端最低气温','℃',-30,-20,-1,'低温'],['rh','RH>90%','h/y',1000,300,1,'高湿'],['dew','凝露风险小时','h/y',200,50,1,'凝露'],['rain','最大1h降雨','mm/h',80,30,1,'强降雨'],['mist','大雾潜势小时','h/y',300,80,1,'大雾'],['pm10','PM10均值','μg/m³',150,45,1,'沙尘'],['erosion','沙蚀指数','-',1,.4,1,'沙蚀'],['salt','Cl⁻沉降','mg/(m²·d)',60,20,1,'盐雾'],['corrRate','碳钢首年腐蚀率','μm/y',80,25,1,'腐蚀'],['alt','海拔','m',3000,1500,1,'高海拔'],['snow','年降雪小时','h/y',120,30,1,'暴雪']];
+function avg(a){let v=(a||[]).filter(Number.isFinite);return v.length?v.reduce((s,x)=>s+x,0)/v.length:NaN}
+function q(a,p){let v=(a||[]).filter(Number.isFinite).sort((x,y)=>x-y);return v.length?v[Math.floor((v.length-1)*p)]:NaN}
+function cnt(a,f){return(a||[]).reduce((n,x,i)=>n+(f(x,i)?1:0),0)}
+function score(id){let d=defs.find(x=>x[0]===id),v=Number(state[id]);if(!Number.isFinite(v))return 0;return d[5]>0?(v>=d[3]?3:v>=d[4]?2:1):(v<=d[3]?3:v<=d[4]?2:1)}
+function updateMap(){let la=Number($('lat').value),lo=Number($('lon').value),dx=.8,dy=.5;$('mapFrame').src='https://www.openstreetmap.org/export/embed.html?bbox='+(lo-dx)+'%2C'+(la-dy)+'%2C'+(lo+dx)+'%2C'+(la+dy)+'&layer=mapnik&marker='+la+'%2C'+lo}
+function setStatus(k,s,r){statusState[k][2]=s;statusState[k][3]=r;renderStatus()}
+function renderStatus(){$('statusBody').innerHTML=Object.values(statusState).map(x=>'<tr><td>'+x[0]+'</td><td>'+x[1]+'</td><td class="'+(x[2]==='成功'?'ok':x[2]==='失败'?'bad':'wait')+'">'+x[2]+'</td><td>'+x[3]+'</td></tr>').join('')}
+async function locate(name){let r=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(name)+'&count=1&language=zh');if(!r.ok)throw Error('地名解析服务不可用');let j=await r.json();if(!j.results?.length)throw Error('未找到该地名');let x=j.results[0];return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}}
+async function elev(lat,lon){let r=await fetch('https://api.open-meteo.com/v1/elevation?latitude='+lat+'&longitude='+lon);if(!r.ok)throw Error('海拔接口失败');let j=await r.json();return j.elevation?.[0]}
+async function weather(lat,lon){
+ const hv='temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,snowfall,wind_speed_10m,shortwave_radiation,surface_pressure,cloud_cover';
+ const merged={temperature_2m:[],relative_humidity_2m:[],dew_point_2m:[],precipitation:[],snowfall:[],wind_speed_10m:[],shortwave_radiation:[],surface_pressure:[],cloud_cover:[]};
+ for(let y=2021;y<=2025;y++){
+   $('msg').textContent='正在获取 ERA5 '+y+' 年数据…';
+   let u='https://archive-api.open-meteo.com/v1/archive?latitude='+lat+'&longitude='+lon+'&start_date='+y+'-01-01&end_date='+y+'-12-31&hourly='+hv+'&timezone=UTC&wind_speed_unit=ms&models=era5';
+   let r=await fetch(u);if(!r.ok){let t=await r.text().catch(()=>''),m='ERA5 '+y+' HTTP '+r.status+(t?': '+t.slice(0,80):'');throw Error(m)}
+   let j=await r.json();if(j.error)throw Error(j.reason||'ERA5返回错误');
+   for(let k of Object.keys(merged))merged[k].push(...(j.hourly?.[k]||[]));
+ }
+ return merged
+}
+async function air(lat,lon){let e=new Date();e.setUTCDate(e.getUTCDate()-1);let s=new Date(e);s.setUTCDate(s.getUTCDate()-89);let v='pm10,pm2_5,dust,sea_salt_aerosol,sulphur_dioxide,nitrogen_dioxide';let u='https://air-quality-api.open-meteo.com/v1/air-quality?latitude='+lat+'&longitude='+lon+'&hourly='+v+'&start_date='+iso(s)+'&end_date='+iso(e)+'&timezone=auto&domains=cams_global';let r=await fetch(u);if(!r.ok)throw Error('CAMS HTTP '+r.status);let j=await r.json();if(j.error)throw Error(j.reason||'CAMS返回错误');return j.hourly||{}}
+function condensation(h){
+ const sigma=5.670374419e-8,rho=7850,Cp=500,delta=.004,eps=.9,alpha=.6,CA=rho*Cp*delta;
+ let T=h.temperature_2m||[],Td=h.dew_point_2m||[],V=h.wind_speed_10m||[],G=h.shortwave_radiation||[],Ts=Number.isFinite(T[0])?T[0]:20,cond=0,valid=0;
+ for(let i=0;i<T.length;i++){if(!Number.isFinite(T[i])||!Number.isFinite(Td[i]))continue;valid++;let hc=5.7+3.8*Math.max(0,V[i]||0);let TsK=Ts+273.15,TaK=T[i]+273.15,qconv=hc*(T[i]-Ts),qsolar=alpha*Math.max(0,G[i]||0),qrad=eps*sigma*(Math.pow(TsK,4)-Math.pow(TaK-6,4));Ts+=Math.max(-5,Math.min(5,3600*(qconv+qsolar-qrad)/CA));if(Ts<=Td[i])cond++}
+ return valid?cond/valid*8760:NaN
+}
+function corrClass(r){return r<=1.3?'C1':r<=25?'C2':r<=50?'C3':r<=80?'C4':r<=200?'C5':'CX'}
+function compute(h,aq,alt){
+ let T=h.temperature_2m||[],RH=h.relative_humidity_2m||[],P=h.precipitation||[],S=h.snowfall||[],V=h.wind_speed_10m||[];
+ state.tmax=+q(T,.99).toFixed(1);state.tmin=+Math.min(...T.filter(Number.isFinite)).toFixed(1);state.rh=+(cnt(RH,x=>x>=90)/5).toFixed(0);state.rain=+Math.max(...P.filter(Number.isFinite)).toFixed(1);state.snow=+(cnt(S,x=>x>0)/5).toFixed(0);state.mist=+(cnt(RH,(x,i)=>x>=95&&(V[i]||99)<3)/5).toFixed(0);state.dew=+condensation(h).toFixed(0);state.alt=Math.round(alt||0);
+ let pm=(aq.pm10||[]).filter(Number.isFinite),dust=(aq.dust||[]).filter(Number.isFinite),sea=(aq.sea_salt_aerosol||[]).filter(Number.isFinite),so2=(aq.sulphur_dioxide||[]).filter(Number.isFinite);
+ state.pm10=+avg(pm).toFixed(1);let wind95=q(V,.95),cp=Math.max(avg(pm),avg(dust),1);state.erosion=+(Math.pow(cp/100,1)*Math.pow(Math.max(wind95,.1)/10,2.5)).toFixed(2);
+ let sea95=q(sea,.95);state.salt=Number.isFinite(sea95)?+(sea95*.003*86400/1000*.55).toFixed(2):NaN;
+ let avgT=avg(T),avgRH=avg(RH),so295=q(so2,.95),Pd=Number.isFinite(so295)?so295*.005*86400/1000:.0001,Sd=Number.isFinite(state.salt)?Math.max(state.salt,.0001):.0001,fst=avgT<=10?.150*(avgT-10):-.054*(avgT-10);
+ let rc=1.77*Math.pow(Math.max(Pd,.0001),.52)*Math.exp(.020*avgRH+fst)+.102*Math.pow(Sd,.62)*Math.exp(.033*avgRH+.040*avgT);state.corrRate=+rc.toFixed(1);state.corr=corrClass(rc);
+ raw={sea95,so295,wind95,pmMean:avg(pm),dustMean:avg(dust)};
+ $('dewOut').textContent='凝露风险小时：'+state.dew+' h/y';
+ $('saltOut').textContent=Number.isFinite(state.salt)?'Cl⁻沉降：'+state.salt+' mg/(m²·d)':'Sea Salt Aerosol 无有效值，盐沉降不计算';
+ $('corrOut').textContent='碳钢首年腐蚀：'+state.corrRate+' μm/y → '+state.corr;
+ $('erosionOut').textContent='沙蚀工程指数：'+state.erosion+'（相对指标）';
+}
+async function assess(byPlace){
+ $('msg').className='msg';$('msg').textContent='开始查询…';let lat=Number($('lat').value),lon=Number($('lon').value);
+ try{
+  if(byPlace){let l=await locate($('place').value);lat=l.lat;lon=l.lon;$('lat').value=lat;$('lon').value=lon;$('place').value=l.name;updateMap()}
+  setStatus('weather','查询中','—');setStatus('elev','查询中','—');setStatus('aq','查询中','—');
+  let w=await weather(lat,lon);setStatus('weather','成功','2021–2025 五年小时数据');
+  let [er,ar]=await Promise.allSettled([elev(lat,lon),air(lat,lon)]);
+  let e=0,aq={};
+  if(er.status==='fulfilled'){e=er.value;setStatus('elev','成功',Math.round(e)+' m')}else setStatus('elev','失败',er.reason?.message||'失败');
+  if(ar.status==='fulfilled'){aq=ar.value;setStatus('aq','成功','PM10 / Dust / Sea Salt / SO₂ 已返回')}else setStatus('aq','失败',ar.reason?.message||'失败');
+  compute(w,aq,e);renderAll();$('msg').textContent='真实数据计算完成。请先查看“数据接入状态”，再看体检和方案。';
+ }catch(e){console.error(e);$('msg').className='msg err';$('msg').textContent='查询失败：'+(e?.message||String(e));if(statusState.weather[2]==='查询中')setStatus('weather','失败',e?.message||String(e))}
+}
+const langRules=[['L1',['tmax'],'存在高温时段，常规冷却配置可能出现降额或热裕量不足。'],['L2',['pm10','erosion'],'风沙颗粒可能导致过滤器堵塞、积灰及磨蚀。'],['L3',['dew','rh'],'高湿与温差可能导致关键电气区域凝露。'],['L4',['rain'],'强降雨/风驱雨可能进入舱室。'],['L5',['mist'],'大雾可能造成进气携液和传感器结雾。'],['L6',['salt','corrRate'],'盐雾/腐蚀环境可能提高金属和电气连接腐蚀风险。'],['L7',['alt'],'高海拔需要修正散热、风机和绝缘能力。'],['L8',['tmin','snow'],'低温/积雪/结冰可能影响启动和通风。']];
+const reqMap={L1:'冷却系统按高温边界校核并预留≥15%热裕量。',L2:'采用惯性除沙/两级过滤/压差监测及耐磨设计。',L3:'关键电气设备按露点裕量≥3 K控制，配置除湿、加热与通风联动。',L4:'采用迷宫百叶、防雨罩、接口密封和排水路径。',L5:'进气侧配置除雾/聚结排液及传感器防雾。',L6:'依据腐蚀等级与Cl⁻沉降选择防腐体系。',L7:'按空气密度修正散热、风机和绝缘能力。',L8:'配置低温加热、低温材料和结冰/积雪防护。'};
+const sceneDefs=[['常温内陆气候',['rh','rain'],.25],['热带雨林气候',['tmax','rh','rain','dew','mist'],.78],['滨海盐雾气候',['salt','corrRate','rh','mist','rain'],.82],['沙戈荒气候',['tmax','pm10','erosion'],.9],['高温环境',['tmax'],.88],['高原高寒气候',['alt','tmin'],.75],['寒地暴雪气候',['tmin','snow'],.8],['海洋气候',['salt','corrRate','rh','rain','mist'],.88],['工矿腐蚀环境',['corrRate','pm10'],.68]];
+const pkgs=[['防腐包',()=>Math.max(score('salt'),score('corrRate')),['腐蚀','盐雾']],['防雾包',()=>Math.max(score('mist'),score('rh')),['大雾','高湿']],['防雨包',()=>score('rain'),['强降雨']],['防凝露包',()=>Math.max(score('dew'),score('rh')),['凝露','高湿']],['防沙尘包',()=>Math.max(score('pm10'),score('erosion')),['沙尘','沙蚀']],['高温强化包',()=>score('tmax'),['高温']],['低温防寒包',()=>score('tmin'),['低温']],['高原包',()=>score('alt'),['高海拔']],['暴雪结冰包',()=>score('snow'),['暴雪']],['海洋强化包',()=>Math.max(score('salt'),score('corrRate'),score('rain'),score('mist'),score('rh')),['盐雾','腐蚀','大雾','强降雨','高湿']],['霉菌防护包',()=>score('rh')>=2&&state.tmax>30?2:0,['高湿']],['工矿污染包',()=>score('corrRate')>=2&&score('pm10')>=1?2:0,['腐蚀','沙尘']];
+function pstate(i){let a=pkgs[i][1](),m=pkgManual[i];return{a,sel:m===undefined?a>=2:m}}
+function renderAll(){
+ $('metrics').innerHTML=defs.map(d=>{let s=score(d[0]),c=s>=3?'hi':s===2?'med':'low',v=d[0]==='corrRate'?(state.corrRate+' μm/y · '+state.corr):((state[d[0]]??'—')+' '+d[2]);return'<div class="metric"><small>'+d[1]+'</small><b>'+v+'</b><div class="risk '+c+'">'+(s>=3?'高':s===2?'中':'低')+'风险 · '+d[6]+'</div></div>'}).join('');
+ langRules.forEach(l=>{if(langOn[l[0]]===undefined)langOn[l[0]]=l[1].some(x=>score(x)>=2)});
+ $('langs').innerHTML=langRules.map(l=>'<label class="lang"><input type="checkbox" '+(langOn[l[0]]?'checked':'')+' onchange="langOn[\''+l[0]+'\']=this.checked;renderAll()"><span>'+l[2]+'</span></label>').join('');
+ let req=[];Object.keys(reqMap).forEach(k=>{if(langOn[k])req.push(reqMap[k])});$('requirements').innerHTML=req.map((x,i)=>'<div class="req"><b>'+(i+1)+'.</b> '+x+'</div>').join('');
+ let sc=sceneDefs.map(s=>[s[0],Math.min(99,Math.round(s[1].map(score).reduce((a,b)=>a+b,0)/(s[1].length*3)*100*s[2]+20))]).sort((a,b)=>b[1]-a[1]);$('sceneRec').textContent=sc.length?'主场景：'+sc[0][0]+' '+sc[0][1]+'%':'等待计算';
+ $('scenes').innerHTML=sc.map((x,i)=>'<div class="scene '+(i===0?'sel':'')+'"><h4>'+(i===0?'★ ':'')+x[0]+'</h4><p>匹配度 '+x[1]+'%</p><div class="bar"><i style="width:'+x[1]+'%"></i></div></div>').join('');
+ let mx=Math.max(0,...defs.map(d=>score(d[0]))),rec=mx>=3?'Plus':mx===2?'Pro':'Standard';if(!mainTouched)selectedMain=rec;let sol={Standard:['满足常规边界'],Pro:['强化环境适应','+15%热裕量、两级过滤、主动除湿'],Plus:['极端环境保障','主动制冷、闭式防护、冗余']};
+ $('solutions').innerHTML=Object.keys(sol).map(k=>'<div class="sol '+(selectedMain===k?'sel':'')+'"><h4>'+k+(k===rec?' · 推荐':'')+'</h4><p style="font-size:11px">'+sol[k].join('；')+'</p><label>选择 <input style="width:auto" type="radio" name="main" '+(selectedMain===k?'checked':'')+' onchange="selectedMain=\''+k+'\';mainTouched=true;renderAll()"></label></div>').join('');
+ $('packages').innerHTML=pkgs.map((p,i)=>{let s=pstate(i);return'<div class="pkg '+(s.sel?'sel':'')+'"><input type="checkbox" '+(s.sel?'checked':'')+' onchange="pkgManual['+i+']=this.checked;renderAll()"><span class="pill">'+(s.a>=3?'强烈推荐':s.a===2?'推荐':'可选')+'</span><h4>'+p[0]+'</h4><p>环境规则分 '+s.a+'/3</p></div>'}).join('');
+ let cap={Standard:1,Pro:2,Plus:3},base={基础型:0,标准型:1,强化型:2},sel=pkgs.filter((p,i)=>pstate(i).sel),rows=[],max=0;defs.forEach(d=>{let need=score(d[0]),b=base[$('machine').value]||0,m=cap[selectedMain]-1,p=sel.some(x=>x[2].includes(d[6]))?2:0,rem=Math.max(0,need-Math.min(3,b+m+p));max=Math.max(max,rem);rows.push('<tr><td>'+d[6]+'</td><td>'+need+'/3</td><td>'+b+'/3</td><td>主+'+m+'；包+'+p+'</td><td class="'+(rem>=2?'hi':rem===1?'med':'low')+'">'+(rem>=2?'高':rem===1?'中':'低')+'</td></tr>')});$('gapBody').innerHTML=rows.join('');$('residual').textContent='综合剩余风险：'+(max>=2?'高':max===1?'中':'低');$('reportTitle').textContent=$('projectName').value;$('summary').innerHTML='<span>主方案：'+selectedMain+'</span><span>升级包：'+sel.map(x=>x[0]).join(' / ')+'</span><span>腐蚀：'+(state.corr||'—')+'</span>';
+}
+$('runBtn').onclick=()=>assess(false);$('coordBtn').onclick=()=>{updateMap();assess(false)};$('placeBtn').onclick=()=>assess(true);$('machine').onchange=renderAll;$('projectName').oninput=renderAll;$('lat').onchange=updateMap;$('lon').onchange=updateMap;
+updateMap();renderStatus();renderAll();
+</script>
+</body></html>
