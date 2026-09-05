@@ -37,12 +37,12 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;borde
 <section id="project" class="hero">
 <div class="card"><div class="title"><div><h3>01 项目输入</h3><p>直接复用原平台已验证的 Open-Meteo / ERA5 / CAMS 取数逻辑</p></div><span class="pill">GITHUB PAGES</span></div>
 <div class="grid2">
-<label>项目名称<input id="projectName" value="新疆若羌示范项目"></label>
-<label>地名<input id="place" value="若羌县"></label>
-<label>纬度<input id="lat" value="39.02"></label>
-<label>经度<input id="lon" value="88.17"></label>
+<label>项目名称<input id="projectName" value="北京示范项目"></label>
+<label>地名<input id="place" value="北京"></label>
+<label>纬度<input id="lat" value="39.9042"></label>
+<label>经度<input id="lon" value="116.4074"></label>
 <label>机组当前环境配置<select id="machine"><option>基础型</option><option selected>标准型</option><option>强化型</option></select></label>
-<label>统计周期<input value="2021–2025" disabled></label>
+<label>统计周期<input value="最近1年" disabled></label>
 </div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:11px"><button class="pri" id="placeBtn">地名检索并计算</button><button class="ghost" id="coordBtn">按经纬度计算</button></div>
 <div id="msg" class="msg">页面加载完成。点击“查询真实数据并计算”开始。</div>
@@ -90,16 +90,23 @@ function renderStatus(){$('statusBody').innerHTML=Object.values(statusState).map
 async function locate(name){let r=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(name)+'&count=1&language=zh');if(!r.ok)throw Error('地名解析服务不可用');let j=await r.json();if(!j.results?.length)throw Error('未找到该地名');let x=j.results[0];return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}}
 async function elev(lat,lon){let r=await fetch('https://api.open-meteo.com/v1/elevation?latitude='+lat+'&longitude='+lon);if(!r.ok)throw Error('海拔接口失败');let j=await r.json();return j.elevation?.[0]}
 async function weather(lat,lon){
+ const end=new Date();end.setUTCDate(end.getUTCDate()-10);
+ const start=new Date(end);start.setUTCFullYear(start.getUTCFullYear()-1);
  const hv='temperature_2m,relative_humidity_2m,dew_point_2m,precipitation,snowfall,wind_speed_10m,shortwave_radiation,surface_pressure,cloud_cover';
  const merged={temperature_2m:[],relative_humidity_2m:[],dew_point_2m:[],precipitation:[],snowfall:[],wind_speed_10m:[],shortwave_radiation:[],surface_pressure:[],cloud_cover:[]};
- for(let y=2021;y<=2025;y++){
-   $('msg').textContent='正在获取 ERA5 '+y+' 年数据…';
-   let u='https://archive-api.open-meteo.com/v1/archive?latitude='+lat+'&longitude='+lon+'&start_date='+y+'-01-01&end_date='+y+'-12-31&hourly='+hv+'&timezone=UTC&wind_speed_unit=ms&models=era5';
-   let r=await fetch(u);if(!r.ok){let t=await r.text().catch(()=>''),m='ERA5 '+y+' HTTP '+r.status+(t?': '+t.slice(0,80):'');throw Error(m)}
-   let j=await r.json();if(j.error)throw Error(j.reason||'ERA5返回错误');
-   for(let k of Object.keys(merged))merged[k].push(...(j.hourly?.[k]||[]));
+ const chunks=[];let cursor=new Date(start);
+ while(cursor<=end){let ce=new Date(Date.UTC(cursor.getUTCFullYear(),11,31));if(ce>end)ce=new Date(end);chunks.push([new Date(cursor),ce]);cursor=new Date(Date.UTC(ce.getUTCFullYear()+1,0,1));}
+ for(let i=0;i<chunks.length;i++){
+   const [cs,ce]=chunks[i];
+   $('msg').textContent='正在获取 ERA5 '+(i+1)+'/'+chunks.length+'：'+iso(cs)+' ~ '+iso(ce)+'…';
+   const u='https://archive-api.open-meteo.com/v1/archive?latitude='+lat+'&longitude='+lon+'&start_date='+iso(cs)+'&end_date='+iso(ce)+'&hourly='+hv+'&timezone=UTC&wind_speed_unit=ms&models=era5';
+   const r=await fetch(u);
+   if(!r.ok){let t=await r.text().catch(()=>''),m='ERA5 HTTP '+r.status+(t?': '+t.slice(0,100):'');throw Error(m)}
+   const j=await r.json(); if(j.error) throw Error(j.reason||'ERA5返回错误');
+   for(const k of Object.keys(merged)) merged[k].push(...(j.hourly?.[k]||[]));
  }
- return merged
+ if(!(merged.temperature_2m||[]).length) throw Error('ERA5未返回小时温度数据');
+ return {hourly:merged,start:iso(start),end:iso(end)}
 }
 async function air(lat,lon){let e=new Date();e.setUTCDate(e.getUTCDate()-1);let s=new Date(e);s.setUTCDate(s.getUTCDate()-89);let v='pm10,pm2_5,dust,sea_salt_aerosol,sulphur_dioxide,nitrogen_dioxide';let u='https://air-quality-api.open-meteo.com/v1/air-quality?latitude='+lat+'&longitude='+lon+'&hourly='+v+'&start_date='+iso(s)+'&end_date='+iso(e)+'&timezone=auto&domains=cams_global';let r=await fetch(u);if(!r.ok)throw Error('CAMS HTTP '+r.status);let j=await r.json();if(j.error)throw Error(j.reason||'CAMS返回错误');return j.hourly||{}}
 function condensation(h){
@@ -128,12 +135,12 @@ async function assess(byPlace){
  try{
   if(byPlace){let l=await locate($('place').value);lat=l.lat;lon=l.lon;$('lat').value=lat;$('lon').value=lon;$('place').value=l.name;updateMap()}
   setStatus('weather','查询中','—');setStatus('elev','查询中','—');setStatus('aq','查询中','—');
-  let w=await weather(lat,lon);setStatus('weather','成功','2021–2025 五年小时数据');
+  let wObj=await weather(lat,lon);let w=wObj.hourly;setStatus('weather','成功',wObj.start+' ~ '+wObj.end+' · '+w.temperature_2m.length+' 小时');
   let [er,ar]=await Promise.allSettled([elev(lat,lon),air(lat,lon)]);
   let e=0,aq={};
   if(er.status==='fulfilled'){e=er.value;setStatus('elev','成功',Math.round(e)+' m')}else setStatus('elev','失败',er.reason?.message||'失败');
   if(ar.status==='fulfilled'){aq=ar.value;setStatus('aq','成功','PM10 / Dust / Sea Salt / SO₂ 已返回')}else setStatus('aq','失败',ar.reason?.message||'失败');
-  compute(w,aq,e);renderAll();$('msg').textContent='真实数据计算完成。请先查看“数据接入状态”，再看体检和方案。';
+  compute(w,aq,e);renderAll();$('msg').textContent='真实数据计算完成：'+wObj.start+' ~ '+wObj.end+'。';
  }catch(e){console.error(e);$('msg').className='msg err';$('msg').textContent='查询失败：'+(e?.message||String(e));if(statusState.weather[2]==='查询中')setStatus('weather','失败',e?.message||String(e))}
 }
 const langRules=[['L1',['tmax'],'存在高温时段，常规冷却配置可能出现降额或热裕量不足。'],['L2',['pm10','erosion'],'风沙颗粒可能导致过滤器堵塞、积灰及磨蚀。'],['L3',['dew','rh'],'高湿与温差可能导致关键电气区域凝露。'],['L4',['rain'],'强降雨/风驱雨可能进入舱室。'],['L5',['mist'],'大雾可能造成进气携液和传感器结雾。'],['L6',['salt','corrRate'],'盐雾/腐蚀环境可能提高金属和电气连接腐蚀风险。'],['L7',['alt'],'高海拔需要修正散热、风机和绝缘能力。'],['L8',['tmin','snow'],'低温/积雪/结冰可能影响启动和通风。']];
@@ -154,6 +161,6 @@ function renderAll(){
  let cap={Standard:1,Pro:2,Plus:3},base={基础型:0,标准型:1,强化型:2},sel=pkgs.filter((p,i)=>pstate(i).sel),rows=[],max=0;defs.forEach(d=>{let need=score(d[0]),b=base[$('machine').value]||0,m=cap[selectedMain]-1,p=sel.some(x=>x[2].includes(d[6]))?2:0,rem=Math.max(0,need-Math.min(3,b+m+p));max=Math.max(max,rem);rows.push('<tr><td>'+d[6]+'</td><td>'+need+'/3</td><td>'+b+'/3</td><td>主+'+m+'；包+'+p+'</td><td class="'+(rem>=2?'hi':rem===1?'med':'low')+'">'+(rem>=2?'高':rem===1?'中':'低')+'</td></tr>')});$('gapBody').innerHTML=rows.join('');$('residual').textContent='综合剩余风险：'+(max>=2?'高':max===1?'中':'低');$('reportTitle').textContent=$('projectName').value;$('summary').innerHTML='<span>主方案：'+selectedMain+'</span><span>升级包：'+sel.map(x=>x[0]).join(' / ')+'</span><span>腐蚀：'+(state.corr||'—')+'</span>';
 }
 $('runBtn').onclick=()=>assess(false);$('coordBtn').onclick=()=>{updateMap();assess(false)};$('placeBtn').onclick=()=>assess(true);$('machine').onchange=renderAll;$('projectName').oninput=renderAll;$('lat').onchange=updateMap;$('lon').onchange=updateMap;
-updateMap();renderStatus();renderAll();
+updateMap();renderStatus();renderAll();setTimeout(()=>assess(false),500);
 </script>
 </body></html>
