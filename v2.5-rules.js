@@ -14,3 +14,20 @@ const DEFAULT_RISK_RULES={
   rad95:{label:'P95太阳辐射',unit:'W/m²',direction:'high',medium:600,high:800}
 };
 const MATCH_RULE={high:70,medium:45,version:'V2.7-CORE-SUPPORT'};
+
+(function bootstrapV27Cloud(){
+  const path=location.pathname||'';
+  if(/\/v2\.5-admin\.html$/.test(path)){
+    location.replace('v2.5-admin-cloud.html'+(location.search||'?v=20260905-cloud1'));
+    return;
+  }
+  if(/\/v2\.5\.html$/.test(path)){
+    window.addEventListener('load',()=>{
+      if(document.querySelector('script[data-v27-cloud]'))return;
+      const s=document.createElement('script');
+      s.src='v2.5-cloud.js?v=20260905-cloud1';
+      s.dataset.v27Cloud='1';
+      document.body.appendChild(s);
+    },{once:true});
+  }
+})();
