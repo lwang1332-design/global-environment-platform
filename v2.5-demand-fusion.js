@@ -1,5 +1,5 @@
 // V2.7 demand fusion: primary + secondary scene customer requirements
-// Compact accordion UI: selected-demand summary + primary expanded / secondary collapsed.
+// Fixed UI baseline: selected-demand summary + primary expanded / secondary collapsed.
 (function installDemandFusion(){
   let demandPanelOpen={主场景:true,次场景:false};
   let demandSceneSignature='';
@@ -7,7 +7,7 @@
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
 
   function topTwoSceneContext(){
-    let ranked=Array.isArray(lastSceneRanking)&&lastSceneRanking.length?lastSceneRanking:[];
+    let ranked=(typeof lastSceneRanking!=='undefined'&&Array.isArray(lastSceneRanking)&&lastSceneRanking.length)?lastSceneRanking:[];
     if(!ranked.length&&Object.keys(env||{}).length)ranked=sceneScores();
     return ranked.slice(0,2).map((s,i)=>({
       name:s.name,
@@ -97,7 +97,25 @@
     if(!contexts.length){
       $('demandCount').textContent='0 条核心诉求';
       grid.className='demands demand-accordion';
-      grid.innerHTML='<div class="empty">完成项目环境分析后，系统将叠加主场景与次场景的客户核心诉求。</div>';
+      grid.innerHTML=`<div class="demand-summary">
+        <div class="demand-summary-head"><b>已选诉求</b><span>0 / 0</span></div>
+        <div class="demand-summary-chips"><span class="demand-summary-empty">完成项目环境分析后自动汇总已选诉求</span></div>
+      </div>
+      <div class="demand-panel open demand-placeholder">
+        <button type="button" class="demand-panel-head" disabled>
+          <span class="demand-panel-arrow">▾</span>
+          <span class="demand-panel-title"><b>主场景｜等待识别</b><small>默认展开</small></span>
+          <span class="demand-panel-count">已选 0/0</span>
+        </button>
+        <div class="demand-panel-body"><div class="empty">查询项目环境后，在这里展开显示主场景客户诉求。</div></div>
+      </div>
+      <div class="demand-panel closed demand-placeholder">
+        <button type="button" class="demand-panel-head" disabled>
+          <span class="demand-panel-arrow">▸</span>
+          <span class="demand-panel-title"><b>次场景｜等待识别</b><small>默认折叠</small></span>
+          <span class="demand-panel-count">已选 0/0</span>
+        </button>
+      </div>`;
       return;
     }
     syncPanelDefaults(contexts);
@@ -212,6 +230,7 @@
       .demand-panel-title small{font-size:9px;color:var(--muted);white-space:nowrap}
       .demand-panel-count{font-size:9px;color:var(--blue);background:#fff;border:1px solid #dce5f2;border-radius:999px;padding:3px 6px;white-space:nowrap}
       .demand-panel-body{padding:4px 7px 6px}
+      .demand-placeholder .demand-panel-head{cursor:default;opacity:.9}
       .demand-compact-row{display:grid;grid-template-columns:18px minmax(0,1fr) auto;gap:7px;align-items:center;padding:5px 3px;border-bottom:1px solid #eef1f4;cursor:pointer}
       .demand-compact-row:last-child{border-bottom:0}
       .demand-compact-row input{width:auto;margin:0}
@@ -238,5 +257,6 @@
 
   installStyles();
   patchCopy();
-  if(Object.keys(env||{}).length){renderDemands();renderRequirements();renderPackages();renderGap();renderResult();}
+  renderDemands();
+  if(Object.keys(env||{}).length){renderRequirements();renderPackages();renderGap();renderResult();}
 })();
