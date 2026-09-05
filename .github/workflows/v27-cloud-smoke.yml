@@ -1,0 +1,46 @@
+name: V2.7 Cloud Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v2.7.html'
+      - 'v2.5-cloud.js'
+      - 'v2.5-admin-cloud.html'
+      - 'v2.5-rules.js'
+      - '.github/workflows/v27-cloud-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  cloud-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify cloud API
+        shell: bash
+        run: |
+          set -euo pipefail
+          API='https://vzlnwrxscufkchxkdjus.supabase.co/functions/v1/v27-shelf'
+          curl -fsSL -H 'Origin: https://lwang1332-design.github.io' "$API/health" | grep -q '2.7-cloud-1'
+          LATEST=$(curl -fsSL -H 'Origin: https://lwang1332-design.github.io' "$API/config/latest")
+          echo "$LATEST" | grep -q 'V2.7-S001'
+          echo "$LATEST" | grep -q '常温内陆气候'
+          echo "$LATEST" | grep -q '海洋强化包'
+          LOGIN=$(curl -fsSL -X POST -H 'Origin: https://lwang1332-design.github.io' -H 'Content-Type: application/json' -d '{"password":"123123"}' "$API/auth/login")
+          echo "$LOGIN" | grep -q 'expiresIn'
+      - name: Wait for GitHub Pages V2.7 Cloud
+        shell: bash
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 36); do
+            HTML=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.7.html?smoke=${GITHUB_SHA}-${i}-$(date +%s)" || true)
+            JS=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.5-cloud.js?smoke=${GITHUB_SHA}-${i}-$(date +%s)" || true)
+            ADMIN=$(curl -fsSL --retry 2 --max-time 20 "https://lwang1332-design.github.io/global-environment-platform/v2.5-admin-cloud.html?smoke=${GITHUB_SHA}-${i}-$(date +%s)" || true)
+            if echo "$HTML" | grep -q 'V2.7 · Cloud' && echo "$HTML" | grep -q 'v2.5-cloud.js' && echo "$JS" | grep -q 'SHELF_CLOUD_API' && echo "$ADMIN" | grep -q '发布到云端'; then
+              echo 'V2.7 Cloud page, loader and admin are live'
+              exit 0
+            fi
+            echo "Waiting for Pages deployment ($i/36)..."
+            sleep 10
+          done
+          echo 'V2.7 cloud artifacts not live after waiting'
+          exit 1
