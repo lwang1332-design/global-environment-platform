@@ -1,36 +1,37 @@
 <!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>环境技术货架管理员 V2.6</title><style>
+<title>环境技术货架管理员 V2.7</title><style>
 :root{--nav:#0b2548;--blue:#1557d6;--bg:#f5f7fb;--line:#dde4ee;--text:#1f2937;--muted:#667085;--green:#087a59;--red:#c83d3d}
-*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,"Microsoft YaHei",sans-serif;color:var(--text);font-size:12px;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.top h1{font-size:20px;color:var(--nav);margin:0}.btn{border:0;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;font-size:11px}.primary{background:var(--blue);color:#fff}.secondary{background:#fff;border:1px solid var(--line);color:var(--nav)}a.btn{text-decoration:none}.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:12px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}label{font-size:10px;color:var(--muted)}input,select,textarea{width:100%;margin-top:5px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font:12px/1.55 Arial,"Microsoft YaHei",sans-serif}textarea{min-height:145px;resize:vertical}.hidden{display:none}.msg{padding:9px;border-radius:8px;background:#eef5ff;color:#164a99;margin:10px 0}.ok{background:#e8f6f0;color:var(--green)}.err{background:#fdecec;color:var(--red)}h2{font-size:18px;color:var(--nav);margin:0 0 10px}h3{font-size:14px;color:var(--nav);margin:0 0 8px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.note{color:var(--muted);font-size:10px}.reqcards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.reqcard{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafbfc}@media(max-width:760px){.grid2,.grid3,.reqcards{grid-template-columns:1fr}.wrap{padding:16px}}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:Arial,"Microsoft YaHei",sans-serif;color:var(--text);font-size:12px;line-height:1.55}.wrap{max-width:1180px;margin:0 auto;padding:24px}.top{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px}.top h1{font-size:20px;color:var(--nav);margin:0}.btn{border:0;border-radius:8px;padding:8px 12px;font-weight:700;cursor:pointer;font-size:11px}.primary{background:var(--blue);color:#fff}.secondary{background:#fff;border:1px solid var(--line);color:var(--nav)}a.btn{text-decoration:none}.card{background:#fff;border:1px solid var(--line);border-radius:13px;padding:14px;margin-bottom:12px}.grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}.grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}label{font-size:10px;color:var(--muted)}input,select,textarea{width:100%;margin-top:5px;padding:8px;border:1px solid var(--line);border-radius:8px;background:#fff;font:12px/1.55 Arial,"Microsoft YaHei",sans-serif}textarea{min-height:145px;resize:vertical}.hidden{display:none}.msg{padding:9px;border-radius:8px;background:#eef5ff;color:#164a99;margin:10px 0}.ok{background:#e8f6f0;color:var(--green)}.err{background:#fdecec;color:var(--red)}h2{font-size:18px;color:var(--nav);margin:0 0 10px}h3{font-size:14px;color:var(--nav);margin:0 0 8px}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px}.note{color:var(--muted);font-size:10px}.reqcards{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}.reqcard{border:1px solid var(--line);border-radius:10px;padding:10px;background:#fafbfc}.rule-table{width:100%;border-collapse:collapse;font-size:11px}.rule-table th,.rule-table td{padding:8px;border-bottom:1px solid #edf0f4;text-align:left}.rule-table th{background:#f6f8fb}.rule-table input,.rule-table select{margin:0;padding:6px;font-size:11px}@media(max-width:760px){.grid2,.grid3,.reqcards{grid-template-columns:1fr}.wrap{padding:16px}}
 </style></head><body><div class="wrap">
-<div class="top"><h1>环境技术货架管理员 V2.6</h1><a class="btn secondary" href="v2.5.html">返回平台</a></div>
+<div class="top"><h1>环境技术货架管理员 V2.7</h1><a class="btn secondary" href="v2.5.html">返回平台</a></div>
 
 <div class="card" id="loginCard"><h2>管理员登录</h2><div class="grid2"><label>管理员密码<input id="pwd" type="password" placeholder="请输入密码"></label><div style="display:flex;align-items:end"><button class="btn primary" id="loginBtn">进入管理员页面</button></div></div><div class="note">当前为静态 HTTPS 版本，管理员配置保存在本浏览器 localStorage。密码用于界面入口保护，不等同服务器级安全认证。</div><div id="loginMsg"></div></div>
 
 <div id="adminArea" class="hidden">
-<div class="card"><h2>场景内容编辑</h2><div class="grid2"><label>选择场景<select id="sceneSelect"></select></label><div class="note" style="align-self:end">可编辑 03 客户诉求、04 设计需求、05 Standard/Pro/Plus 场景方案。</div></div></div>
+<div class="card"><h2>02 项目环境体检风险定义规则</h2><div class="note">这里定义环境体检卡片的低/中/高风险阈值，并直接参与 Design Gap、升级包触发及“常温内陆”反向扣分。高风险阈值表示风险等级 3，中风险阈值表示等级 2。</div><div style="overflow:auto;margin-top:10px"><table class="rule-table"><thead><tr><th>参数</th><th>显示名称</th><th>单位</th><th>风险方向</th><th>中风险阈值</th><th>高风险阈值</th></tr></thead><tbody id="riskRuleBody"></tbody></table></div><div class="toolbar"><button class="btn primary" id="saveRiskRules">保存环境风险规则</button></div></div>
+<div class="card"><h2>场景内容编辑</h2><div class="grid2"><label>选择场景<select id="sceneSelect"></select></label><div class="note" style="align-self:end">可编辑客户诉求、产品设计需求、Standard/Pro/Plus 场景方案。</div></div></div>
 
-<div class="card"><h3>03 客户核心诉求</h3><div class="note">每行格式：标题 || 客户语言描述 || 类型。类型建议使用 normal / heat / humidity / rain / dust / salt / mist / altitude / cold / snow / marine / industry。</div><textarea id="demandEditor"></textarea></div>
+<div class="card"><h3>04 客户核心诉求</h3><div class="note">每行格式：标题 || 客户语言描述 || 类型。类型建议使用 normal / heat / humidity / rain / dust / salt / mist / altitude / cold / snow / marine / industry。</div><textarea id="demandEditor"></textarea></div>
 
-<div class="card"><h3>04 设计需求</h3><div class="note">每个“类型”对应多条设计需求，每行一条。保存后主页面会结合实际气象参数生成需求表。</div><div id="reqEditors" class="reqcards"></div></div>
+<div class="card"><h3>05 产品设计需求</h3><div class="note">每个“类型”对应多条设计需求，每行一条。保存后主页面会结合实际气象参数生成需求表。</div><div id="reqEditors" class="reqcards"></div></div>
 
-<div class="card"><h3>05 匹配场景方案</h3><div class="grid3"><label>Standard<textarea id="planStandard"></textarea></label><label>Pro<textarea id="planPro"></textarea></label><label>Plus<textarea id="planPlus"></textarea></label></div><div class="toolbar"><button class="btn primary" id="saveScene">保存当前场景</button></div></div>
+<div class="card"><h3>06 匹配场景方案</h3><div class="grid3"><label>Standard<textarea id="planStandard"></textarea></label><label>Pro<textarea id="planPro"></textarea></label><label>Plus<textarea id="planPlus"></textarea></label></div><div class="toolbar"><button class="btn primary" id="saveScene">保存当前场景</button></div></div>
 
-<div class="card"><h2>06 升级包编辑</h2><div class="grid2"><label>选择升级包<select id="packageSelect"></select></label><label>适用风险/触发条件<input id="pkgApply"></label></div><label>具体方案/措施<textarea id="pkgDesc"></textarea></label><label>触发类型（逗号分隔）<input id="pkgTypes"></label><div class="toolbar"><button class="btn primary" id="savePackage">保存当前升级包</button></div></div>
+<div class="card"><h2>07 升级包编辑</h2><div class="grid2"><label>选择升级包<select id="packageSelect"></select></label><label>适用风险/触发条件<input id="pkgApply"></label></div><label>具体方案/措施<textarea id="pkgDesc"></textarea></label><label>触发类型（逗号分隔）<input id="pkgTypes"></label><div class="toolbar"><button class="btn primary" id="savePackage">保存当前升级包</button></div></div>
 
 <div class="card"><h2>配置管理</h2><div class="toolbar"><button class="btn secondary" id="exportBtn">导出 JSON</button><label class="btn secondary" style="cursor:pointer">导入 JSON<input id="importFile" type="file" accept="application/json" style="display:none"></label><button class="btn secondary" id="resetBtn">恢复附件默认内容</button></div><div id="saveMsg" class="msg">尚未修改。保存后刷新主平台即可生效。</div></div>
 </div>
-</div><script src="v2.5-data.js"></script><script>
+</div><script src="v2.5-rules.js"></script><script src="v2.5-data.js"></script><script>
 const KEY='ea_v25_admin_config',PASS='123123',$=id=>document.getElementById(id);
-let cfg=loadCfg();let workingPackages=Array.isArray(cfg.packages)?cfg.packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]):packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]);
+let cfg=loadCfg();let workingPackages=Array.isArray(cfg.packages)?cfg.packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]):packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]);let workingRules={};for(const [k,v] of Object.entries(DEFAULT_RISK_RULES))workingRules[k]={...v,...(cfg.riskRules?.[k]||{})};
 function loadCfg(){try{return JSON.parse(localStorage.getItem(KEY)||'{"scenarios":{}}')}catch(e){return{scenarios:{}}}}
-function saveCfg(){cfg.packages=workingPackages;localStorage.setItem(KEY,JSON.stringify(cfg));$('saveMsg').className='msg ok';$('saveMsg').textContent='保存成功。返回主平台并刷新后生效。'}
+function saveCfg(){cfg.packages=workingPackages;cfg.riskRules=workingRules;localStorage.setItem(KEY,JSON.stringify(cfg));$('saveMsg').className='msg ok';$('saveMsg').textContent='保存成功。返回主平台并刷新后生效。'}
 function mergedScene(name){const b=scenarioData[name],o=cfg.scenarios?.[name]||{};return{demands:o.demands||b.demands,reqs:o.reqs||b.reqs,plans:{...b.plans,...(o.plans||{})}}}
 function lines(a){return(a||[]).join('\n')}function splitLines(s){return String(s||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean)}
 function init(){
  $('sceneSelect').innerHTML=Object.keys(scenarioData).map(x=>`<option>${x}</option>`).join('');
  $('packageSelect').innerHTML=workingPackages.map((p,i)=>`<option value="${i}">${p[0]}</option>`).join('');
- loadScene();loadPackage();
+ loadScene();loadPackage();renderRiskRules();
 }
 function loadScene(){
  const name=$('sceneSelect').value,d=mergedScene(name);
@@ -48,9 +49,16 @@ function saveScene(){
 }
 function loadPackage(){const p=workingPackages[Number($('packageSelect').value)||0];$('pkgApply').value=p[1]||'';$('pkgDesc').value=p[2]||'';$('pkgTypes').value=(p[3]||[]).join(',')}
 function savePackage(){const i=Number($('packageSelect').value)||0,p=workingPackages[i];workingPackages[i]=[p[0],$('pkgApply').value.trim(),$('pkgDesc').value.trim(),$('pkgTypes').value.split(',').map(x=>x.trim()).filter(Boolean)];saveCfg();loadPackage()}
+function renderRiskRules(){
+ const rows=Object.entries(workingRules);
+ $('riskRuleBody').innerHTML=rows.map(([k,r])=>`<tr><td><b>${k}</b></td><td><input data-rule="${k}" data-field="label" value="${r.label||''}"></td><td><input data-rule="${k}" data-field="unit" value="${r.unit||''}"></td><td><select data-rule="${k}" data-field="direction"><option value="high" ${r.direction==='high'?'selected':''}>数值越高风险越高</option><option value="low" ${r.direction==='low'?'selected':''}>数值越低风险越高</option></select></td><td><input type="number" step="any" data-rule="${k}" data-field="medium" value="${r.medium}"></td><td><input type="number" step="any" data-rule="${k}" data-field="high" value="${r.high}"></td></tr>`).join('');
+}
+function saveRiskRules(){
+ document.querySelectorAll('[data-rule]').forEach(el=>{const k=el.dataset.rule,f=el.dataset.field;workingRules[k]=workingRules[k]||{};workingRules[k][f]=(f==='medium'||f==='high')?Number(el.value):el.value});saveCfg();renderRiskRules();
+}
 $('loginBtn').onclick=()=>{if($('pwd').value===PASS){$('loginCard').classList.add('hidden');$('adminArea').classList.remove('hidden');init()}else{$('loginMsg').className='msg err';$('loginMsg').textContent='密码错误。'}};
-$('sceneSelect').onchange=loadScene;$('packageSelect').onchange=loadPackage;$('saveScene').onclick=saveScene;$('savePackage').onclick=savePackage;
-$('resetBtn').onclick=()=>{if(confirm('确定恢复附件默认技术货架内容？')){localStorage.removeItem(KEY);cfg={scenarios:{}};workingPackages=packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]);init();$('saveMsg').className='msg ok';$('saveMsg').textContent='已恢复默认内容。'}};
+$('saveRiskRules').onclick=saveRiskRules;$('sceneSelect').onchange=loadScene;$('packageSelect').onchange=loadPackage;$('saveScene').onclick=saveScene;$('savePackage').onclick=savePackage;
+$('resetBtn').onclick=()=>{if(confirm('确定恢复附件默认技术货架内容？')){localStorage.removeItem(KEY);cfg={scenarios:{}};workingPackages=packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]);workingRules={};for(const [k,v] of Object.entries(DEFAULT_RISK_RULES))workingRules[k]={...v};init();$('saveMsg').className='msg ok';$('saveMsg').textContent='已恢复默认内容。'}};
 $('exportBtn').onclick=()=>{const blob=new Blob([JSON.stringify({...cfg,packages:workingPackages},null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='environment-shelf-config.json';a.click();URL.revokeObjectURL(a.href)};
-$('importFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const j=JSON.parse(await f.text());cfg=j||{scenarios:{}};workingPackages=Array.isArray(j.packages)?j.packages:packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]);saveCfg();init()}catch(err){$('saveMsg').className='msg err';$('saveMsg').textContent='导入失败：'+err.message}};
+$('importFile').onchange=async e=>{const f=e.target.files?.[0];if(!f)return;try{const j=JSON.parse(await f.text());cfg=j||{scenarios:{}};workingPackages=Array.isArray(j.packages)?j.packages:packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])] ]);workingRules={};for(const [k,v] of Object.entries(DEFAULT_RISK_RULES))workingRules[k]={...v,...(j.riskRules?.[k]||{})};saveCfg();init()}catch(err){$('saveMsg').className='msg err';$('saveMsg').textContent='导入失败：'+err.message}};
 </script></body></html>
