@@ -1,0 +1,54 @@
+name: Install Admin Excel Importer
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/install-admin-excel.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  install:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch admin page and cloud smoke
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          admin = Path('v2.5-admin-cloud.html')
+          s = admin.read_text(encoding='utf-8')
+          marker = 'v2.5-admin-excel.js?v=20260905-excel1'
+          if marker not in s:
+              old = '</script></body></html>'
+              new = '</script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="v2.5-admin-excel.js?v=20260905-excel1"></script></body></html>'
+              if old not in s:
+                  raise SystemExit('admin tail marker not found')
+              s = s.replace(old, new, 1)
+              admin.write_text(s, encoding='utf-8')
+
+          wf = Path('.github/workflows/v27-cloud-smoke.yml')
+          w = wf.read_text(encoding='utf-8')
+          w = w.replace("      - 'v2.5-admin-cloud.html'\n", "      - 'v2.5-admin-cloud.html'\n      - 'v2.5-admin-excel.js'\n")
+          w = w.replace("echo \"$LATEST\" | grep -q 'V2.7-S002'", "echo \"$LATEST\" | grep -Eq 'V2\\.7-S[0-9]+'")
+          w = w.replace("&& echo \"$ADMIN\" | grep -q '发布到云端'; then", "&& echo \"$ADMIN\" | grep -q 'v2.5-admin-excel.js' \\\n              && curl -fsSL --retry 2 --max-time 20 \"https://lwang1332-design.github.io/global-environment-platform/v2.5-admin-excel.js?smoke=${GITHUB_SHA}-${i}-$(date +%s)\" | grep -q 'Excel 技术货架导入' \\\n              && echo \"$ADMIN\" | grep -q '发布到云端'; then")
+          wf.write_text(w, encoding='utf-8')
+
+          installer = Path('.github/workflows/install-admin-excel.yml')
+          if installer.exists():
+              installer.unlink()
+          PY
+      - name: Commit installed integration
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A
+          git commit -m 'Wire Excel import workflow into cloud admin'
+          git push
