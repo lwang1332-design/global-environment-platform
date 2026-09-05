@@ -55,8 +55,8 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;borde
 
 <section id="env"><div class="title"><div><h3>03 机组环境体检报告</h3><p>只读，不可编辑</p></div><span class="pill">SYSTEM OUTPUT</span></div><div class="metrics" id="metrics"></div></section>
 
-<section id="lang"><div class="title"><div><h3>04 客户语言</h3><p>系统自动建议，工程师勾选确认</p></div></div><div id="langs" class="langs"></div></section>
-<section id="req"><div class="title"><div><h3>05 设计需求</h3><p>环境体检 + 勾选客户语言联合生成</p></div></div><div id="requirements" class="card"></div></section>
+<section id="lang"><div class="title"><div><h3>04 客户语言</h3><p>由环境体检结果自动生成建议，工程师可勾选 / 取消；人工选择优先于系统推荐</p></div><span class="pill" id="langCount">0 条建议</span></div><div id="langs" class="langs"></div></section>
+<section id="req"><div class="title"><div><h3>05 设计需求</h3><p>设计需求 = 环境体检结果 + 已勾选客户语言 + 高风险专项校核要求</p></div><span class="pill" id="reqCount">0 条需求</span></div><div id="requirements" class="card"></div></section>
 <section id="scene"><div class="title"><div><h3>06 推荐场景主方案</h3><p>9 类气候自动评分</p></div><span id="sceneRec" class="pill"></span></div><div id="scenes" class="scenes"></div><div id="solutions" class="solutions" style="margin-top:10px"></div></section>
 <section id="pkg"><div class="title"><div><h3>07 12 个环控升级包</h3><p>环境参数自动触发，允许人工覆盖</p></div></div><div id="packages" class="pkggrid"></div></section>
 <section id="gap"><div class="title"><div><h3>08 Design Gap</h3><p>环境要求 − 当前能力 − 主方案 − 升级包</p></div><span id="residual" class="pill"></span></div><div class="card"><table><thead><tr><th>能力域</th><th>环境要求</th><th>当前能力</th><th>方案补偿</th><th>剩余风险</th></tr></thead><tbody id="gapBody"></tbody></table></div></section>
@@ -65,7 +65,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;borde
 
 <script>
 const $=id=>document.getElementById(id),iso=d=>d.toISOString().slice(0,10);
-let state={},raw={},langOn={},pkgManual={},selectedMain='Pro',mainTouched=false;
+let state={},raw={},langOn={},langManual={},pkgManual={},selectedMain='Pro',mainTouched=false;
 let statusState={
 weather:['ERA5 / Open-Meteo','温度、湿度、露点、降雨、风、辐射、云量、降雪','未查询','—'],
 elev:['Open-Meteo Elevation','海拔','未查询','—'],
@@ -131,7 +131,8 @@ function condensation(h){
 function corrClass(r){return r<=1.3?'C1':r<=25?'C2':r<=50?'C3':r<=80?'C4':r<=200?'C5':'CX'}
 function compute(h,aq,alt){
  let T=h.temperature_2m||[],RH=h.relative_humidity_2m||[],P=h.precipitation||[],S=h.snowfall||[],V=h.wind_speed_10m||[];
- state.tmax=+q(T,.99).toFixed(1);state.tmin=+Math.min(...T.filter(Number.isFinite)).toFixed(1);state.rh=+(cnt(RH,x=>x>=90)/5).toFixed(0);state.rain=+Math.max(...P.filter(Number.isFinite)).toFixed(1);state.snow=+(cnt(S,x=>x>0)/5).toFixed(0);state.mist=+(cnt(RH,(x,i)=>x>=95&&(V[i]||99)<3)/5).toFixed(0);state.dew=+condensation(h).toFixed(0);state.alt=Math.round(alt||0);
+ let annualFactor=T.length?8760/T.length:1;
+ state.tmax=+q(T,.99).toFixed(1);state.tmin=+Math.min(...T.filter(Number.isFinite)).toFixed(1);state.rh=+(cnt(RH,x=>x>=90)*annualFactor).toFixed(0);state.rain=+Math.max(...P.filter(Number.isFinite)).toFixed(1);state.snow=+(cnt(S,x=>x>0)*annualFactor).toFixed(0);state.mist=+(cnt(RH,(x,i)=>x>=95&&(V[i]||99)<3)*annualFactor).toFixed(0);state.dew=+condensation(h).toFixed(0);state.alt=Math.round(alt||0);
  let pm=(aq.pm10||[]).filter(Number.isFinite),dust=(aq.dust||[]).filter(Number.isFinite),sea=(aq.sea_salt_aerosol||[]).filter(Number.isFinite),so2=(aq.sulphur_dioxide||[]).filter(Number.isFinite);
  state.pm10=+avg(pm).toFixed(1);let wind95=q(V,.95),cp=Math.max(avg(pm),avg(dust),1);state.erosion=+(Math.pow(cp/100,1)*Math.pow(Math.max(wind95,.1)/10,2.5)).toFixed(2);
  let sea95=q(sea,.95);state.salt=Number.isFinite(sea95)?+(sea95*.003*86400/1000*.55).toFixed(2):NaN;
@@ -153,7 +154,7 @@ async function assess(byPlace){
   let e=0,aq={};
   if(er.status==='fulfilled'){e=er.value;setStatus('elev','成功',Math.round(e)+' m')}else setStatus('elev','失败',er.reason?.message||'失败');
   if(ar.status==='fulfilled'){aq=ar.value;setStatus('aq','成功','PM10 / Dust / Sea Salt / SO₂ 已返回')}else setStatus('aq','失败',ar.reason?.message||'失败');
-  compute(w,aq,e);renderAll();$('msg').textContent='真实数据计算完成：'+wObj.start+' ~ '+wObj.end+'。';
+  compute(w,aq,e);renderAll();$('msg').textContent='真实数据计算完成：'+wObj.start+' ~ '+wObj.end+'。客户语言、设计需求、场景和升级包已同步刷新。';
  }catch(e){console.error(e);$('msg').className='msg err';$('msg').textContent='查询失败：'+(e?.message||String(e));if(statusState.weather[2]==='查询中')setStatus('weather','失败',e?.message||String(e))}
 }
 const langRules=[['L1',['tmax'],'存在高温时段，常规冷却配置可能出现降额或热裕量不足。'],['L2',['pm10','erosion'],'风沙颗粒可能导致过滤器堵塞、积灰及磨蚀。'],['L3',['dew','rh'],'高湿与温差可能导致关键电气区域凝露。'],['L4',['rain'],'强降雨/风驱雨可能进入舱室。'],['L5',['mist'],'大雾可能造成进气携液和传感器结雾。'],['L6',['salt','corrRate'],'盐雾/腐蚀环境可能提高金属和电气连接腐蚀风险。'],['L7',['alt'],'高海拔需要修正散热、风机和绝缘能力。'],['L8',['tmin','snow'],'低温/积雪/结冰可能影响启动和通风。']];
@@ -163,9 +164,16 @@ const pkgs=[['防腐包',()=>Math.max(score('salt'),score('corrRate')),['腐蚀'
 function pstate(i){let a=pkgs[i][1](),m=pkgManual[i];return{a,sel:m===undefined?a>=2:m}}
 function renderAll(){
  $('metrics').innerHTML=defs.map(d=>{let s=score(d[0]),c=s>=3?'hi':s===2?'med':'low',v=d[0]==='corrRate'?(state.corrRate+' μm/y · '+state.corr):((state[d[0]]??'—')+' '+d[2]);return'<div class="metric"><small>'+d[1]+'</small><b>'+v+'</b><div class="risk '+c+'">'+(s>=3?'高':s===2?'中':'低')+'风险 · '+d[6]+'</div></div>'}).join('');
- langRules.forEach(l=>{if(langOn[l[0]]===undefined)langOn[l[0]]=l[1].some(x=>score(x)>=2)});
- $('langs').innerHTML=langRules.map(l=>'<label class="lang"><input type="checkbox" '+(langOn[l[0]]?'checked':'')+' onchange="langOn[\''+l[0]+'\']=this.checked;renderAll()"><span>'+l[2]+'</span></label>').join('');
- let req=[];Object.keys(reqMap).forEach(k=>{if(langOn[k])req.push(reqMap[k])});$('requirements').innerHTML=req.map((x,i)=>'<div class="req"><b>'+(i+1)+'.</b> '+x+'</div>').join('');
+ langRules.forEach(l=>{let auto=l[1].some(x=>score(x)>=2);langOn[l[0]]=Object.prototype.hasOwnProperty.call(langManual,l[0])?langManual[l[0]]:auto});
+ let activeLang=langRules.filter(l=>langOn[l[0]]);
+ $('langCount').textContent=activeLang.length+' 条建议';
+ $('langs').innerHTML=langRules.map(l=>{let evidence=l[1].filter(x=>score(x)>=2).map(x=>defs.find(d=>d[0]===x)?.[6]).filter(Boolean).join(' / ');return '<label class="lang"><input type="checkbox" '+(langOn[l[0]]?'checked':'')+' onchange="langManual[\''+l[0]+'\']=this.checked;langOn[\''+l[0]+'\']=this.checked;renderAll()"><span><b>'+(langOn[l[0]]?'建议纳入':'可选')+'</b>｜'+l[2]+(evidence?'<br><small style="color:#667085">环境依据：'+evidence+'</small>':'')+'</span></label>'}).join('');
+ let req=[];
+ Object.keys(reqMap).forEach(k=>{if(langOn[k])req.push(reqMap[k])});
+ defs.forEach(d=>{if(score(d[0])>=3)req.push('【'+d[1]+'】达到高风险阈值，详细设计阶段需增加专项校核 / 试验 / 验证条目。')});
+ req=[...new Set(req)];
+ $('reqCount').textContent=req.length+' 条需求';
+ $('requirements').innerHTML=req.length?req.map((x,i)=>'<div class="req"><b>'+(i+1)+'.</b> '+x+'</div>').join(''):'<div style="color:#667085;font-size:11px">当前尚无设计需求。完成真实数据查询后，系统会根据环境体检和客户语言自动生成。</div>';
  let sc=sceneDefs.map(s=>[s[0],Math.min(99,Math.round(s[1].map(score).reduce((a,b)=>a+b,0)/(s[1].length*3)*100*s[2]+20))]).sort((a,b)=>b[1]-a[1]);$('sceneRec').textContent=sc.length?'主场景：'+sc[0][0]+' '+sc[0][1]+'%':'等待计算';
  $('scenes').innerHTML=sc.map((x,i)=>'<div class="scene '+(i===0?'sel':'')+'"><h4>'+(i===0?'★ ':'')+x[0]+'</h4><p>匹配度 '+x[1]+'%</p><div class="bar"><i style="width:'+x[1]+'%"></i></div></div>').join('');
  let mx=Math.max(0,...defs.map(d=>score(d[0]))),rec=mx>=3?'Plus':mx===2?'Pro':'Standard';if(!mainTouched)selectedMain=rec;let sol={Standard:['满足常规边界'],Pro:['强化环境适应','+15%热裕量、两级过滤、主动除湿'],Plus:['极端环境保障','主动制冷、闭式防护、冗余']};
