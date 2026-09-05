@@ -29,10 +29,10 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;borde
 <body>
 <aside>
 <h2>EA · 环境适应性</h2><div class="ver">WORKING DATA LOGIC · V2.4</div>
-<div class="nav"><a href="#project">01 项目与地图</a><a href="#status">02 数据状态</a><a href="#env">03 环境体检</a><a href="#lang">04 客户语言</a><a href="#req">05 设计需求</a><a href="#scene">07 场景方案</a><a href="#pkg">08 升级包</a><a href="#gap">08 Design Gap</a></div>
+<div class="nav"><a href="#project">01 项目与地图</a><a href="#status">02 数据状态</a><a href="#env">03 环境体检</a><a href="#lang">04 客户语言</a><a href="#req">05 设计需求</a><a href="#scene">06 场景方案</a><a href="#pkg">07 升级包</a><a href="#gap">08 Design Gap</a></div>
 </aside>
 <div class="main">
-<header><h1>全球风电环境适应性智能决策平台 V2.4 修复版</h1><button class="pri" id="runBtn">查询真实数据并计算</button></header>
+<header><h1>全球风电环境适应性智能决策平台 V2.4 修复版</h1><button class="pri" id="runBtn">按当前坐标查询</button></header>
 
 <section id="project" class="hero">
 <div class="card"><div class="title"><div><h3>01 项目输入</h3><p>直接复用原平台已验证的 Open-Meteo / ERA5 / CAMS 取数逻辑</p></div><span class="pill">GITHUB PAGES</span></div>
@@ -45,7 +45,7 @@ table{width:100%;border-collapse:collapse;font-size:11px}th,td{padding:9px;borde
 <label>统计周期<input value="最近1年" disabled></label>
 </div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:11px"><button class="pri" id="placeBtn">地名检索并计算</button><button class="ghost" id="coordBtn">按经纬度计算</button></div>
-<div id="msg" class="msg">页面加载完成。点击“查询真实数据并计算”开始。</div>
+<div id="locResult" class="msg" style="background:#f7faff;color:#334155">定位结果：未定位</div><div id="msg" class="msg">页面加载完成。点击“查询真实数据并计算”开始。</div>
 </div>
 <div class="card" style="padding:0;overflow:hidden"><iframe id="mapFrame"></iframe></div>
 </section>
@@ -79,7 +79,28 @@ function score(id){let d=defs.find(x=>x[0]===id),v=Number(state[id]);if(!Number.
 function updateMap(){let la=Number($('lat').value),lo=Number($('lon').value),dx=.8,dy=.5;$('mapFrame').src='https://www.openstreetmap.org/export/embed.html?bbox='+(lo-dx)+'%2C'+(la-dy)+'%2C'+(lo+dx)+'%2C'+(la+dy)+'&layer=mapnik&marker='+la+'%2C'+lo}
 function setStatus(k,s,r){statusState[k][2]=s;statusState[k][3]=r;renderStatus()}
 function renderStatus(){$('statusBody').innerHTML=Object.values(statusState).map(x=>'<tr><td>'+x[0]+'</td><td>'+x[1]+'</td><td class="'+(x[2]==='成功'?'ok':x[2]==='失败'?'bad':'wait')+'">'+x[2]+'</td><td>'+x[3]+'</td></tr>').join('')}
-async function locate(name){let r=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(name)+'&count=1&language=zh');if(!r.ok)throw Error('地名解析服务不可用');let j=await r.json();if(!j.results?.length)throw Error('未找到该地名');let x=j.results[0];return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}}
+const LOCAL_PLACES={
+ '北京':{lat:39.9042,lon:116.4074,name:'北京 · 中国'},
+ '北京市':{lat:39.9042,lon:116.4074,name:'北京 · 中国'},
+ 'beijing':{lat:39.9042,lon:116.4074,name:'Beijing · China'},
+ '上海':{lat:31.2304,lon:121.4737,name:'上海 · 中国'},
+ '广州':{lat:23.1291,lon:113.2644,name:'广州 · 中国'},
+ '深圳':{lat:22.5431,lon:114.0579,name:'深圳 · 中国'},
+ '三亚':{lat:18.2528,lon:109.5119,name:'三亚 · 海南 · 中国'},
+ '乌鲁木齐':{lat:43.8256,lon:87.6168,name:'乌鲁木齐 · 新疆 · 中国'}
+};
+async function locate(name){
+ name=String(name||'').trim();
+ if(!name)throw Error('请输入地名');
+ const local=LOCAL_PLACES[name]||LOCAL_PLACES[name.toLowerCase()];
+ if(local)return {...local};
+ let r=await fetch('https://geocoding-api.open-meteo.com/v1/search?name='+encodeURIComponent(name)+'&count=1&language=zh');
+ if(!r.ok)throw Error('地名解析服务不可用');
+ let j=await r.json();
+ if(!j.results?.length)throw Error('未找到该地名，请输入“城市 + 省份/国家”或直接使用经纬度');
+ let x=j.results[0];
+ return{lat:x.latitude,lon:x.longitude,name:[x.name,x.admin1,x.country].filter(Boolean).join(' · ')}
+}
 async function elev(lat,lon){let r=await fetch('https://api.open-meteo.com/v1/elevation?latitude='+lat+'&longitude='+lon);if(!r.ok)throw Error('海拔接口失败');let j=await r.json();return j.elevation?.[0]}
 async function weather(lat,lon){
  const end=new Date();end.setUTCDate(end.getUTCDate()-10);
@@ -125,7 +146,7 @@ function compute(h,aq,alt){
 async function assess(byPlace){
  $('msg').className='msg';$('msg').textContent='开始查询…';let lat=Number($('lat').value),lon=Number($('lon').value);
  try{
-  if(byPlace){let l=await locate($('place').value);lat=l.lat;lon=l.lon;$('lat').value=lat;$('lon').value=lon;$('place').value=l.name;updateMap()}
+  if(byPlace){$('locResult').textContent='正在定位：'+$('place').value+'…';let l=await locate($('place').value);lat=l.lat;lon=l.lon;$('lat').value=lat;$('lon').value=lon;$('place').value=l.name;updateMap();$('locResult').textContent='已定位：'+l.name+' ｜ 纬度 '+lat.toFixed(4)+' ｜ 经度 '+lon.toFixed(4);$('msg').textContent='定位成功，正在读取最近1年真实环境数据…'}else{$('locResult').textContent='按坐标：纬度 '+lat.toFixed(4)+' ｜ 经度 '+lon.toFixed(4)}
   setStatus('weather','查询中','—');setStatus('elev','查询中','—');setStatus('aq','查询中','—');
   let wObj=await weather(lat,lon);let w=wObj.hourly;setStatus('weather','成功',wObj.start+' ~ '+wObj.end+' · '+w.temperature_2m.length+' 小时');
   let [er,ar]=await Promise.allSettled([elev(lat,lon),air(lat,lon)]);
