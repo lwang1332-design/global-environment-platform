@@ -104,6 +104,16 @@
     return s;
   };
 
+  // Switching between the primary/secondary scene is only a plan-source choice;
+  // it must not erase the already fused customer-demand selections.
+  window.selectScene=function(name){
+    const allowed=new Set(topTwoSceneContext().map(x=>x.name));
+    if(!allowed.has(name))return;
+    selectedScene=name;
+    planManual=false;
+    renderDecision();
+  };
+
   // Report snapshot: retain source scene/role for each selected customer demand.
   const previousSave=saveReportSnapshot;
   saveReportSnapshot=function(){
