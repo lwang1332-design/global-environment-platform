@@ -16,7 +16,7 @@ jobs:
   cloud-smoke:
     runs-on: ubuntu-latest
     steps:
-      - name: Verify cloud API and scenario model
+      - name: Verify cloud API and published shelf
         shell: bash
         run: |
           set -euo pipefail
@@ -24,9 +24,11 @@ jobs:
           curl -fsSL -H 'Origin: https://lwang1332-design.github.io' "$API/health" | grep -q '2.7-cloud-1'
           LATEST=$(curl -fsSL -H 'Origin: https://lwang1332-design.github.io' "$API/config/latest")
           echo "$LATEST" | grep -Eq 'V2\.7-S[0-9]+'
-          echo "$LATEST" | grep -q 'scenarioModel'
           echo "$LATEST" | grep -q '常温内陆气候'
+          echo "$LATEST" | grep -q '海洋气候'
           echo "$LATEST" | grep -q '海洋强化包'
+          echo "$LATEST" | grep -q 'riskRules'
+          echo "$LATEST" | grep -q 'packages'
           LOGIN=$(curl -fsSL -X POST -H 'Origin: https://lwang1332-design.github.io' -H 'Content-Type: application/json' -d '{"password":"123123"}' "$API/auth/login")
           echo "$LOGIN" | grep -q 'expiresIn'
       - name: Wait for GitHub Pages V2.7 cloud admin and Excel importer
