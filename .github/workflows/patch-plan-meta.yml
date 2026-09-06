@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - name: Patch Excel report and loaders
+      - name: Patch Excel and cache loaders
         run: |
           python - <<'PY'
           from pathlib import Path
@@ -48,21 +48,13 @@ jobs:
           p=Path('v2.5-admin-cloud.html')
           s=p.read_text().replace('v2.5-admin-excel.js?v=20260905-excel1','v2.5-admin-excel.js?v=20260906-planmeta1').replace('v2.5-admin-plan-images.js?v=20260906-planimg1','v2.5-admin-plan-images.js?v=20260906-planmeta1')
           p.write_text(s)
-
-          p=Path('v2.5-report.html')
-          s=p.read_text()
-          old='<div class="report-plan-layout"><div><h3>方案措施</h3><ul class="list">${s.plan.items.map(x=>`<li>${esc(x)}</li>`).join(\'\')}</ul></div>${s.plan.imageUrl?`<figure class="report-plan-figure"><img src="${esc(s.plan.imageUrl)}" alt="${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}" onerror="this.closest(\'figure\').remove()"><figcaption>${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}</figcaption></figure>`:\'\'}</div>'
-          new='<div class="report-plan-layout"><div><h3>方案措施</h3><ul class="list">${s.plan.items.map(x=>`<li>${esc(x)}</li>`).join(\'\')}</ul><h3>方案决策信息</h3>${tbl([\'项目\',\'内容\'],[[\'主要风险\',esc(s.plan.mainRisk||\'—\')],[\'方案定位\',esc(s.plan.positioning||\'—\')],[\'相对成本变化\',esc(s.plan.costChange||\'—\')]],['26%','74%'])}</div>${s.plan.imageUrl?`<figure class="report-plan-figure"><img src="${esc(s.plan.imageUrl)}" alt="${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}" onerror="this.closest(\'figure\').remove()"><figcaption>${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}</figcaption></figure>`:\'\'}</div>'
-          if old not in s: raise SystemExit('report marker not found')
-          s=s.replace(old,new)
-          p.write_text(s)
           PY
           node --check v2.5-admin-excel.js
           node --check v2.5-plan-images.js
           node --check v2.5-admin-plan-images.js
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add v2.5-admin-excel.js v2.7.html v2.5-admin-cloud.html v2.5-report.html
+          git add v2.5-admin-excel.js v2.7.html v2.5-admin-cloud.html
           if ! git diff --cached --quiet; then
             git commit -m "Integrate editable plan risk positioning and cost metadata"
             git push
