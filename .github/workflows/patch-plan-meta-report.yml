@@ -1,0 +1,35 @@
+name: Patch plan metadata report
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-plan-meta-report.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch report
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          p=Path('v2.5-report.html')
+          s=p.read_text()
+          old = r'''<div class="report-plan-layout"><div><h3>方案措施</h3><ul class="list">${s.plan.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>${s.plan.imageUrl?`<figure class="report-plan-figure"><img src="${esc(s.plan.imageUrl)}" alt="${esc(s.plan.imageCaption||s.plan.name+' 方案图')}" onerror="this.closest('figure').remove()"><figcaption>${esc(s.plan.imageCaption||s.plan.name+' 方案图')}</figcaption></figure>`:''}</div>'''
+          new = r'''<div class="report-plan-layout"><div><h3>方案措施</h3><ul class="list">${s.plan.items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul><h3>方案决策信息</h3>${tbl(['项目','内容'],[['主要风险',esc(s.plan.mainRisk||'—')],['方案定位',esc(s.plan.positioning||'—')],['相对成本变化',esc(s.plan.costChange||'—')]],['26%','74%'])}</div>${s.plan.imageUrl?`<figure class="report-plan-figure"><img src="${esc(s.plan.imageUrl)}" alt="${esc(s.plan.imageCaption||s.plan.name+' 方案图')}" onerror="this.closest('figure').remove()"><figcaption>${esc(s.plan.imageCaption||s.plan.name+' 方案图')}</figcaption></figure>`:''}</div>'''
+          if old not in s:
+              raise SystemExit('report plan marker not found')
+          p.write_text(s.replace(old,new))
+          PY
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v2.5-report.html
+          git commit -m "Show plan risk positioning and cost in report"
+          git push
