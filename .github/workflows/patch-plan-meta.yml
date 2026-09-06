@@ -1,0 +1,69 @@
+name: Patch plan metadata integration
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/patch-plan-meta.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Patch Excel report and loaders
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('v2.5-admin-excel.js')
+          s=p.read_text()
+          old="plans.push({scene,Standard:splitMulti(get(r,'Standard')),Pro:splitMulti(get(r,'Pro')),Plus:splitMulti(get(r,'Plus')),row:r.__row});"
+          new="plans.push({scene,Standard:splitMulti(get(r,'Standard')),Pro:splitMulti(get(r,'Pro')),Plus:splitMulti(get(r,'Plus')),planMeta:{Standard:{mainRisk:txt(get(r,'Standard_主要风险','Standard主要风险')),positioning:txt(get(r,'Standard_方案定位','Standard方案定位')),costChange:txt(get(r,'Standard_成本变化','Standard成本变化'))},Pro:{mainRisk:txt(get(r,'Pro_主要风险','Pro主要风险')),positioning:txt(get(r,'Pro_方案定位','Pro方案定位')),costChange:txt(get(r,'Pro_成本变化','Pro成本变化'))},Plus:{mainRisk:txt(get(r,'Plus_主要风险','Plus主要风险')),positioning:txt(get(r,'Plus_方案定位','Plus方案定位')),costChange:txt(get(r,'Plus_成本变化','Plus成本变化'))}},row:r.__row});"
+          if old not in s: raise SystemExit('parse plan marker not found')
+          s=s.replace(old,new)
+          old="candidateScenarios[scene]={...base,demands:ds.map(x=>[x.title,x.desc,x.type]),reqs:rq,plans:p?{Standard:p.Standard,Pro:p.Pro,Plus:p.Plus}:clone(base.plans||{Standard:[],Pro:[],Plus:[]})};"
+          new="candidateScenarios[scene]={...base,demands:ds.map(x=>[x.title,x.desc,x.type]),reqs:rq,plans:p?{Standard:p.Standard,Pro:p.Pro,Plus:p.Plus}:clone(base.plans||{Standard:[],Pro:[],Plus:[]}),planMeta:p?.planMeta||clone(base.planMeta||{})};"
+          if old not in s: raise SystemExit('candidate marker not found')
+          s=s.replace(old,new)
+          old="pRows.push(['PLN',scene,(d.plans?.Standard||[]).join('\\n'),(d.plans?.Pro||[]).join('\\n'),(d.plans?.Plus||[]).join('\\n'),'是',''])"
+          new="pRows.push(['PLN',scene,(d.plans?.Standard||[]).join('\\n'),(d.plans?.Pro||[]).join('\\n'),(d.plans?.Plus||[]).join('\\n'),d.planMeta?.Standard?.mainRisk||'',d.planMeta?.Standard?.positioning||'',d.planMeta?.Standard?.costChange||'',d.planMeta?.Pro?.mainRisk||'',d.planMeta?.Pro?.positioning||'',d.planMeta?.Pro?.costChange||'',d.planMeta?.Plus?.mainRisk||'',d.planMeta?.Plus?.positioning||'',d.planMeta?.Plus?.costChange||'','是',''])"
+          if old not in s: raise SystemExit('export row marker not found')
+          s=s.replace(old,new)
+          old="['记录ID','场景','Standard','Pro','Plus','启用','备注']"
+          new="['记录ID','场景','Standard','Pro','Plus','Standard_主要风险','Standard_方案定位','Standard_成本变化','Pro_主要风险','Pro_方案定位','Pro_成本变化','Plus_主要风险','Plus_方案定位','Plus_成本变化','启用','备注']"
+          if old not in s: raise SystemExit('export header marker not found')
+          s=s.replace(old,new)
+          p.write_text(s)
+
+          p=Path('v2.7.html')
+          s=p.read_text().replace('v2.5-plan-images.js?v=20260906-planimg1','v2.5-plan-images.js?v=20260906-planmeta1')
+          p.write_text(s)
+
+          p=Path('v2.5-admin-cloud.html')
+          s=p.read_text().replace('v2.5-admin-excel.js?v=20260905-excel1','v2.5-admin-excel.js?v=20260906-planmeta1').replace('v2.5-admin-plan-images.js?v=20260906-planimg1','v2.5-admin-plan-images.js?v=20260906-planmeta1')
+          p.write_text(s)
+
+          p=Path('v2.5-report.html')
+          s=p.read_text()
+          old='<div class="report-plan-layout"><div><h3>方案措施</h3><ul class="list">${s.plan.items.map(x=>`<li>${esc(x)}</li>`).join(\'\')}</ul></div>${s.plan.imageUrl?`<figure class="report-plan-figure"><img src="${esc(s.plan.imageUrl)}" alt="${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}" onerror="this.closest(\'figure\').remove()"><figcaption>${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}</figcaption></figure>`:\'\'}</div>'
+          new='<div class="report-plan-layout"><div><h3>方案措施</h3><ul class="list">${s.plan.items.map(x=>`<li>${esc(x)}</li>`).join(\'\')}</ul><h3>方案决策信息</h3>${tbl([\'项目\',\'内容\'],[[\'主要风险\',esc(s.plan.mainRisk||\'—\')],[\'方案定位\',esc(s.plan.positioning||\'—\')],[\'相对成本变化\',esc(s.plan.costChange||\'—\')]],['26%','74%'])}</div>${s.plan.imageUrl?`<figure class="report-plan-figure"><img src="${esc(s.plan.imageUrl)}" alt="${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}" onerror="this.closest(\'figure\').remove()"><figcaption>${esc(s.plan.imageCaption||s.plan.name+\' 方案图\')}</figcaption></figure>`:\'\'}</div>'
+          if old not in s: raise SystemExit('report marker not found')
+          s=s.replace(old,new)
+          p.write_text(s)
+          PY
+          node --check v2.5-admin-excel.js
+          node --check v2.5-plan-images.js
+          node --check v2.5-admin-plan-images.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v2.5-admin-excel.js v2.7.html v2.5-admin-cloud.html v2.5-report.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Integrate editable plan risk positioning and cost metadata"
+            git push
+          fi
