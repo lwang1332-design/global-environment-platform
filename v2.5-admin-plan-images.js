@@ -1,4 +1,4 @@
-// Admin plugin: upload / preview / replace / clear Standard-Pro-Plus plan images.
+// Admin plugin: upload / preview / replace / clear Standard-Pro-Plus plan images + editable plan metadata.
 (function installAdminPlanImages(){
   const LEVELS=['Standard','Pro','Plus'];
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
@@ -8,6 +8,8 @@
     if(!scene)return;
     scene.planImages=scene.planImages&&typeof scene.planImages==='object'?scene.planImages:{};
     scene.planImageCaptions=scene.planImageCaptions&&typeof scene.planImageCaptions==='object'?scene.planImageCaptions:{};
+    scene.planMeta=scene.planMeta&&typeof scene.planMeta==='object'?scene.planMeta:{};
+    LEVELS.forEach(level=>{scene.planMeta[level]=scene.planMeta[level]&&typeof scene.planMeta[level]==='object'?scene.planMeta[level]:{mainRisk:'',positioning:'',costChange:''}});
   }
 
   function installStyle(){
@@ -21,6 +23,9 @@
       .admin-plan-empty{font-size:10px;color:var(--muted);text-align:center;padding:10px}.admin-plan-empty b{display:block;color:#607086;margin-bottom:3px}
       .admin-plan-actions{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px}.admin-plan-actions .btn{padding:6px 8px}
       .admin-upload-state{font-size:9px;color:var(--muted);margin-top:6px;min-height:14px}
+      .admin-plan-meta{margin-top:10px;padding-top:9px;border-top:1px solid #e6ebf2;display:grid;gap:8px}
+      .admin-plan-meta textarea{min-height:72px}.admin-plan-meta input{min-height:36px}
+      .admin-plan-meta .cost-hint{font-size:9px;color:var(--muted);margin-top:3px}
       @media(max-width:760px){.admin-plan-media-grid{grid-template-columns:1fr}}
     `;document.head.appendChild(st);
   }
@@ -40,17 +45,32 @@
   function render(){
     installUi();if(!mediaRoot)return;
     const name=document.getElementById('sceneSelect')?.value;const d=workingScenarios?.[name];if(!d)return;ensureFields(d);
-    mediaRoot.innerHTML=LEVELS.map(level=>{const url=d.planImages?.[level]||'',cap=d.planImageCaptions?.[level]||'';return `<div class="admin-plan-media-card" data-level="${level}"><h4>${level} 方案图</h4>${preview(level,url,cap)}
+    mediaRoot.innerHTML=LEVELS.map(level=>{const url=d.planImages?.[level]||'',cap=d.planImageCaptions?.[level]||'',m=d.planMeta?.[level]||{};return `<div class="admin-plan-media-card" data-level="${level}"><h4>${level} 方案扩展信息</h4>${preview(level,url,cap)}
       <label>图片标题 / 图注<input data-caption="${level}" value="${esc(cap)}" placeholder="例如：海洋气候 ${level} 方案系统架构示意图"></label>
       <input data-file="${level}" type="file" accept="image/jpeg,image/png,image/webp" style="display:none">
       <div class="admin-plan-actions"><button type="button" class="btn secondary" data-upload="${level}">${url?'更换图片':'上传图片'}</button><button type="button" class="btn secondary" data-clear="${level}" ${url?'':'disabled'}>移除图片</button></div>
-      <div class="admin-upload-state" data-state="${level}">${url?'已配置方案图':'未配置方案图'}</div></div>`}).join('');
+      <div class="admin-upload-state" data-state="${level}">${url?'已配置方案图':'未配置方案图'}</div>
+      <div class="admin-plan-meta">
+        <label>主要风险<textarea data-main-risk="${level}" placeholder="填写采用该档方案后仍需关注的主要风险">${esc(m.mainRisk||'')}</textarea></label>
+        <label>方案定位<textarea data-positioning="${level}" placeholder="填写该档方案适用项目、核心价值和定位">${esc(m.positioning||'')}</textarea></label>
+        <label>相对成本变化<input data-cost-change="${level}" value="${esc(m.costChange||'')}" placeholder="例如：基准、15%～25%、35%～55%"><div class="cost-hint">表示相对于 Standard 基准方案的技术方案增量成本参考，不代表整机总BOM增幅。</div></label>
+      </div></div>`}).join('');
     LEVELS.forEach(level=>{
-      const file=mediaRoot.querySelector(`[data-file="${level}"]`),upload=mediaRoot.querySelector(`[data-upload="${level}"]`),clear=mediaRoot.querySelector(`[data-clear="${level}"]`),cap=mediaRoot.querySelector(`[data-caption="${level}"]`);
+      const file=mediaRoot.querySelector(`[data-file="${level}"]`),upload=mediaRoot.querySelector(`[data-upload="${level}"]`),clear=mediaRoot.querySelector(`[data-clear="${level}"]`),cap=mediaRoot.querySelector(`[data-caption="${level}"]`),risk=mediaRoot.querySelector(`[data-main-risk="${level}"]`),position=mediaRoot.querySelector(`[data-positioning="${level}"]`),cost=mediaRoot.querySelector(`[data-cost-change="${level}"]`);
       upload.onclick=()=>file.click();file.onchange=e=>uploadImage(level,e.target.files?.[0]);
       clear.onclick=()=>clearImage(level);
-      cap.oninput=()=>{const scene=workingScenarios[document.getElementById('sceneSelect').value];ensureFields(scene);scene.planImageCaptions[level]=cap.value.trim();markDirty(`${level} 方案图注已修改，尚未发布。`)};
+      cap.oninput=()=>mutate(level,'caption',cap.value.trim());
+      risk.oninput=()=>mutate(level,'mainRisk',risk.value.trim());
+      position.oninput=()=>mutate(level,'positioning',position.value.trim());
+      cost.oninput=()=>mutate(level,'costChange',cost.value.trim());
     });
+  }
+
+  function mutate(level,key,value){
+    const name=document.getElementById('sceneSelect').value,scene=workingScenarios[name];ensureFields(scene);
+    if(key==='caption')scene.planImageCaptions[level]=value;else scene.planMeta[level][key]=value;
+    const label=key==='mainRisk'?'主要风险':key==='positioning'?'方案定位':key==='costChange'?'相对成本变化':'方案图注';
+    markDirty(`${name} · ${level} · ${label} 已修改，尚未发布。`);
   }
 
   async function uploadImage(level,file){
