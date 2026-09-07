@@ -1,0 +1,54 @@
+name: Finalize demand risk gap UI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/finalize-demand-risk-gap.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  patch:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Finalize cache, plan copy and report Gap table
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+
+          p=Path('v2.7.html')
+          s=p.read_text()
+          s=s.replace('v2.5-demand-gap-core.js?v=20260907-core1','v2.5-demand-gap-core.js?v=20260907-core2')
+          s=s.replace('v2.5-plan-images.js?v=20260906-planmeta1','v2.5-plan-images.js?v=20260907-planrisk1')
+          p.write_text(s)
+
+          p=Path('v2.5-plan-images.js')
+          s=p.read_text()
+          old='方案图、主要风险、方案定位和相对成本变化仅用于工程决策展示，不参与推荐算法。'
+          new='方案图、方案定位和相对成本变化不参与 Standard / Pro / Plus 推荐算法；“主要风险”用于 07 升级包推荐评价，但不反向改变 06 三档方案推荐结果。'
+          if old in s:s=s.replace(old,new)
+          p.write_text(s)
+
+          p=Path('v2.5-report.html')
+          s=p.read_text()
+          old="${tbl(['能力域','环境要求','当前基础','主方案','升级包','综合已具备','剩余风险'],s.gaps.map(x=>[esc(x.domain),x.need+'/3',x.base+'/3','+'+x.plan,'+'+x.pkg,x.supplied+'/3',`<b class=\"${riskCls(x.rem)}\">${riskTxt(x.rem)} (${x.rem})</b>`]),['18%','12%','12%','12%','12%','16%','18%'])}"
+          new="${tbl(['风险域','项目要求','当前机组','Standard','Pro','Plus','场景包','剩余Gap'],s.gaps.map(x=>[esc(x.domain),x.need+'/3',(x.current??x.base)+'/3',(x.Standard??x.base)+'/3',(x.Pro??x.base)+'/3',(x.Plus??x.base)+'/3',(x.scenePackage??x.pkg)?'+'+(x.scenePackage??x.pkg):'0',`<b class=\"${riskCls(x.rem)}\">${x.rem===0?'0 · 已覆盖':'Gap '+x.rem}</b>`]),['14%','11%','11%','11%','11%','11%','10%','21%'])}"
+          if old not in s:
+              raise SystemExit('report gap marker not found')
+          s=s.replace(old,new)
+          p.write_text(s)
+          PY
+          node --check v2.5-demand-gap-core.js
+          node --check v2.5-plan-images.js
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add v2.7.html v2.5-plan-images.js v2.5-report.html
+          if ! git diff --cached --quiet; then
+            git commit -m "Finalize demand plus plan-risk upgrades and core Gap matrix"
+            git push
+          fi
