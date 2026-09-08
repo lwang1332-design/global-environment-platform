@@ -1,0 +1,12 @@
+const R=6371;
+function dest(lat,lon,bearing,km){const br=bearing*Math.PI/180,p1=lat*Math.PI/180,l1=lon*Math.PI/180,d=km/R;const p2=Math.asin(Math.sin(p1)*Math.cos(d)+Math.cos(p1)*Math.sin(d)*Math.cos(br));const l2=l1+Math.atan2(Math.sin(br)*Math.sin(d)*Math.cos(p1),Math.cos(d)-Math.sin(p1)*Math.sin(p2));return [p2*180/Math.PI,((l2*180/Math.PI+540)%360)-180];}
+async function topo(points){const chunks=[];for(let i=0;i<points.length;i+=95)chunks.push(points.slice(i,i+95));const vals=[];for(const c of chunks){const locations=c.map(p=>`${p[0].toFixed(5)},${p[1].toFixed(5)}`).join('|');const r=await fetch('https://api.opentopodata.org/v1/gebco2020',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({locations,interpolation:'nearest'})});if(!r.ok)throw new Error(`OpenTopoData ${r.status}`);const d=await r.json();vals.push(...(d.results||[]).map(x=>Number(x.elevation)));await new Promise(res=>setTimeout(res,1020));}return vals;}
+export async function fallbackGisContext(lat,lon){
+  const bearings=[...Array(24)].map((_,i)=>i*15),dists=[1,2,5,10,20,40,80,150,300,600,1000],pts=[[lat,lon]];
+  for(const b of bearings)for(const d of dists)pts.push(dest(lat,lon,b,d));
+  const elevations=await topo(pts),siteElev=elevations[0],siteSea=Number.isFinite(siteElev)&&siteElev<0;let idx=1,bins=[];
+  for(const b of bearings){const e=elevations.slice(idx,idx+dists.length);idx+=dists.length;if(siteSea){let firstLand=null;for(let j=0;j<dists.length;j++){const isSea=Number.isFinite(e[j])&&e[j]<0;if(!isSea){firstLand=dists[j];break;}}bins.push({bearing:b,seaDistanceKm:0,fetchKm:firstLand??1000});continue;}let seaDist=null,fetch=0,entered=false,lastD=null;for(let j=0;j<dists.length;j++){const isSea=Number.isFinite(e[j])&&e[j]<0;if(!entered&&isSea){seaDist=dists[j];entered=true;lastD=dists[j];}else if(entered&&isSea){fetch=dists[j]-seaDist;lastD=dists[j];}else if(entered&&!isSea)break;}if(entered&&fetch===0)fetch=Math.max(1,(lastD||seaDist)-seaDist);bins.push({bearing:b,seaDistanceKm:seaDist??999,fetchKm:fetch});}
+  const best=bins.reduce((a,b)=>b.seaDistanceKm<a.seaDistanceKm?b:a,bins[0]);
+  return {elevation:siteElev,siteMedium:siteSea?'sea':'land',distanceToCoastKm:best.seaDistanceKm,coastBearing:best.bearing,bearingBins:bins,provenance:{type:'CALC/FALLBACK',source:'GEBCO2020 via OpenTopoData radial land/sea mask',confidence:'C',note:'Direct GIS不可用时的自动Fallback。'}};
+}
+export async function resolveGis(lat,lon,direct){if(direct?.gis?.bearingBins?.length)return direct.gis;return fallbackGisContext(lat,lon);}
