@@ -1,0 +1,15 @@
+{
+  "name": "全球海洋大气腐蚀环境评估平台",
+  "version": "3.2.2",
+  "frontendEntry": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
+  "frontendRuntime": "Vercel Production via GitHub Pages launcher",
+  "frontendTarget": "https://global-marine-corrosion-engineering-lwang1332-4885.vercel.app/",
+  "directApi": "https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct",
+  "dataChain": ["ERA5 Direct", "CAMS EAC4 / Forecast", "CMEMS", "Open-Meteo fallback"],
+  "calibration": {
+    "rawRows": 641,
+    "independentRows": 121,
+    "globalBenchmarkPoints": 26
+  },
+  "notes": "GitHub Pages provides the stable HTTPS entry, while secret-bearing Direct data access remains on Vercel. Direct sources remain visibly marked RAW/Fallback/EST according to actual availability."
+}
