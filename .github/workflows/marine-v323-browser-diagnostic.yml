@@ -1,0 +1,108 @@
+name: Marine V3.2.3 browser diagnostic
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/marine-v323-browser-diagnostic.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Network endpoint diagnostics
+        shell: bash
+        run: |
+          set +e
+          PAGES='https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/'
+          DIRECT='https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct'
+          echo '=== PAGES ==='
+          curl -L -sS -D /tmp/pages.h -o /tmp/pages.html -w 'HTTP=%{http_code}\n' --max-time 30 "$PAGES"
+          head -20 /tmp/pages.h || true
+          grep -Eo 'V3\.[0-9.]+' /tmp/pages.html | head || true
+          echo '=== DIRECT GET ==='
+          curl -L -sS -D /tmp/direct-get.h -o /tmp/direct-get.out -w 'HTTP=%{http_code}\n' --max-time 30 "$DIRECT"
+          cat /tmp/direct-get.h || true
+          head -c 2000 /tmp/direct-get.out || true; echo
+          echo '=== DIRECT OPTIONS / CORS ==='
+          curl -sS -i -X OPTIONS "$DIRECT" \
+            -H 'Origin: https://lwang1332-design.github.io' \
+            -H 'Access-Control-Request-Method: POST' \
+            -H 'Access-Control-Request-Headers: content-type' \
+            --max-time 30 | head -80 || true
+          echo '=== DIRECT POST ==='
+          curl -L -sS -D /tmp/direct-post.h -o /tmp/direct-post.out -w 'HTTP=%{http_code}\n' --max-time 60 -X POST "$DIRECT" \
+            -H 'Origin: https://lwang1332-design.github.io' \
+            -H 'Content-Type: application/json' \
+            --data '{"lat":18.2528,"lon":109.5119,"mode":"historical","year":2025,"height":100}'
+          cat /tmp/direct-post.h || true
+          head -c 3000 /tmp/direct-post.out || true; echo
+          echo '=== OpenTopoData browser-style POST ==='
+          curl -sS -i -X POST 'https://api.opentopodata.org/v1/gebco2020' \
+            -H 'Origin: https://lwang1332-design.github.io' \
+            -H 'Content-Type: application/json' \
+            --data '{"locations":"18.2528,109.5119|18.2528,109.5219","interpolation":"nearest"}' \
+            --max-time 30 | head -100 || true
+          echo '=== Open-Meteo historical small request ==='
+          curl -sS -I 'https://archive-api.open-meteo.com/v1/archive?latitude=18.2528&longitude=109.5119&start_date=2025-01-01&end_date=2025-01-02&hourly=temperature_2m&timezone=UTC' --max-time 30 | head -60 || true
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i playwright@1.55.0 >/dev/null
+          npx playwright install chromium --with-deps >/dev/null
+
+      - name: Browser runtime diagnostic
+        env:
+          PAGE_URL: https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/
+        run: |
+          cat > /tmp/diag.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser = await chromium.launch({headless:true});
+          const page = await browser.newPage();
+          page.on('console', m => console.log('CONSOLE', m.type(), m.text()));
+          page.on('pageerror', e => console.log('PAGEERROR', e.message));
+          page.on('requestfailed', r => console.log('REQFAIL', r.method(), r.url(), r.failure()?.errorText));
+          page.on('response', r => {
+            const u=r.url();
+            if (r.status()>=400 || /vercel|open-meteo|opentopodata|jsdelivr|marine-corrosion/.test(u))
+              console.log('RESP', r.status(), u);
+          });
+          const url=process.env.PAGE_URL+'?diag='+Date.now();
+          console.log('GOTO', url);
+          await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForTimeout(7000);
+          console.log('TITLE', await page.title());
+          console.log('RUNBTN', await page.locator('#runBtn').count(), await page.locator('#runBtn').first().textContent().catch(()=>''));
+          console.log('SOURCE', await page.locator('#sourceText').textContent().catch(()=>''));
+          console.log('LOADING_BEFORE', await page.locator('#loading').getAttribute('class').catch(()=>''));
+          if(await page.locator('#runBtn').count()) await page.locator('#runBtn').click();
+          for(let i=0;i<18;i++){
+            await page.waitForTimeout(5000);
+            const info=await page.evaluate(()=>({
+              loading:document.querySelector('#loading')?.className,
+              title:document.querySelector('#loadingTitle')?.textContent,
+              text:document.querySelector('#loadingText')?.textContent,
+              hours:document.querySelector('#loadingHours')?.textContent,
+              stages:[...document.querySelectorAll('.load-stage')].map(x=>({s:x.dataset.status,t:x.querySelector('.load-stage-detail')?.textContent})),
+              toast:document.querySelector('#toast')?.textContent,
+              source:document.querySelector('#sourceText')?.textContent,
+              summary:document.querySelector('#summaryGrid')?.innerText?.slice(0,800)
+            }));
+            console.log('TICK', i, JSON.stringify(info));
+            if(info.loading?.includes('hidden')) break;
+          }
+          await browser.close();
+          JS
+          node /tmp/diag.mjs
