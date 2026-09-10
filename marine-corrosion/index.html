@@ -1,28 +1,105 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<meta name="theme-color" content="#0a2a59">
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<meta name="description" content="全球海洋大气腐蚀环境评估平台 V3.2.3"/>
 <title>全球海洋大气腐蚀环境评估平台 V3.2.3</title>
+<link rel="preconnect" href="https://unpkg.com">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
+<link rel="stylesheet" href="./styles.css?v=3.2.3"/>
 <style>
-html,body{height:100%;margin:0;font-family:Inter,"PingFang SC","Microsoft YaHei",Arial,sans-serif;background:#f4f7fb;color:#172334}.wrap{height:100%;display:grid;place-items:center}.card{width:min(760px,calc(100% - 36px));background:#fff;border:1px solid #d9e3ef;box-shadow:0 10px 34px rgba(10,42,89,.08);padding:28px 30px}.mark{width:42px;height:42px;display:grid;place-items:center;background:#0a2a59;color:#fff;font-weight:800;border-radius:4px}.title{font-size:22px;font-weight:800;color:#0a2a59;margin:16px 0 6px}.sub{color:#667085;line-height:1.7}.status{margin:18px 0 4px;padding:14px 16px;background:#f7faff;border-left:4px solid #1769e0}.status strong{color:#0a2a59}.steps{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:16px 0}.step{border:1px solid #d9e3ef;padding:10px 8px;font-size:12px;color:#667085;background:#fff}.step b{display:block;color:#0a2a59;margin-bottom:4px}.go{display:inline-block;margin-top:12px;background:#0a2a59;color:#fff;text-decoration:none;padding:10px 18px;border-radius:4px;font-weight:700}.small{font-size:12px;color:#7a8798;margin-top:14px}@media(max-width:640px){.steps{grid-template-columns:1fr 1fr}}
+.loader-card-wide{width:min(620px,calc(100vw - 32px));padding:22px 24px}.loader-head{display:flex;gap:14px;align-items:flex-start}.loader-head h3{margin:0 0 4px}.loader-head p{margin:0}.load-meta{display:flex;justify-content:space-between;gap:12px;margin:16px 0 8px;padding:9px 11px;background:#f7fafc;border:1px solid var(--line);font-size:12px;color:var(--muted)}.load-meta b{color:var(--blue);font-size:13px}.load-stages{margin-top:14px;border:1px solid var(--line)}.load-stage{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #edf1f5;background:#fff}.load-stage:last-child{border-bottom:0}.load-num{font-size:10px;font-weight:800;color:#91a0b4}.load-stage strong{display:block;font-size:12px;color:#29425f}.load-stage small{display:block;margin-top:2px;color:#8390a1;font-size:10px}.load-stage em{font-style:normal;font-size:10px;font-weight:800;padding:3px 6px;border:1px solid #d7e0e9;color:#7c8998;background:#f8fafc}.load-stage[data-status="active"]{background:#f1f7fd}.load-stage[data-status="active"] .load-num,.load-stage[data-status="active"] strong{color:var(--blue)}.load-stage[data-status="active"] em{color:#15528d;border-color:#b8d1e8;background:#eff6fc}.load-stage[data-status="done"] em{color:#176c4f;border-color:#a8d9c7;background:#eff9f5}.load-stage[data-status="warn"] em{color:#9a5c0b;border-color:#e6c996;background:#fff7e9}.load-stage[data-status="error"] em{color:#a32323;border-color:#e4b6b6;background:#fff2f2}.load-foot{margin-top:13px}.load-foot>span{font-size:10px;color:#7f8b9a;line-height:1.5}.loading-overlay .progress i#progressBar{animation:none!important;transition:width .35s ease}.home-load-note{font-size:11px;color:#5d6d80;margin-top:6px}.home-load-note b{color:var(--blue)}@media(max-width:640px){.loader-card-wide{padding:18px}.load-meta{flex-direction:column;gap:4px}.load-stage{grid-template-columns:30px 1fr auto}}
 </style>
 </head>
 <body>
-<div class="wrap"><div class="card">
-<div class="mark">GE</div>
-<div class="title">全球海洋大气腐蚀环境评估平台 V3.2.3</div>
-<div class="sub">快速启动模式：打开首页时<strong>不下载年度 ERA5 / CAMS / CMEMS 数据</strong>，仅加载界面并异步检查数据源状态。</div>
-<div class="status"><strong>初始化年度数据量：0</strong><br>只有点击“自动获取真实数据并计算”后，才按所选 1 / 3 / 5 年开始获取真实环境数据。</div>
-<div class="steps"><div class="step"><b>① GIS</b>坐标 / 距海 / Fetch</div><div class="step"><b>② ERA5</b>逐小时气象</div><div class="step"><b>③ CAMS / CMEMS</b>海盐 / 波浪 / 盐度</div><div class="step"><b>④ Physics</b>沉降 / 凝露 / 腐蚀</div></div>
-<a id="go" class="go" href="https://global-marine-corrosion-engineering-lwang1332-4885.vercel.app/">进入平台</a>
-<div class="small">约 0.2 秒后自动进入。进入后请点击“自动获取真实数据并计算”才开始年度数据任务。</div>
+<div id="app">
+<header class="topbar">
+  <div class="brand"><div class="brand-mark">GE</div><div><div class="brand-title">全球海洋大气腐蚀环境评估平台 V3.2.3</div><div class="brand-sub">Real Data · Dynamic Fetch · Multi-Zone · Benchmark</div></div></div>
+  <div class="top-project"><span class="muted">当前项目</span><strong id="projectNameTop">沿海环境评估项目</strong></div>
+  <nav class="topnav"><button data-page="overview" class="active">项目总览</button><button data-page="data">真实数据</button><button data-page="model">物理模型</button><button data-page="validation">模型验证</button><button data-page="design">设计建议</button></nav>
+  <div class="top-status"><span id="sourceDot" class="dot warn"></span><span id="sourceText">检查数据源…</span><button id="adminTop" class="ghost">管理员</button></div>
+</header>
+<div class="shell">
+<aside class="sidebar">
+  <button class="nav-item active" data-page="overview"><span>01</span> 项目概览</button>
+  <button class="nav-item" data-page="geo"><span>02</span> 自动GIS</button>
+  <button class="nav-item" data-page="data"><span>03</span> ERA5气象</button>
+  <button class="nav-item" data-page="ocean"><span>04</span> CAMS / CMEMS</button>
+  <button class="nav-item" data-page="salt"><span>05</span> 海盐与沉降</button>
+  <button class="nav-item" data-page="wet"><span>06</span> 凝露与湿热</button>
+  <button class="nav-item" data-page="risk"><span>07</span> 腐蚀环境</button>
+  <button class="nav-item" data-page="zones"><span>08</span> 暴露区带</button>
+  <button class="nav-item" data-page="design"><span>09</span> 防护设计</button>
+  <button class="nav-item" data-page="model"><span>10</span> 物理模型</button>
+  <button class="nav-item" data-page="validation"><span>11</span> 26点Benchmark</button>
+  <button class="nav-item" data-page="report"><span>12</span> 报告输出</button>
+  <div class="nav-sep"></div>
+  <button class="nav-item" data-page="sources"><span>13</span> 数据源状态</button>
+  <button class="nav-item" data-page="admin"><span>14</span> 管理员Override</button>
+</aside>
+<main class="main">
+<section class="project-strip v32">
+  <div><span>项目名称</span><input id="projectName" value="沿海环境评估项目"/></div>
+  <div><span>纬度</span><input id="latitude" type="number" step="0.0001" value="18.2528"/></div>
+  <div><span>经度</span><input id="longitude" type="number" step="0.0001" value="109.5119"/></div>
+  <div><span>分析模式</span><select id="mode"><option value="historical">Historical</option><option value="current">Current</option></select></div>
+  <div id="periodCell"><span>统计周期</span><select id="period"><option value="1">1年</option><option value="3">3年</option><option value="5">5年</option></select></div>
+  <div id="yearCell"><span>截至完整年度</span><select id="year"></select></div>
+  <div><span>设备高度</span><input id="height" type="number" min="2" max="150" value="10"/><em>m</em></div>
+  <div><span>暴露区带</span><select id="exposureZone"><option value="atmospheric">Atmospheric</option><option value="splash">Splash</option><option value="tidal">Tidal</option><option value="submerged">Submerged</option></select></div>
+  <div><span>材料</span><select id="material"><option value="carbon_steel">Carbon Steel</option><option value="zinc">Zinc</option><option value="copper">Copper</option><option value="aluminium">Aluminium</option></select></div>
+  <div><span>设计寿命</span><select id="designLife"><option>20</option><option selected>25</option><option>30</option></select><em>年</em></div>
+  <div class="action-cell"><button id="runBtn" class="primary">自动获取真实数据并计算</button></div>
+</section>
+<section id="globalNotice" class="notice info"><strong>V3.2.3加载策略：</strong>首页不预加载1/3/5年年度数据，仅进行不超过4秒的轻量数据源状态检查。点击“自动获取真实数据并计算”后，才执行 GIS → ERA5/CAMS/CMEMS → 统一时间轴 → 物理模型。<div class="home-load-note">默认1年：<b>8760 h</b>（闰年8784 h）；3/5年按年度逐年获取与累计，不在首页一次性下载。</div></section>
+
+<div id="page-overview" class="page active">
+  <div class="grid hero-grid">
+    <section class="panel map-panel"><div class="panel-head"><div><h2>项目空间定位</h2><p>点击地图更新经纬度；距海/海岸方位由后台自动分析</p></div><span class="tag calc">AUTO GIS</span></div><div id="map"></div><div id="geoInline" class="mini-kpis"></div></section>
+    <section class="panel verdict-panel"><div class="panel-head"><div><h2>环境综合判定</h2><p>Atmospheric使用ISO 9223；其它区带独立分流</p></div><span class="tag calc">CALC</span></div><div class="verdict-main"><div class="risk-ring" id="riskRing"><b id="isoClass">—</b><small id="isoLabel">ISO CORROSIVITY</small></div><div class="verdict-text"><span>典型场景</span><strong id="sceneText">待计算</strong><span>Cl类别</span><strong id="clClass">—</strong><span>模型可信度</span><strong id="confidence">—</strong></div></div><div id="riskReasons" class="risk-list">点击“自动获取真实数据并计算”。</div></section>
+  </div>
+  <section class="panel metrics-panel"><div class="panel-head"><div><h2>关键工程结果</h2><p>点击任一指标查看“数据→公式→结果→标准”追溯</p></div><div class="legend"><span class="tag raw">RAW</span><span class="tag calc">CALC</span><span class="tag est">EST</span><span class="tag override">OVERRIDE</span></div></div><div id="metricRows" class="metric-rows"></div></section>
+  <div class="grid chart-grid"><section class="panel"><div class="panel-head"><div><h2>统一时间轴</h2><p>Historical按1/3/5年逐年计算；Current展示当前窗口</p></div></div><div id="timelineChart" class="chart"></div></section><section class="panel"><div class="panel-head"><div><h2>工程判断摘要</h2></div></div><div id="engineeringSummary" class="summary-list"></div></section></div>
+</div>
+
+<div id="page-geo" class="page"><section class="panel"><div class="panel-head"><div><h2>自动GIS结果</h2><p>前端不再提供距海/海向输入；Production优先GSHHG Direct，Fallback使用GEBCO陆海掩膜</p></div><span class="tag calc">CALC</span></div><div id="geoStats" class="stat-grid empty-state">计算后显示。</div></section><section class="panel"><div class="formula-box">每小时：WD(t) → 上风向射线 → D_upwind(t) → 连续海面长度 Fetch(t)。最近距海只用于项目描述，不直接替代盐雾输运距离。</div></section></div>
+
+<div id="page-data" class="page"><section class="panel"><div class="panel-head"><div><h2>ERA5 / 气象主数据</h2><p>Direct可用时使用ERA5；否则明确标记Open-Meteo Fallback</p></div><span class="tag raw">RAW</span></div><div id="dataStats" class="stat-grid empty-state">计算后显示。</div></section><section class="panel"><div id="weatherChart" class="chart tall"></div></section></div>
+
+<div id="page-ocean" class="page"><section class="panel"><div class="panel-head"><div><h2>CAMS海盐 + CMEMS波浪/盐度</h2><p>CAMS 0.03–20 μm作为背景；>20 μm保持局地EST项，避免重复计源</p></div></div><div id="oceanStats" class="stat-grid empty-state">计算后显示。</div></section><section class="panel"><div id="oceanStatus" class="source-table"></div></section></div>
+
+<div id="page-salt" class="page"><section class="panel"><div class="panel-head"><div><h2>海盐气溶胶 → Cl⁻沉降 → 表面盐库存</h2></div></div><div id="saltMetrics" class="stat-grid"></div></section><section class="panel"><div id="saltChart" class="chart tall"></div></section></div>
+<div id="page-wet" class="page"><section class="panel"><div class="panel-head"><div><h2>凝露 / TOW / Salt-Wet</h2><p>TOW保留为诊断量，不重复乘入ISO 9223剂量响应</p></div></div><div id="wetMetrics" class="stat-grid"></div></section><section class="panel"><div id="wetChart" class="chart tall"></div></section></div>
+<div id="page-risk" class="page"><section class="panel"><div class="panel-head"><div><h2>腐蚀环境判定</h2><p>所选材料使用对应ISO 9223首年剂量响应与材料阈值</p></div></div><div id="riskMetrics" class="stat-grid"></div></section><section class="panel"><div id="riskExplain" class="risk-explain"></div></section></div>
+<div id="page-zones" class="page"><section class="panel"><div class="panel-head"><div><h2>Atmospheric / Splash / Tidal / Submerged</h2><p>四区带分流，不将浸没/潮差/浪溅错误映射为大气C1–CX</p></div></div><div id="zoneFlow" class="design-flow"></div></section></div>
+<div id="page-design" class="page"><section class="panel"><div class="panel-head"><div><h2>环境 → 风险 → 材料 → 寿命 → 防护设计</h2></div></div><div id="designFlow" class="design-flow"></div></section></div>
+<div id="page-model" class="page"><section class="panel"><div class="panel-head"><div><h2>物理模型与公式中心</h2></div></div><div id="formulaList" class="formula-list"></div></section></div>
+
+<div id="page-validation" class="page">
+  <section class="panel"><div class="panel-head"><div><h2>26点 Benchmark Dataset</h2><p>参考腐蚀率来自用户给定表；固定高度2 m、Carbon Steel、Atmospheric。用于验证模型，不直接拟合ISO公式。</p></div><span class="tag calc">BENCHMARK</span></div><div class="button-row"><button id="benchmarkBtn" class="primary">运行26点验证</button><button id="benchmarkStop" class="secondary">停止</button></div><div class="progress"><i id="benchmarkBar" style="animation:none;width:0"></i></div><div id="benchmarkKpis" class="kpis-row"></div></section>
+  <section class="panel"><div class="source-table"><table class="table"><thead><tr><th>点位</th><th>坐标</th><th>参考 μm/a</th><th>平台 μm/a</th><th>偏差</th><th>相对误差</th><th>参考等级</th><th>平台等级</th><th>状态</th></tr></thead><tbody id="benchmarkBody"></tbody></table></div></section>
+</div>
+
+<div id="page-report" class="page"><section class="panel"><div class="panel-head"><div><h2>报告与数据输出</h2></div></div><div class="button-row"><button id="printBtn" class="primary">打印 / 保存PDF</button><button id="jsonBtn" class="secondary">导出计算JSON</button></div></section></div>
+<div id="page-sources" class="page"><section class="panel"><div class="panel-head"><div><h2>数据源状态与数据血缘</h2><p>Direct / Fallback / RAW / CALC / EST必须明确区分</p></div></div><div id="sourceTable" class="source-table"></div></section></div>
+<div id="page-admin" class="page"><section class="panel"><div class="panel-head"><div><h2>管理员 Override 与模型参数</h2><p>RAW永不覆盖：Original RAW + Override + Effective Value + Audit</p></div></div><div id="adminGate" class="admin-gate"><input id="adminPwd" type="password" placeholder="管理员密码"/><button id="adminLogin" class="primary">验证</button><span id="adminMsg" class="muted"></span></div><div id="adminPanel" class="hidden"><h3>数据Override</h3><div id="overrideTable" class="parameter-table"></div><h3>模型校准参数</h3><div id="parameterTable" class="parameter-table"></div><div class="button-row"><button id="saveParams" class="primary">保存Override/参数</button><button id="resetParams" class="secondary">恢复默认</button></div><h3>本地审计记录</h3><div id="auditTable" class="source-table"></div></div></section></div>
+</main></div></div>
+<div id="loading" class="loading-overlay hidden"><div class="loader-card loader-card-wide">
+  <div class="loader-head"><div class="spinner"></div><div><h3 id="loadingTitle">正在获取数据</h3><p id="loadingText">同步数据源并执行物理模型…</p></div></div>
+  <div class="load-meta"><span>已获取/处理 <b id="loadingHours">0 / — h</b></span><span>耗时 <b id="loadingElapsed">0 s</b></span></div>
+  <div class="progress"><i id="progressBar" style="animation:none;width:4%"></i></div>
+  <div class="load-stages">
+    <div class="load-stage" data-load-stage="0" data-status="pending"><span class="load-num">01</span><div><strong>GIS 与项目定位</strong><small class="load-stage-detail">陆海属性、距海、海岸方位、动态Fetch</small></div><em class="load-stage-status">等待</em></div>
+    <div class="load-stage" data-load-stage="1" data-status="pending"><span class="load-num">02</span><div><strong>ERA5 / CAMS / CMEMS</strong><small class="load-stage-detail">气象、海盐/SO₂、波浪与盐度</small></div><em class="load-stage-status">等待</em></div>
+    <div class="load-stage" data-load-stage="2" data-status="pending"><span class="load-num">03</span><div><strong>统一逐小时时间轴</strong><small class="load-stage-detail">1年8760 h；闰年8784 h</small></div><em class="load-stage-status">等待</em></div>
+    <div class="load-stage" data-load-stage="3" data-status="pending"><span class="load-num">04</span><div><strong>物理模型与工程判定</strong><small class="load-stage-detail">盐雾→Cl⁻→盐库存→湿润/凝露→ISO 9223</small></div><em class="load-stage-status">等待</em></div>
+  </div>
+  <div class="load-foot"><span>首次无缓存时，CDS/ADS/CMEMS远程任务可能需要数十秒至数分钟；页面会持续显示当前阶段与已返回小时数。</span></div>
 </div></div>
-<script>
-const target='https://global-marine-corrosion-engineering-lwang1332-4885.vercel.app/'+location.search+location.hash;
-document.getElementById('go').href=target;
-setTimeout(()=>location.replace(target),200);
-</script>
-</body>
-</html>
+<div id="drawer" class="drawer"><button id="drawerClose" class="drawer-close">×</button><div id="drawerBody"></div></div><div id="toast" class="toast hidden"></div>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
+<script src="./loading-v323.js?v=3.2.3"></script>
+<script type="module" src="./app-browser.js?v=3.2.3"></script>
+</body></html>
