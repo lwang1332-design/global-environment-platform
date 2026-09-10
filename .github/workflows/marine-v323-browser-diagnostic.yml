@@ -1,4 +1,4 @@
-name: Marine V3.2.4 browser diagnostic
+name: Marine V3.2.5 browser diagnostic
 
 on:
   push:
@@ -56,7 +56,7 @@ jobs:
           page.on('requestfailed', r => console.log('REQFAIL', r.method(), r.url(), r.failure()?.errorText));
           page.on('response', r => {
             const u=r.url();
-            if (r.status()>=400 || /vercel|open-meteo|world-atlas|gis-browser|jsdelivr|marine-corrosion/.test(u)) console.log('RESP', r.status(), u);
+            if (r.status()>=400 || /vercel|open-meteo|world-atlas|gis-browser|browser-sources|jsdelivr|marine-corrosion/.test(u)) console.log('RESP', r.status(), u);
           });
           const url=process.env.PAGE_URL+'?diag='+Date.now();
           console.log('GOTO', url);
