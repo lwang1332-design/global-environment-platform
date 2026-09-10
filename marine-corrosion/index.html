@@ -3,12 +3,12 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="description" content="全球海洋大气腐蚀环境评估平台 V3.2.4"/>
-<title>全球海洋大气腐蚀环境评估平台 V3.2.4</title>
+<meta name="description" content="全球海洋大气腐蚀环境评估平台 V3.2.5"/>
+<title>全球海洋大气腐蚀环境评估平台 V3.2.5</title>
 <link rel="preconnect" href="https://unpkg.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<link rel="stylesheet" href="./styles.css?v=3.2.4"/>
-<script type="importmap">{"imports":{"https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/gis.js":"./gis-browser-v324.js?v=3.2.4"}}</script>
+<link rel="stylesheet" href="./styles.css?v=3.2.5"/>
+<script type="importmap">{"imports":{"https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/gis.js":"./gis-browser-v324.js?v=3.2.5","https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/browser-sources.js":"./browser-sources-v325.js?v=3.2.5"}}</script>
 <style>
 .loader-card-wide{width:min(620px,calc(100vw - 32px));padding:22px 24px}.loader-head{display:flex;gap:14px;align-items:flex-start}.loader-head h3{margin:0 0 4px}.loader-head p{margin:0}.load-meta{display:flex;justify-content:space-between;gap:12px;margin:16px 0 8px;padding:9px 11px;background:#f7fafc;border:1px solid var(--line);font-size:12px;color:var(--muted)}.load-meta b{color:var(--blue);font-size:13px}.load-stages{margin-top:14px;border:1px solid var(--line)}.load-stage{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #edf1f5;background:#fff}.load-stage:last-child{border-bottom:0}.load-num{font-size:10px;font-weight:800;color:#91a0b4}.load-stage strong{display:block;font-size:12px;color:#29425f}.load-stage small{display:block;margin-top:2px;color:#8390a1;font-size:10px}.load-stage em{font-style:normal;font-size:10px;font-weight:800;padding:3px 6px;border:1px solid #d7e0e9;color:#7c8998;background:#f8fafc}.load-stage[data-status="active"]{background:#f1f7fd}.load-stage[data-status="active"] .load-num,.load-stage[data-status="active"] strong{color:var(--blue)}.load-stage[data-status="active"] em{color:#15528d;border-color:#b8d1e8;background:#eff6fc}.load-stage[data-status="done"] em{color:#176c4f;border-color:#a8d9c7;background:#eff9f5}.load-stage[data-status="warn"] em{color:#9a5c0b;border-color:#e6c996;background:#fff7e9}.load-stage[data-status="error"] em{color:#a32323;border-color:#e4b6b6;background:#fff2f2}.load-foot{margin-top:13px}.load-foot>span{font-size:10px;color:#7f8b9a;line-height:1.5}.loading-overlay .progress i#progressBar{animation:none!important;transition:width .35s ease}.home-load-note{font-size:11px;color:#5d6d80;margin-top:6px}.home-load-note b{color:var(--blue)}@media(max-width:640px){.loader-card-wide{padding:18px}.load-meta{flex-direction:column;gap:4px}.load-stage{grid-template-columns:30px 1fr auto}}
 </style>
@@ -16,7 +16,7 @@
 <body>
 <div id="app">
 <header class="topbar">
-  <div class="brand"><div class="brand-mark">GE</div><div><div class="brand-title">全球海洋大气腐蚀环境评估平台 V3.2.4</div><div class="brand-sub">Real Data · Dynamic Fetch · Multi-Zone · Benchmark</div></div></div>
+  <div class="brand"><div class="brand-mark">GE</div><div><div class="brand-title">全球海洋大气腐蚀环境评估平台 V3.2.5</div><div class="brand-sub">Real Data · Dynamic Fetch · Multi-Zone · Benchmark</div></div></div>
   <div class="top-project"><span class="muted">当前项目</span><strong id="projectNameTop">沿海环境评估项目</strong></div>
   <nav class="topnav"><button data-page="overview" class="active">项目总览</button><button data-page="data">真实数据</button><button data-page="model">物理模型</button><button data-page="validation">模型验证</button><button data-page="design">设计建议</button></nav>
   <div class="top-status"><span id="sourceDot" class="dot warn"></span><span id="sourceText">检查数据源…</span><button id="adminTop" class="ghost">管理员</button></div>
@@ -53,7 +53,7 @@
   <div><span>设计寿命</span><select id="designLife"><option>20</option><option selected>25</option><option>30</option></select><em>年</em></div>
   <div class="action-cell"><button id="runBtn" class="primary">自动获取真实数据并计算</button></div>
 </section>
-<section id="globalNotice" class="notice info"><strong>V3.2.4加载策略：</strong>首页不预加载1/3/5年年度数据，仅进行不超过4秒的轻量数据源状态检查。点击“自动获取真实数据并计算”后，才执行 GIS → ERA5/CAMS/CMEMS → 统一时间轴 → 物理模型。Direct不可用时，GIS改用浏览器可直接读取的Natural Earth 1:50m陆地掩膜，避免CORS导致计算中断。<div class="home-load-note">默认1年：<b>8760 h</b>（闰年8784 h）；3/5年按年度逐年获取与累计，不在首页一次性下载。</div></section>
+<section id="globalNotice" class="notice info"><strong>V3.2.5加载策略：</strong>首页不预加载年度数据。点击计算后执行 GIS → 气象/海洋 → 统一时间轴 → 物理模型。Direct不可用时，GIS采用Natural Earth 1:50m浏览器Fallback；Historical海浪按所选完整年度请求Open-Meteo ERA5-Ocean，不再把当前7天海浪错配到历史年份；盐度代理明确标记EST。<div class="home-load-note">默认1年：<b>8760 h</b>（闰年8784 h）；Direct请求最多等待约8秒即切换Fallback。</div></section>
 
 <div id="page-overview" class="page active">
   <div class="grid hero-grid">
@@ -101,6 +101,6 @@
 <div id="drawer" class="drawer"><button id="drawerClose" class="drawer-close">×</button><div id="drawerBody"></div></div><div id="toast" class="toast hidden"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-<script src="./loading-v323.js?v=3.2.4"></script>
-<script type="module" src="./app-browser.js?v=3.2.4"></script>
+<script src="./loading-v323.js?v=3.2.5"></script>
+<script type="module" src="./app-browser.js?v=3.2.5"></script>
 </body></html>
