@@ -1,0 +1,38 @@
+name: Direct V3.2.6 Smoke
+on:
+  push:
+    paths:
+      - '.github/workflows/direct-v326-smoke.yml'
+  workflow_dispatch:
+
+jobs:
+  smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Vercel preview and test health
+        shell: bash
+        run: |
+          set -euo pipefail
+          URL='https://marine-corrosion-direct-v326-enos3nkky-lwang1332-4885.vercel.app/api/direct'
+          echo "Testing $URL"
+          ok=0
+          for i in $(seq 1 18); do
+            code=$(curl -L -sS -o /tmp/out -w '%{http_code}' --max-time 30 "$URL" || true)
+            echo "attempt=$i http=$code"
+            cat /tmp/out || true
+            echo
+            if [ "$code" = "200" ]; then ok=1; break; fi
+            sleep 10
+          done
+          test "$ok" = "1"
+      - name: Test POST without credentials
+        shell: bash
+        run: |
+          URL='https://marine-corrosion-direct-v326-enos3nkky-lwang1332-4885.vercel.app/api/direct'
+          code=$(curl -L -sS -o /tmp/post -w '%{http_code}' --max-time 60 \
+            -H 'Content-Type: application/json' \
+            -d '{"lat":18.2528,"lon":109.5119,"mode":"historical","year":2025,"height":10}' "$URL" || true)
+          echo "POST http=$code"
+          head -c 4000 /tmp/post || true
+          echo
+          test "$code" = "200"
