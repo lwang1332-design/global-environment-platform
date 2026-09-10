@@ -1,0 +1,130 @@
+name: Marine corrosion live smoke test
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/marine-corrosion-live-smoke.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - name: Check GitHub Pages entry
+        run: |
+          set -euo pipefail
+          URL='https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/'
+          code=$(curl -L --retry 6 --retry-delay 10 --connect-timeout 20 --max-time 90 -sS -o /tmp/pages.html -w '%{http_code}' "$URL")
+          echo "PAGES_HTTP=$code"
+          test "$code" = "200"
+          grep -Eiq '海洋|腐蚀|marine|corrosion' /tmp/pages.html
+          echo 'PAGES_OK=true'
+
+      - name: Check Vercel frontend
+        run: |
+          set -euo pipefail
+          URL='https://global-marine-corrosion-engineering-lwang1332-4885.vercel.app/'
+          code=$(curl -L --retry 6 --retry-delay 10 --connect-timeout 20 --max-time 90 -sS -o /tmp/frontend.html -w '%{http_code}' "$URL")
+          echo "FRONTEND_HTTP=$code"
+          test "$code" = "200"
+          grep -Eiq '海洋|腐蚀|marine|corrosion' /tmp/frontend.html
+          echo 'FRONTEND_OK=true'
+
+      - name: Check Vercel Direct health
+        id: direct
+        run: |
+          set -euo pipefail
+          URL='https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct'
+          code=$(curl -L --retry 6 --retry-delay 10 --connect-timeout 20 --max-time 90 -sS -o /tmp/direct.json -w '%{http_code}' "$URL")
+          echo "DIRECT_HTTP=$code"
+          cat /tmp/direct.json
+          echo
+          test "$code" = "200"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/direct.json',encoding='utf-8'))
+          assert d.get('ok') is True, d
+          print('DIRECT_VERSION=',d.get('version'))
+          print('DIRECT_RUNTIME=',d.get('runtime'))
+          print('ERA5_READY=',bool(d.get('era5')))
+          print('CAMS_READY=',bool(d.get('cams')))
+          print('CMEMS_READY=',bool(d.get('cmems')))
+          print('RAW_STACK_READY=',bool(d.get('era5') and d.get('cams') and d.get('cmems')))
+          PY
+
+      - name: Run Sanya 2025 platform analysis
+        run: |
+          set -euo pipefail
+          URL='https://global-marine-corrosion-engineering-lwang1332-4885.vercel.app/api/analyze'
+          cat >/tmp/payload.json <<'JSON'
+          {
+            "latitude": 18.2528,
+            "longitude": 109.5119,
+            "mode": "historical",
+            "year": 2025,
+            "height": 100,
+            "exposureZone": "atmospheric",
+            "material": "carbon_steel",
+            "designLife": 25
+          }
+          JSON
+          code=$(curl -L --retry 2 --retry-delay 5 --connect-timeout 20 --max-time 240 -sS -X POST "$URL" -H 'Content-Type: application/json' --data-binary @/tmp/payload.json -o /tmp/analyze.json -w '%{http_code}')
+          echo "ANALYZE_HTTP=$code"
+          python - <<'PY'
+          import json
+          p='/tmp/analyze.json'
+          try:
+              d=json.load(open(p,encoding='utf-8'))
+          except Exception:
+              print(open(p,encoding='utf-8',errors='replace').read()[:4000])
+              raise
+          print('ANALYZE_OK=',d.get('ok'))
+          if not d.get('ok'):
+              print('ANALYZE_ERROR=',d.get('error'))
+              raise SystemExit(1)
+          s=d.get('sources',{})
+          m=d.get('summary',{})
+          print('DIRECT_GATEWAY=',s.get('directGateway'))
+          print('DIRECT_ERROR=',s.get('directError'))
+          print('WEATHER_SOURCE=',s.get('weather'))
+          print('CAMS_SOURCE=',s.get('cams'))
+          print('OCEAN_SOURCE=',s.get('ocean'))
+          print('GIS_SOURCE=',s.get('gis'))
+          keys=['hours','airSaltMean','airSaltP95','clDepMean','annualCl','towHours','condHours','meanWaveHeight','meanSalinity','firstYearCorrosion','engineeringFirstYearCorrosion','corrosionClass','engineeringCorrosionClass','chlorideClass']
+          for k in keys: print(f'{k}={m.get(k)}')
+          PY
+          test "$code" = "200"
+
+      - name: Run Direct Sanya 2025 only when RAW stack is ready
+        run: |
+          set -euo pipefail
+          URL='https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct'
+          ready=$(python - <<'PY'
+          import json
+          d=json.load(open('/tmp/direct.json',encoding='utf-8'))
+          print('1' if d.get('era5') and d.get('cams') and d.get('cmems') else '0')
+          PY
+          )
+          if [ "$ready" != "1" ]; then
+            echo 'DIRECT_RAW_SANYA=SKIPPED_MISSING_SECRETS_OR_AUTH'
+            exit 0
+          fi
+          cat >/tmp/direct-payload.json <<'JSON'
+          {"lat":18.2528,"lon":109.5119,"mode":"historical","year":2025,"height":100}
+          JSON
+          code=$(curl -L --connect-timeout 20 --max-time 300 -sS -X POST "$URL" -H 'Content-Type: application/json' --data-binary @/tmp/direct-payload.json -o /tmp/direct-sanya.json -w '%{http_code}')
+          echo "DIRECT_SANYA_HTTP=$code"
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/direct-sanya.json',encoding='utf-8'))
+          for k in ['weather','cams','ocean','gis']:
+              v=d.get(k)
+              print(k.upper(), 'PRESENT=', bool(v), 'SOURCE=', (v or {}).get('source') or (v or {}).get('provenance'))
+              if isinstance(v,dict) and isinstance(v.get('time'),list): print(k.upper(),'N=',len(v['time']))
+          PY
+          test "$code" = "200"
