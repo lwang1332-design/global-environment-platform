@@ -1,36 +1,31 @@
 {
   "name": "全球海洋大气腐蚀环境评估平台",
-  "version": "3.2.3",
+  "version": "3.2.5",
   "frontendEntry": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "frontendRuntime": "GitHub Pages native static app",
   "frontendTarget": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "directApi": "https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct",
+  "directApiStatus": "deployment_missing_2026-09-11",
   "dataChain": [
-    "ERA5 Direct",
-    "CAMS EAC4 / Forecast",
-    "CMEMS",
-    "Open-Meteo fallback"
+    "ERA5 Direct when gateway is restored",
+    "CAMS EAC4 / Forecast when gateway is restored",
+    "CMEMS when gateway is restored",
+    "Open-Meteo Historical / Forecast fallback",
+    "Open-Meteo ERA5-Ocean historical wave fallback",
+    "Natural Earth 1:50m browser GIS fallback"
   ],
   "calibration": {
     "rawRows": 641,
     "independentRows": 121,
     "globalBenchmarkPoints": 26
   },
-  "notes": "V3.2.3 is served natively by GitHub Pages. Initial annual data load is zero; real annual data begins only after the user starts calculation. RAW/Fallback/EST provenance remains explicit.",
+  "notes": "V3.2.5 restores browser-side calculation when Direct is unavailable. Direct endpoint currently returns Vercel DEPLOYMENT_NOT_FOUND, so the UI must not label fallback data as Direct RAW. Historical marine fallback follows the selected complete year; salinity 35 PSU remains explicit EST.",
   "startupPolicy": {
     "annualDataOnInitialLoad": false,
     "healthCheckTimeoutSeconds": 4,
-    "historicalPeriodsYears": [
-      1,
-      3,
-      5
-    ],
-    "stages": [
-      "GIS",
-      "ERA5/CAMS/CMEMS",
-      "Hourly timeline",
-      "Physics / ISO 9223"
-    ],
+    "directCalculationTimeoutSeconds": 8,
+    "historicalPeriodsYears": [1, 3, 5],
+    "stages": ["GIS", "ERA5/CAMS/CMEMS or fallback", "Hourly timeline", "Physics / ISO 9223"],
     "progressUnit": "hours"
   }
 }
