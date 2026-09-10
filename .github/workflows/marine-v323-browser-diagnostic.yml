@@ -67,7 +67,7 @@ jobs:
         env:
           PAGE_URL: https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/
         run: |
-          cat > /tmp/diag.mjs <<'JS'
+          cat > diag.mjs <<'JS'
           import { chromium } from 'playwright';
           const browser = await chromium.launch({headless:true});
           const page = await browser.newPage();
@@ -105,4 +105,4 @@ jobs:
           }
           await browser.close();
           JS
-          node /tmp/diag.mjs
+          node ./diag.mjs
