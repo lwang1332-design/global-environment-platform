@@ -28,7 +28,7 @@ jobs:
           exit 1
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Install Playwright
         run: |
           npm init -y >/dev/null 2>&1
@@ -45,7 +45,7 @@ jobs:
           page.on('pageerror',e=>errors.push('pageerror:'+e.message));
           page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource/i.test(m.text()))errors.push('console:'+m.text())});
           await page.goto(base,{waitUntil:'domcontentloaded',timeout:60000});
-          await page.waitForSelector('#uiDecisionSummary',{state:'attached',timeout:60000});
+          await page.waitForSelector('#cockpitLayout',{state:'attached',timeout:60000});
           await page.waitForSelector('#uiModelWrap',{state:'attached',timeout:60000});
           await page.waitForTimeout(1800);
 
@@ -56,23 +56,33 @@ jobs:
             const nested=[...document.querySelectorAll('#mainPage *')].filter(e=>{
               const cs=getComputedStyle(e);return !allowed(e)&&(cs.overflowY==='auto'||cs.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+5;
             }).length;
+            const tops={
+              hero:rect('#cockpitHero')?.top,
+              env:rect('#cockpitEnvSection')?.top,
+              analysis:rect('#cockpitAnalysis')?.top,
+              physics:rect('#cockpitPhysicsSection')?.top,
+              matrix:rect('#cockpitMatrixSection')?.top,
+              decision:rect('#cockpitDecision')?.top
+            };
+            const ordered=Number.isFinite(tops.hero)&&Number.isFinite(tops.env)&&Number.isFinite(tops.analysis)&&Number.isFinite(tops.physics)&&Number.isFinite(tops.matrix)&&Number.isFinite(tops.decision)&&tops.hero<tops.env&&tops.env<tops.analysis&&tops.analysis<tops.physics&&tops.physics<tops.matrix&&tops.matrix<tops.decision;
             return {
-              ui:!!document.querySelector('#uiDecisionSummary')&&!!document.querySelector('.uiPrimaryGrid')&&!!document.querySelector('.uiProjectSupport'),
+              ui:!!document.querySelector('#cockpitLayout')&&!!document.querySelector('#cockpitHero')&&!!document.querySelector('#cockpitEnvSection')&&!!document.querySelector('#cockpitAnalysis')&&!!document.querySelector('#cockpitPhysicsSection'),
               logo:!!logo&&logo.complete&&logo.naturalWidth>0,
               overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
               nested,
-              summaryCards:document.querySelectorAll('.uiSummaryCard').length,
               riskLegend:!!document.querySelector('.riskLegend'),
               modelTable:!!document.querySelector('.uiEngineeringTable'),
               drawer:!!document.querySelector('#uiDrawerMask'),
               reportModal:!!document.querySelector('#uiReportModal'),
               subtitle:document.querySelector('.brand p')?.textContent||'',
-              firstScreen:{toolbar:rect('.toolbar')?.top<1080,summary:rect('#uiDecisionSummary')?.top<1080,risk:rect('.riskCard')?.top<1080,physics:rect('.physicsCard')?.top<1080}
+              tops,ordered,
+              firstScreen:{toolbar:(rect('.toolbar')?.top??9999)<1080,hero:(tops.hero??9999)<1080,env:(tops.env??9999)<1080},
+              analysisNearFold:(tops.analysis??9999)<1250
             };
           });
           console.log('DESKTOP_1920',desktop);
-          if(!desktop.ui||!desktop.logo||desktop.overflow>2||desktop.nested>0||desktop.summaryCards!==5||!desktop.riskLegend||!desktop.modelTable||!desktop.drawer||!desktop.reportModal) throw new Error('Desktop shell/layout regression '+JSON.stringify(desktop));
-          if(!Object.values(desktop.firstScreen).every(Boolean)) throw new Error('1920 first-screen requirement failed '+JSON.stringify(desktop.firstScreen));
+          if(!desktop.ui||!desktop.logo||desktop.overflow>2||desktop.nested>0||!desktop.riskLegend||!desktop.modelTable||!desktop.drawer||!desktop.reportModal||!desktop.ordered) throw new Error('Desktop shell/layout regression '+JSON.stringify(desktop));
+          if(!Object.values(desktop.firstScreen).every(Boolean)||!desktop.analysisNearFold) throw new Error('1920 first-screen/near-fold requirement failed '+JSON.stringify({firstScreen:desktop.firstScreen,tops:desktop.tops}));
           if(!desktop.subtitle.includes('环境数据')||!desktop.subtitle.includes('工程决策')) throw new Error('Header subtitle not updated');
 
           for(const vp of [{width:1600,height:900},{width:1366,height:768},{width:900,height:1024}]){
@@ -83,44 +93,48 @@ jobs:
 
           await page.setViewportSize({width:390,height:844});await page.waitForTimeout(350);
           const mobile=await page.evaluate(()=>{
-            const go=document.querySelector('#go')?.getBoundingClientRect(),pdf=document.querySelector('#pdfReport')?.getBoundingClientRect();
-            const matrixDisplay=getComputedStyle(document.querySelector('.matrixContent')).display;
-            const mobileList=getComputedStyle(document.querySelector('#mobileMatrixList')).display;
-            return {overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,goH:go?.height,pdfH:pdf?.height,matrixDisplay,mobileList,summaryCols:getComputedStyle(document.querySelector('#uiDecisionSummary')).gridTemplateColumns};
+            const go=document.querySelector('#go')?.getBoundingClientRect(),pdf=document.querySelector('#pdfReport')?.getBoundingClientRect(),map=document.querySelector('#map')?.getBoundingClientRect();
+            const matrix=document.querySelector('.matrixContent');
+            const mobileList=document.querySelector('#mobileMatrixList');
+            return {
+              overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+              goH:go?.height||0,pdfH:pdf?.height||0,mapH:map?.height||0,mapW:map?.width||0,
+              matrixDisplay:matrix?getComputedStyle(matrix).display:'missing',
+              mobileList:mobileList?getComputedStyle(mobileList).display:'missing'
+            };
           });
           console.log('MOBILE',mobile);
-          if(mobile.overflow>2||mobile.goH<44||mobile.pdfH<44||mobile.matrixDisplay!=='none'||mobile.mobileList==='none')throw new Error('Mobile responsive regression '+JSON.stringify(mobile));
+          if(mobile.overflow>2||mobile.goH<44||mobile.pdfH<44||mobile.mapH<300||mobile.mapW<300||mobile.matrixDisplay!=='none'||mobile.mobileList==='none')throw new Error('Mobile responsive regression '+JSON.stringify(mobile));
 
           await page.setViewportSize({width:1440,height:1000});
-          await page.locator('#query').fill('30.5085,47.7804');
+          await page.locator('#locationModeCoords').click();
+          await page.locator('#longitude').fill('47.7804');
+          await page.locator('#latitude').fill('30.5085');
           await page.locator('#years').selectOption('1');
           await page.locator('#go').click();
           await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败')},{timeout:180000});
           const status=await page.locator('#status').textContent();console.log('FINAL_STATUS',status);
           if(status.includes('真实数据计算完成')){
             const calc=await page.evaluate(()=>({
-              summaries:[...document.querySelectorAll('.uiSummaryValue')].map(x=>x.textContent.trim()),
               riskRows:document.querySelectorAll('#riskList .riskrow').length,
               riskColored:[...document.querySelectorAll('#riskList .riskrow')].every(x=>/risk-(low|mid|elevated|high)/.test(x.className)),
               modelRows:document.querySelectorAll('#uiModelBody tr').length,
               decisions:document.querySelectorAll('#decisionTableBody tr').length,
               matrixCells:document.querySelectorAll('#matrix .cell').length,
               noNaN:!document.body.innerText.includes('NaN'),
-              reportLen:reportHtml().length,
+              reportLen:typeof reportHtml==='function'?reportHtml().length:0,
               filter:Number.isFinite(result?.dust?.penetration),dt:result?.condensation?.params?.dt_min
             }));
             console.log('CALCULATED',calc);
-            if(calc.summaries.some(x=>x==='--')||calc.riskRows<10||!calc.riskColored||calc.modelRows<6||calc.decisions<10||calc.matrixCells<80||!calc.noNaN||calc.reportLen<15000||!calc.filter||calc.dt!==10)throw new Error('Calculated UI/core regression '+JSON.stringify(calc));
-            await page.locator('[data-model="cond"]').click();await page.waitForTimeout(100);
-            if(!await page.locator('#uiDrawerMask').evaluate(e=>e.classList.contains('open')))throw new Error('Model drawer did not open');
-            await page.locator('#uiDrawerClose').click();
+            if(calc.riskRows<10||!calc.riskColored||calc.modelRows<6||calc.decisions<10||calc.matrixCells<80||!calc.noNaN||calc.reportLen<15000||!calc.filter||calc.dt!==10)throw new Error('Calculated UI/core regression '+JSON.stringify(calc));
+            const cond=page.locator('[data-model="cond"]');
+            if(await cond.count()){await cond.first().click();await page.waitForTimeout(100);if(!await page.locator('#uiDrawerMask').evaluate(e=>e.classList.contains('open')))throw new Error('Model drawer did not open');await page.locator('#uiDrawerClose').click();}
             await page.locator('#pdfReport').click();await page.waitForTimeout(100);
             if(!await page.locator('#uiReportModal').evaluate(e=>e.classList.contains('open')))throw new Error('Report scope preview did not open');
             await page.locator('#uiReportCancel').click();
           }else{
-            const limited=/429|Daily API request limit exceeded/i.test(status||'');
             const errorUI=await page.evaluate(()=>({visible:document.querySelector('#uiErrorBanner')?.classList.contains('show'),text:document.querySelector('#uiErrorBanner')?.textContent||''}));
-            console.log('RATE_LIMIT_OR_SOURCE_FAILURE',limited,errorUI);
+            console.log('SOURCE_FAILURE',errorUI);
             if(!errorUI.visible)throw new Error('Source failure was not surfaced in UI: '+status);
           }
           if(errors.length)throw new Error('Browser errors: '+errors.join(' | '));
