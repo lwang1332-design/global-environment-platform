@@ -151,8 +151,8 @@
  .cockpit-v29 .cockpitDecision{grid-template-columns:1fr!important}
 }
 @media(max-width:760px){
- .cockpit-v29 .mapCard{height:330px!important;min-height:330px!important}
- .cockpit-v29 .mapCard .mapWrap,.cockpit-v29 .mapCard #map,.cockpit-v29 .mapCard .osmCompatMap{height:288px!important;min-height:288px!important}
+ .cockpit-v29 .mapCard{height:360px!important;min-height:360px!important}
+ .cockpit-v29 .mapCard .mapWrap,.cockpit-v29 .mapCard #map,.cockpit-v29 .mapCard .osmCompatMap{height:318px!important;min-height:318px!important}
  .cockpit-v29 .heroDecisionJudgements{grid-template-columns:1fr!important}
  .cockpit-v29 .heroDecisionJudgements>div{border-right:0!important;border-bottom:1px solid #EEF2F5}
  .cockpit-v29 .heroDecisionJudgements>div:last-child{border-bottom:0}
