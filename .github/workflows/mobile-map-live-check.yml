@@ -12,13 +12,13 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
       - name: Install Playwright
         run: |
           npm init -y >/dev/null 2>&1
           npm i -D playwright@1.55.0 >/dev/null
           npx playwright install chromium >/dev/null
-      - name: Check online, offline fallback and mobile section sequence
+      - name: Check online, offline fallback and mobile cockpit sequence
         run: |
           cat > mobile-map.mjs <<'JS'
           import { chromium } from 'playwright';
@@ -31,49 +31,55 @@ jobs:
             userAgent:'Mozilla/5.0 (Linux; Android 14; Mobile) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Mobile Safari/537.36 Lark/7.50.0 Feishu'
           });
           const page=await context.newPage();
-          await page.route('**/archive-api.open-meteo.com/**',r=>r.abort());
-          await page.route('**/air-quality-api.open-meteo.com/**',r=>r.abort());
-          const base='https://lwang1332-design.github.io/global-environment-platform/?mobile-v28='+Date.now();
-          let onlineOK=false,last=null;
-          for(let i=0;i<12;i++){
-            await page.goto(base+'&try='+i,{waitUntil:'domcontentloaded',timeout:60000});
-            await page.waitForTimeout(3500);
-            last=await page.evaluate(()=>{
-              const card=document.querySelector('.mapCard');
-              const wrap=document.querySelector('.mapWrap');
-              const map=document.querySelector('#map');
-              const compat=document.querySelector('.osmCompatMap');
-              const overlay=document.querySelector('.mapOverlay');
-              const tiles=[...document.querySelectorAll('.osmTile')];
-              const logo=document.querySelector('.logo img');
-              const headings=[...document.querySelectorAll('#mainPage .dashboard>.card>.head>h2')].map(x=>x.textContent.trim());
-              return {
-                ua:navigator.userAgent,
-                cardH:card?.getBoundingClientRect().height||0,
-                wrapH:wrap?.getBoundingClientRect().height||0,
-                mapH:map?.getBoundingClientRect().height||0,
-                mapW:map?.getBoundingClientRect().width||0,
-                mapVisible:!!compat && getComputedStyle(compat).display!=='none',
-                iframe:!!document.querySelector('#osmFrame'),
-                tiles:tiles.length,
-                loadedTiles:tiles.filter(x=>x.complete&&x.naturalWidth>0).length,
-                marker:!!document.querySelector('.osmMarker'),
-                overlay:overlay?.innerText||'',
-                overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none',
-                logo:!!logo,
-                headings
-              };
-            });
-            console.log('FEISHU_MOBILE_ONLINE',last);
-            const named=(last.overlay.includes('Basra')||last.overlay.includes('巴士拉'));
-            const expected=['01 项目定位','02 项目综合信息','03 环境数据','04 环境风险画像','05 物理模型实时计算结果','06 环境 × 设备风险矩阵','07 工程决策建议'];
-            const orderOK=JSON.stringify(last.headings)===JSON.stringify(expected);
-            if(last.ua.includes('Feishu')&&last.mapVisible&&!last.iframe&&last.cardH>=340&&last.wrapH>=300&&last.mapH>=300&&last.mapW>=300&&last.tiles>=4&&last.loadedTiles>=4&&last.marker&&last.overlayVisible&&named&&last.logo&&orderOK){onlineOK=true;break;}
-            await page.waitForTimeout(6000);
-          }
-          if(!onlineOK){await browser.close();throw new Error('Feishu mobile online/order check failed: '+JSON.stringify(last));}
+          const base='https://lwang1332-design.github.io/global-environment-platform/?mobile-cockpit='+Date.now();
+          await page.goto(base,{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForSelector('#cockpitLayout',{state:'attached',timeout:60000});
+          await page.waitForFunction(()=>typeof window.renderOsmMap==='function',{timeout:60000});
+          await page.evaluate(()=>window.renderOsmMap(30.5085,47.7804,'Basra, Iraq',3));
+          await page.waitForTimeout(1200);
 
-          // Simulate losing connectivity after the app shell is loaded. renderOsmMap must switch to the embedded global base map.
+          const online=await page.evaluate(()=>{
+            const card=document.querySelector('.mapCard');
+            const wrap=document.querySelector('.mapWrap');
+            const map=document.querySelector('#map');
+            const compat=document.querySelector('.osmCompatMap');
+            const overlay=document.querySelector('.mapOverlay');
+            const tiles=[...document.querySelectorAll('.osmTile')];
+            const logo=document.querySelector('.logo img');
+            const structure={
+              heroMap:!!document.querySelector('#cockpitHero .mapCard'),
+              heroSummary:!!document.querySelector('#cockpitHero .summaryCard'),
+              env:!!document.querySelector('#cockpitEnvSection .envCard'),
+              risk:!!document.querySelector('#cockpitAnalysis .riskCard'),
+              physics:!!document.querySelector('#cockpitPhysicsSection .physicsCard'),
+              matrix:!!document.querySelector('#cockpitMatrixSection .matrixCard'),
+              decision:!!document.querySelector('#cockpitDecision .decisionCard')
+            };
+            return {
+              ua:navigator.userAgent,
+              cardH:card?.getBoundingClientRect().height||0,
+              wrapH:wrap?.getBoundingClientRect().height||0,
+              mapH:map?.getBoundingClientRect().height||0,
+              mapW:map?.getBoundingClientRect().width||0,
+              mapVisible:!!compat && getComputedStyle(compat).display!=='none',
+              iframe:!!document.querySelector('#osmFrame'),
+              tiles:tiles.length,
+              loadedTiles:tiles.filter(x=>x.complete&&x.naturalWidth>0).length,
+              marker:!!document.querySelector('.osmMarker'),
+              overlay:overlay?.innerText||'',
+              overlayVisible:!!overlay && getComputedStyle(overlay).display!=='none',
+              logo:!!logo&&logo.complete&&logo.naturalWidth>0,
+              structure,
+              overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth
+            };
+          });
+          console.log('FEISHU_MOBILE_ONLINE',online);
+          const structureOK=Object.values(online.structure).every(Boolean);
+          const named=online.overlay.includes('Basra')||online.overlay.includes('巴士拉');
+          if(!online.ua.includes('Feishu')||!online.mapVisible||online.iframe||online.cardH<340||online.wrapH<300||online.mapH<300||online.mapW<300||online.tiles<4||online.loadedTiles<4||!online.marker||!online.overlayVisible||!named||!online.logo||!structureOK||online.overflow>2){
+            await browser.close();throw new Error('Feishu mobile online/cockpit check failed: '+JSON.stringify(online));
+          }
+
           await context.setOffline(true);
           await page.evaluate(()=>window.renderOsmMap(30.5085,47.7804,'Basra, Iraq',3));
           await page.waitForTimeout(600);
@@ -84,11 +90,12 @@ jobs:
             tiles:document.querySelectorAll('.osmTile').length,
             badge:document.querySelector('#mapSourceBadge')?.textContent||'',
             mapH:document.querySelector('#map')?.getBoundingClientRect().height||0,
-            mapW:document.querySelector('#map')?.getBoundingClientRect().width||0
+            mapW:document.querySelector('#map')?.getBoundingClientRect().width||0,
+            overlay:document.querySelector('.mapOverlay')?.innerText||''
           }));
           console.log('FEISHU_MOBILE_OFFLINE',offline);
           await browser.close();
-          if(offline.online!==false||!offline.embedded||!offline.svg||offline.tiles!==0||!offline.badge.includes('内置全球离线底图')||offline.mapH<300||offline.mapW<300){
+          if(offline.online!==false||!offline.embedded||!offline.svg||offline.tiles!==0||!offline.badge.includes('内置全球离线底图')||offline.mapH<300||offline.mapW<300||!offline.overlay.includes('Basra')){
             throw new Error('Embedded offline world map check failed: '+JSON.stringify(offline));
           }
           JS
