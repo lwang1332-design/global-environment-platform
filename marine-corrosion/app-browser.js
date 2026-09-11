@@ -27,29 +27,56 @@ function expectedHours(){if($('#mode').value!=='historical')return null;return y
 function updateLoadMeta(done=0,total=expectedHours()){const h=$('#loadingHours');h.dataset.done=String(done||0);h.dataset.total=total?String(total):'';h.textContent=total?`${Number(done||0).toLocaleString()} / ${Number(total).toLocaleString()} h`:(done?`${Number(done).toLocaleString()} h`:'Current窗口');$('#loadingElapsed').textContent=`${Math.max(0,Math.round((Date.now()-state.runStartedAt)/1000))} s`}
 function startElapsedTicker(){return setInterval(()=>{if($('#loading').classList.contains('hidden'))return;updateLoadMeta(Number($('#loadingHours').dataset.done||0),Number($('#loadingHours').dataset.total||0)||null)},1000)}
 function riskClass(level){return /HIGH|C5|CX|S3|Very High/.test(String(level))?'risk-high':/MED|C4|S2|S1|High/.test(String(level))?'risk-med':'risk-low'}
-function setPage(page){$$('.page').forEach(x=>x.classList.remove('active'));const t=$(`#page-${page}`)||$('#page-overview');t.classList.add('active');$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));history.replaceState({},'',page==='overview'?location.pathname:location.pathname+'?page='+page);if(page==='validation'&&!state.benchmarkRows.length)loadBenchmark();setTimeout(resizeCharts,50)}
+function setPage(page){$$('.page').forEach(x=>x.classList.remove('active'));const t=$(`#page-${page}`)||$('#page-overview');t.classList.add('active');$$('[data-page]').forEach(b=>b.classList.toggle('active',b.dataset.page===page));history.replaceState({},'',page==='overview'?location.pathname:location.pathname+'?page='+page);if(page==='validation'&&!state.benchmarkRows.length)loadBenchmark();setTimeout(()=>{resizeCharts();if(t.id==='page-overview')state.map?.invalidateSize()},50)}
 function resizeCharts(){Object.values(state.charts).forEach(c=>c?.resize())}
 function doseResponse(material,pd,sd,rh,t){pd=Math.max(pd||0,.001);sd=Math.max(sd||0,.001);if(material==='zinc'){const f=t<=10?.038*(t-10):-.071*(t-10);return .0129*pd**.44*Math.exp(.046*rh+f)+.0175*sd**.57*Math.exp(.008*rh+.085*t)}if(material==='copper'){const f=t<=10?.126*(t-10):-.080*(t-10);return .0053*pd**.26*Math.exp(.059*rh+f)+.01025*sd**.27*Math.exp(.036*rh+.049*t)}if(material==='aluminium'){const f=t<=10?.009*(t-10):-.043*(t-10);return .0042*pd**.73*Math.exp(.025*rh+f)+.0018*sd**.60*Math.exp(.020*rh+.094*t)}const f=t<=10?.150*(t-10):-.054*(t-10);return 1.77*pd**.52*Math.exp(.020*rh+f)+.102*sd**.62*Math.exp(.033*rh+.040*t)}
 function corrosionClass(material,r){if(!Number.isFinite(r))return'N/A';if(material==='zinc'){if(r<=.1)return'C1';if(r<=.7)return'C2';if(r<=2.1)return'C3';if(r<=4.2)return'C4';if(r<=8.4)return'C5';return'CX'}if(material==='copper'){if(r<=.1)return'C1';if(r<=.6)return'C2';if(r<=1.3)return'C3';if(r<=2.8)return'C4';if(r<=5.6)return'C5';return'CX'}if(material==='aluminium'){if(r<=.6)return'C2';if(r<=2)return'C3';if(r<=5)return'C4';if(r<=10)return'C5';return'CX'}if(r<=1.3)return'C1';if(r<=25)return'C2';if(r<=50)return'C3';if(r<=80)return'C4';if(r<=200)return'C5';return'CX'}
 function initYear(){const y=new Date().getUTCFullYear()-1;for(let i=0;i<12;i++){const o=document.createElement('option');o.value=y-i;o.textContent=`${y-i}`;$('#year').append(o)}}
-function locationChanged(lat,lon,zoom=state.map.getZoom()){
+function wrapLongitude(lon){return ((lon+180)%360+360)%360-180}
+function mapCoordinateText(lat,lon){return `纬度 ${lat.toFixed(4)}° / 经度 ${wrapLongitude(lon).toFixed(4)}°`}
+function updateMapCoordinates(){
+  const selected=state.marker.getLatLng(),center=state.map.getCenter();
+  $('#mapSelectedCoords').textContent=mapCoordinateText(selected.lat,selected.lng);
+  $('#mapCenterCoords').textContent=mapCoordinateText(center.lat,center.lng);
+}
+function locationChanged(lat,lon,zoom=state.map.getZoom(),recenter=true){
   if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return;
   $('#latitude').value=lat.toFixed(4);$('#longitude').value=lon.toFixed(4);
   const coords=[Number($('#latitude').value),Number($('#longitude').value)];
-  state.marker.setLatLng(coords);state.map.invalidateSize();state.map.setView(coords,zoom);
+  state.marker.setLatLng(coords);state.map.invalidateSize();if(recenter)state.map.setView(coords,zoom);
+  updateMapCoordinates();$('#mapPickStatus').textContent='选点已更新，经纬度已同步。确认位置后点击计算。';
   if(state.result){const p=state.result.project;if(Math.abs(p.latitude-coords[0])>.00005||Math.abs(p.longitude-coords[1])>.00005){$('#globalNotice').className='notice info';$('#globalNotice').textContent='项目位置已更新。下方结果仍属于上次计算的位置，请点击“计算”刷新环境评估。'}}
 }
 function initMap(){
   state.map=L.map('map',{zoomControl:true}).setView([18.2528,109.5119],8);
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(state.map);
-  state.marker=L.marker([18.2528,109.5119]).addTo(state.map);
+  state.marker=L.marker([18.2528,109.5119],{draggable:true,autoPan:true,title:'已选点，拖动可调整位置',alt:'已选点标记'}).addTo(state.map);
   const placeSearch=initPlaceSearch({onSelect:place=>{locationChanged(place.latitude,place.longitude,10);toast('已填写经纬度并更新地图，请确认位置后点击计算')}});
-  state.map.on('click',e=>{const{lat,lng}=e.latlng;placeSearch.coordinatesChanged();locationChanged(lat,((lng+180)%360+360)%360-180);toast('已更新经纬度；距海/海向将在计算时更新')});
+  function selectMapPoint(point){
+    placeSearch.coordinatesChanged();locationChanged(point.lat,wrapLongitude(point.lng),state.map.getZoom(),false);
+    toast('已选取地图位置，经纬度已同步');
+  }
+  state.map.on('click',e=>selectMapPoint(e.latlng));
+  state.marker.on('dragend',()=>selectMapPoint(state.marker.getLatLng()));
+  state.map.on('moveend',updateMapCoordinates);
+  $('#mapUseCenter').addEventListener('click',()=>selectMapPoint(state.map.getCenter()));
+  $('#mapReturnSelected').addEventListener('click',()=>{state.map.setView(state.marker.getLatLng(),state.map.getZoom());updateMapCoordinates()});
+  $('#mapPickBtn').addEventListener('click',()=>{
+    setPage('overview');
+    requestAnimationFrame(()=>{
+      state.map.invalidateSize();updateMapCoordinates();
+      $('#mapPickerPanel').scrollIntoView({block:'start'});$('#map').focus({preventScroll:true});
+    });
+  });
+  $('#map').addEventListener('keydown',e=>{
+    if(e.target===$('#map')&&e.key==='Enter'&&!e.isComposing){e.preventDefault();selectMapPoint(state.map.getCenter())}
+  });
   for(const id of ['latitude','longitude'])$('#'+id).addEventListener('change',()=>{
     placeSearch.coordinatesChanged();
     const lat=$('#latitude').value.trim(),lon=$('#longitude').value.trim();
     if(lat&&lon)locationChanged(Number(lat),Number(lon));
   });
+  updateMapCoordinates();
 }
 function modeChanged(){const hist=$('#mode').value==='historical';$('#periodCell').classList.toggle('disabled',!hist);$('#yearCell').classList.toggle('disabled',!hist);$('#period').disabled=!hist;$('#year').disabled=!hist;$('#runBtn').textContent=hist?'自动获取真实数据并计算':'获取Current数据并评估'}
 async function health(){const c=new AbortController(),timer=setTimeout(()=>c.abort(),4000);try{const r=await fetch('https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct',{signal:c.signal,cache:'no-store'});const d=await r.json();state.health={dataSources:{engineeringDataGateway:d.ok?'configured':'failed',era5Direct:d.era5?'configured':'not_configured',cams:d.cams?'configured':'not_configured',cmems:d.cmems?'configured':'not_configured',gisGshhg:d.gshhg?'configured':'fallback',openMeteoArchive:'fallback_available'}};$('#sourceDot').className='dot '+(d.era5&&d.cams&&d.cmems?'ok':'warn');$('#sourceText').textContent=d.era5&&d.cams&&d.cmems?'ERA5/CAMS/CMEMS Direct 已连接':'Direct网关待凭据 / Fallback可用';renderSources()}catch(e){state.health={dataSources:{engineeringDataGateway:'failed',era5Direct:'not_configured',cams:'not_configured',cmems:'not_configured',gisGshhg:'fallback',openMeteoArchive:'fallback_available'}};$('#sourceDot').className='dot warn';$('#sourceText').textContent=e.name==='AbortError'?'状态检查超时（首页可继续）':'Direct暂不可达 / Fallback可用';renderSources()}finally{clearTimeout(timer)}}

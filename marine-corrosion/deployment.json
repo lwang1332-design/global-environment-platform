@@ -1,6 +1,6 @@
 {
   "name": "全球海洋大气腐蚀环境评估平台",
-  "version": "3.2.6",
+  "version": "3.2.7",
   "frontendEntry": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "frontendRuntime": "GitHub Pages native static app",
   "frontendTarget": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
@@ -26,6 +26,13 @@
     "trigger": "Search button or Enter; select a candidate to update coordinates and map",
     "resultLimit": 10,
     "timeoutSeconds": 8,
+    "automaticEnvironmentCalculation": false
+  },
+  "mapPicking": {
+    "entry": "Map picker button next to place-name search",
+    "methods": ["map click", "marker drag", "map centre selection", "keyboard Enter"],
+    "coordinateSystem": "WGS84",
+    "panOnlyChangesViewport": true,
     "automaticEnvironmentCalculation": false
   },
   "startupPolicy": {
