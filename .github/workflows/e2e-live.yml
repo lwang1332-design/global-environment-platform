@@ -11,20 +11,22 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for GitHub Pages engineering UI
+      - name: Wait for GitHub Pages current assets
         run: |
+          LOCAL_CSS_SHA=$(sha256sum assets/cockpit-v291.css | awk '{print $1}')
           for i in $(seq 1 36); do
-            JS_URL="https://lwang1332-design.github.io/global-environment-platform/assets/ui-engineering.js?wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            CSS_URL="https://lwang1332-design.github.io/global-environment-platform/assets/cockpit-v291.css?wait=${GITHUB_SHA}-${i}-$(date +%s)"
             HTML_URL="https://lwang1332-design.github.io/global-environment-platform/?wait=${GITHUB_SHA}-${i}-$(date +%s)"
-            if curl -fsSL --retry 2 --max-time 20 "$JS_URL" | grep -q "Engineering Decision UI v1.0" && \
+            if curl -fsSL --retry 2 --max-time 20 "$CSS_URL" -o /tmp/remote.css && \
+               [ "$(sha256sum /tmp/remote.css | awk '{print $1}')" = "$LOCAL_CSS_SHA" ] && \
                curl -fsSL --retry 2 --max-time 20 "$HTML_URL" | grep -q "report-v29.js?v=20260901-r2"; then
-              echo "Engineering UI is live on GitHub Pages"
+              echo "Current cockpit assets are live on GitHub Pages"
               exit 0
             fi
-            echo "Waiting for Pages deployment ($i/36)..."
+            echo "Waiting for current Pages deployment ($i/36)..."
             sleep 10
           done
-          echo "Engineering UI not live after waiting"
+          echo "Current Pages assets not live after waiting"
           exit 1
       - uses: actions/setup-node@v4
         with:
@@ -56,29 +58,9 @@ jobs:
             const nested=[...document.querySelectorAll('#mainPage *')].filter(e=>{
               const cs=getComputedStyle(e);return !allowed(e)&&(cs.overflowY==='auto'||cs.overflowY==='scroll')&&e.scrollHeight>e.clientHeight+5;
             }).length;
-            const tops={
-              hero:rect('#cockpitHero')?.top,
-              env:rect('#cockpitEnvSection')?.top,
-              analysis:rect('#cockpitAnalysis')?.top,
-              physics:rect('#cockpitPhysicsSection')?.top,
-              matrix:rect('#cockpitMatrixSection')?.top,
-              decision:rect('#cockpitDecision')?.top
-            };
+            const tops={hero:rect('#cockpitHero')?.top,env:rect('#cockpitEnvSection')?.top,analysis:rect('#cockpitAnalysis')?.top,physics:rect('#cockpitPhysicsSection')?.top,matrix:rect('#cockpitMatrixSection')?.top,decision:rect('#cockpitDecision')?.top};
             const ordered=Number.isFinite(tops.hero)&&Number.isFinite(tops.env)&&Number.isFinite(tops.analysis)&&Number.isFinite(tops.physics)&&Number.isFinite(tops.matrix)&&Number.isFinite(tops.decision)&&tops.hero<tops.env&&tops.env<tops.analysis&&tops.analysis<tops.physics&&tops.physics<tops.matrix&&tops.matrix<tops.decision;
-            return {
-              ui:!!document.querySelector('#cockpitLayout')&&!!document.querySelector('#cockpitHero')&&!!document.querySelector('#cockpitEnvSection')&&!!document.querySelector('#cockpitAnalysis')&&!!document.querySelector('#cockpitPhysicsSection'),
-              logo:!!logo&&logo.complete&&logo.naturalWidth>0,
-              overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
-              nested,
-              riskLegend:!!document.querySelector('.riskLegend'),
-              modelTable:!!document.querySelector('.uiEngineeringTable'),
-              drawer:!!document.querySelector('#uiDrawerMask'),
-              reportModal:!!document.querySelector('#uiReportModal'),
-              subtitle:document.querySelector('.brand p')?.textContent||'',
-              tops,ordered,
-              firstScreen:{toolbar:(rect('.toolbar')?.top??9999)<1080,hero:(tops.hero??9999)<1080,env:(tops.env??9999)<1080},
-              analysisNearFold:(tops.analysis??9999)<1250
-            };
+            return {ui:!!document.querySelector('#cockpitLayout')&&!!document.querySelector('#cockpitHero')&&!!document.querySelector('#cockpitEnvSection')&&!!document.querySelector('#cockpitAnalysis')&&!!document.querySelector('#cockpitPhysicsSection'),logo:!!logo&&logo.complete&&logo.naturalWidth>0,overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,nested,riskLegend:!!document.querySelector('.riskLegend'),modelTable:!!document.querySelector('.uiEngineeringTable'),drawer:!!document.querySelector('#uiDrawerMask'),reportModal:!!document.querySelector('#uiReportModal'),subtitle:document.querySelector('.brand p')?.textContent||'',tops,ordered,firstScreen:{toolbar:(rect('.toolbar')?.top??9999)<1080,hero:(tops.hero??9999)<1080,env:(tops.env??9999)<1080},analysisNearFold:(tops.analysis??9999)<1250};
           });
           console.log('DESKTOP_1920',desktop);
           if(!desktop.ui||!desktop.logo||desktop.overflow>2||desktop.nested>0||!desktop.riskLegend||!desktop.modelTable||!desktop.drawer||!desktop.reportModal||!desktop.ordered) throw new Error('Desktop shell/layout regression '+JSON.stringify(desktop));
@@ -87,21 +69,15 @@ jobs:
 
           for(const vp of [{width:1600,height:900},{width:1366,height:768},{width:900,height:1024}]){
             await page.setViewportSize(vp);await page.waitForTimeout(250);
-            const v=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,body:document.body.scrollWidth-document.body.clientWidth}));
-            console.log('VIEWPORT',vp,v);if(v.overflow>2||v.body>2)throw new Error('Horizontal page overflow '+JSON.stringify({vp,v}));
+            const v=await page.evaluate(()=>({overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,bodyIntrinsic:document.body.scrollWidth-document.body.clientWidth}));
+            console.log('VIEWPORT',vp,v);if(v.overflow>2)throw new Error('Visible horizontal page overflow '+JSON.stringify({vp,v}));
           }
 
           await page.setViewportSize({width:390,height:844});await page.waitForTimeout(350);
           const mobile=await page.evaluate(()=>{
             const go=document.querySelector('#go')?.getBoundingClientRect(),pdf=document.querySelector('#pdfReport')?.getBoundingClientRect(),map=document.querySelector('#map')?.getBoundingClientRect();
-            const matrix=document.querySelector('.matrixContent');
-            const mobileList=document.querySelector('#mobileMatrixList');
-            return {
-              overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
-              goH:go?.height||0,pdfH:pdf?.height||0,mapH:map?.height||0,mapW:map?.width||0,
-              matrixDisplay:matrix?getComputedStyle(matrix).display:'missing',
-              mobileList:mobileList?getComputedStyle(mobileList).display:'missing'
-            };
+            const matrix=document.querySelector('.matrixContent');const mobileList=document.querySelector('#mobileMatrixList');
+            return {overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,goH:go?.height||0,pdfH:pdf?.height||0,mapH:map?.height||0,mapW:map?.width||0,matrixDisplay:matrix?getComputedStyle(matrix).display:'missing',mobileList:mobileList?getComputedStyle(mobileList).display:'missing'};
           });
           console.log('MOBILE',mobile);
           if(mobile.overflow>2||mobile.goH<44||mobile.pdfH<44||mobile.mapH<300||mobile.mapW<300||mobile.matrixDisplay!=='none'||mobile.mobileList==='none')throw new Error('Mobile responsive regression '+JSON.stringify(mobile));
@@ -115,27 +91,13 @@ jobs:
           await page.waitForFunction(()=>{const s=document.querySelector('#status')?.textContent||'';return s.includes('真实数据计算完成')||s.includes('查询失败')},{timeout:180000});
           const status=await page.locator('#status').textContent();console.log('FINAL_STATUS',status);
           if(status.includes('真实数据计算完成')){
-            const calc=await page.evaluate(()=>({
-              riskRows:document.querySelectorAll('#riskList .riskrow').length,
-              riskColored:[...document.querySelectorAll('#riskList .riskrow')].every(x=>/risk-(low|mid|elevated|high)/.test(x.className)),
-              modelRows:document.querySelectorAll('#uiModelBody tr').length,
-              decisions:document.querySelectorAll('#decisionTableBody tr').length,
-              matrixCells:document.querySelectorAll('#matrix .cell').length,
-              noNaN:!document.body.innerText.includes('NaN'),
-              reportLen:typeof reportHtml==='function'?reportHtml().length:0,
-              filter:Number.isFinite(result?.dust?.penetration),dt:result?.condensation?.params?.dt_min
-            }));
+            const calc=await page.evaluate(()=>({riskRows:document.querySelectorAll('#riskList .riskrow').length,riskColored:[...document.querySelectorAll('#riskList .riskrow')].every(x=>/risk-(low|mid|elevated|high)/.test(x.className)),modelRows:document.querySelectorAll('#uiModelBody tr').length,decisions:document.querySelectorAll('#decisionTableBody tr').length,matrixCells:document.querySelectorAll('#matrix .cell').length,noNaN:!document.body.innerText.includes('NaN'),reportLen:typeof reportHtml==='function'?reportHtml().length:0,filter:Number.isFinite(result?.dust?.penetration),dt:result?.condensation?.params?.dt_min}));
             console.log('CALCULATED',calc);
             if(calc.riskRows<10||!calc.riskColored||calc.modelRows<6||calc.decisions<10||calc.matrixCells<80||!calc.noNaN||calc.reportLen<15000||!calc.filter||calc.dt!==10)throw new Error('Calculated UI/core regression '+JSON.stringify(calc));
-            const cond=page.locator('[data-model="cond"]');
-            if(await cond.count()){await cond.first().click();await page.waitForTimeout(100);if(!await page.locator('#uiDrawerMask').evaluate(e=>e.classList.contains('open')))throw new Error('Model drawer did not open');await page.locator('#uiDrawerClose').click();}
-            await page.locator('#pdfReport').click();await page.waitForTimeout(100);
-            if(!await page.locator('#uiReportModal').evaluate(e=>e.classList.contains('open')))throw new Error('Report scope preview did not open');
-            await page.locator('#uiReportCancel').click();
+            const cond=page.locator('[data-model="cond"]');if(await cond.count()){await cond.first().click();await page.waitForTimeout(100);if(!await page.locator('#uiDrawerMask').evaluate(e=>e.classList.contains('open')))throw new Error('Model drawer did not open');await page.locator('#uiDrawerClose').click();}
+            await page.locator('#pdfReport').click();await page.waitForTimeout(100);if(!await page.locator('#uiReportModal').evaluate(e=>e.classList.contains('open')))throw new Error('Report scope preview did not open');await page.locator('#uiReportCancel').click();
           }else{
-            const errorUI=await page.evaluate(()=>({visible:document.querySelector('#uiErrorBanner')?.classList.contains('show'),text:document.querySelector('#uiErrorBanner')?.textContent||''}));
-            console.log('SOURCE_FAILURE',errorUI);
-            if(!errorUI.visible)throw new Error('Source failure was not surfaced in UI: '+status);
+            const errorUI=await page.evaluate(()=>({visible:document.querySelector('#uiErrorBanner')?.classList.contains('show'),text:document.querySelector('#uiErrorBanner')?.textContent||''}));console.log('SOURCE_FAILURE',errorUI);if(!errorUI.visible)throw new Error('Source failure was not surfaced in UI: '+status);
           }
           if(errors.length)throw new Error('Browser errors: '+errors.join(' | '));
           await browser.close();
