@@ -2,6 +2,7 @@ import {computeModel} from 'https://cdn.jsdelivr.net/gh/lwang1332-design/global-
 import {fetchOpenMeteoHistorical,fetchOpenMeteoCurrent,fetchOpenMeteoMarine,fetchDirectGateway,normalizeDirectWeather,normalizeDirectCams,normalizeDirectOcean} from 'https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/browser-sources.js';
 import {resolveGis} from 'https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/gis.js';
 import {localExperienceCalibration,CALIBRATION_META} from 'https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/calibration.js';
+import {initPlaceSearch} from './place-search.js?v=3.2.6';
 const BENCHMARK_POINTS=[
 ['巴西1',-23.8,-46.0,98.7],['巴西2',-22.9,-43.8,73.1],['巴西3',-23.0,-43.2,127.1],['沙特1',26.1,50.0,40.2],['沙特2',27.2,49.3,39.0],['沙特3',28.9,47.9,33.7],['沙特4',16.7,42.1,127.1],['沙特5',21.1,39.2,99.3],['沙特6',24.0,38.1,124.3],['沙特7',29.4,34.9,72.9],['沙特8',21.3,39.2,78.5],['印度1',12.3,79.5,51.3],['印度2',10.7,79.8,28.9],['印度3',12.4,75.0,108.4],['印度4',21.1,73.2,27.3],['印度5',14.5,80.2,111.5],['越南1',10.5,107.2,27.5],['越南2',10.9,106.6,46.4],['越南3',12.2,109.2,41.0],['越南4',16.0,108.2,63.7],['越南5',17.4,106.6,72.4],['越南6',19.7,105.6,39.5],['越南7',20.8,106.1,46.6],['越南8',20.7,106.7,47.3],['泰国1',13.6,100.6,40.1],['泰国2',7.8,98.3,30.9]
 ].map((p,i)=>({id:i+1,name:p[0],latitude:p[1],longitude:p[2],referenceCorrosion:p[3],material:'carbon_steel',height:2}));
@@ -31,7 +32,25 @@ function resizeCharts(){Object.values(state.charts).forEach(c=>c?.resize())}
 function doseResponse(material,pd,sd,rh,t){pd=Math.max(pd||0,.001);sd=Math.max(sd||0,.001);if(material==='zinc'){const f=t<=10?.038*(t-10):-.071*(t-10);return .0129*pd**.44*Math.exp(.046*rh+f)+.0175*sd**.57*Math.exp(.008*rh+.085*t)}if(material==='copper'){const f=t<=10?.126*(t-10):-.080*(t-10);return .0053*pd**.26*Math.exp(.059*rh+f)+.01025*sd**.27*Math.exp(.036*rh+.049*t)}if(material==='aluminium'){const f=t<=10?.009*(t-10):-.043*(t-10);return .0042*pd**.73*Math.exp(.025*rh+f)+.0018*sd**.60*Math.exp(.020*rh+.094*t)}const f=t<=10?.150*(t-10):-.054*(t-10);return 1.77*pd**.52*Math.exp(.020*rh+f)+.102*sd**.62*Math.exp(.033*rh+.040*t)}
 function corrosionClass(material,r){if(!Number.isFinite(r))return'N/A';if(material==='zinc'){if(r<=.1)return'C1';if(r<=.7)return'C2';if(r<=2.1)return'C3';if(r<=4.2)return'C4';if(r<=8.4)return'C5';return'CX'}if(material==='copper'){if(r<=.1)return'C1';if(r<=.6)return'C2';if(r<=1.3)return'C3';if(r<=2.8)return'C4';if(r<=5.6)return'C5';return'CX'}if(material==='aluminium'){if(r<=.6)return'C2';if(r<=2)return'C3';if(r<=5)return'C4';if(r<=10)return'C5';return'CX'}if(r<=1.3)return'C1';if(r<=25)return'C2';if(r<=50)return'C3';if(r<=80)return'C4';if(r<=200)return'C5';return'CX'}
 function initYear(){const y=new Date().getUTCFullYear()-1;for(let i=0;i<12;i++){const o=document.createElement('option');o.value=y-i;o.textContent=`${y-i}`;$('#year').append(o)}}
-function initMap(){state.map=L.map('map',{zoomControl:true}).setView([18.2528,109.5119],8);L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(state.map);state.marker=L.marker([18.2528,109.5119]).addTo(state.map);state.map.on('click',e=>{const{lat,lng}=e.latlng;$('#latitude').value=lat.toFixed(4);$('#longitude').value=lng.toFixed(4);state.marker.setLatLng(e.latlng);toast('已更新经纬度；距海/海向将自动重新计算')})}
+function locationChanged(lat,lon,zoom=state.map.getZoom()){
+  if(!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return;
+  $('#latitude').value=lat.toFixed(4);$('#longitude').value=lon.toFixed(4);
+  const coords=[Number($('#latitude').value),Number($('#longitude').value)];
+  state.marker.setLatLng(coords);state.map.invalidateSize();state.map.setView(coords,zoom);
+  if(state.result){const p=state.result.project;if(Math.abs(p.latitude-coords[0])>.00005||Math.abs(p.longitude-coords[1])>.00005){$('#globalNotice').className='notice info';$('#globalNotice').textContent='项目位置已更新。下方结果仍属于上次计算的位置，请点击“计算”刷新环境评估。'}}
+}
+function initMap(){
+  state.map=L.map('map',{zoomControl:true}).setView([18.2528,109.5119],8);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap'}).addTo(state.map);
+  state.marker=L.marker([18.2528,109.5119]).addTo(state.map);
+  const placeSearch=initPlaceSearch({onSelect:place=>{locationChanged(place.latitude,place.longitude,10);toast('已填写经纬度并更新地图，请确认位置后点击计算')}});
+  state.map.on('click',e=>{const{lat,lng}=e.latlng;placeSearch.coordinatesChanged();locationChanged(lat,((lng+180)%360+360)%360-180);toast('已更新经纬度；距海/海向将在计算时更新')});
+  for(const id of ['latitude','longitude'])$('#'+id).addEventListener('change',()=>{
+    placeSearch.coordinatesChanged();
+    const lat=$('#latitude').value.trim(),lon=$('#longitude').value.trim();
+    if(lat&&lon)locationChanged(Number(lat),Number(lon));
+  });
+}
 function modeChanged(){const hist=$('#mode').value==='historical';$('#periodCell').classList.toggle('disabled',!hist);$('#yearCell').classList.toggle('disabled',!hist);$('#period').disabled=!hist;$('#year').disabled=!hist;$('#runBtn').textContent=hist?'自动获取真实数据并计算':'获取Current数据并评估'}
 async function health(){const c=new AbortController(),timer=setTimeout(()=>c.abort(),4000);try{const r=await fetch('https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct',{signal:c.signal,cache:'no-store'});const d=await r.json();state.health={dataSources:{engineeringDataGateway:d.ok?'configured':'failed',era5Direct:d.era5?'configured':'not_configured',cams:d.cams?'configured':'not_configured',cmems:d.cmems?'configured':'not_configured',gisGshhg:d.gshhg?'configured':'fallback',openMeteoArchive:'fallback_available'}};$('#sourceDot').className='dot '+(d.era5&&d.cams&&d.cmems?'ok':'warn');$('#sourceText').textContent=d.era5&&d.cams&&d.cmems?'ERA5/CAMS/CMEMS Direct 已连接':'Direct网关待凭据 / Fallback可用';renderSources()}catch(e){state.health={dataSources:{engineeringDataGateway:'failed',era5Direct:'not_configured',cams:'not_configured',cmems:'not_configured',gisGshhg:'fallback',openMeteoArchive:'fallback_available'}};$('#sourceDot').className='dot warn';$('#sourceText').textContent=e.name==='AbortError'?'状态检查超时（首页可继续）':'Direct暂不可达 / Fallback可用';renderSources()}finally{clearTimeout(timer)}}
 function tagFor(p){const s=String(p?.type||'EST').toUpperCase();if(s.includes('OVERRIDE'))return'override';if(s.includes('RAW'))return'raw';if(s.includes('CALC'))return'calc';return'est'}
@@ -107,7 +126,7 @@ function aggregate(results){
 }
 async function run(){
   const mode=$('#mode').value,lat=Number($('#latitude').value),lon=Number($('#longitude').value),height=Number($('#height').value);
-  if(!Number.isFinite(lat)||!Number.isFinite(lon))return toast('请输入有效经纬度');if(height<2||height>150)return toast('设备高度必须在2–150 m');
+  if(!$('#latitude').value.trim()||!$('#longitude').value.trim()||!Number.isFinite(lat)||!Number.isFinite(lon)||Math.abs(lat)>90||Math.abs(lon)>180)return toast('请输入有效坐标：纬度 -90～90，经度 -180～180');if(height<2||height>150)return toast('设备高度必须在2–150 m');
   state.runStartedAt=Date.now();const total=expectedHours();showLoading(true,'正在获取工程环境数据','仅在点击计算后请求年度数据；首次无缓存可能较慢。');updateLoadMeta(0,total);const ticker=startElapsedTicker();
   try{
     state.results=[];let done=0;

@@ -3,11 +3,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="description" content="全球海洋大气腐蚀环境评估平台 V3.2.5"/>
-<title>全球海洋大气腐蚀环境评估平台 V3.2.5</title>
+<meta name="description" content="全球海洋大气腐蚀环境评估平台 V3.2.6 · 支持中英文地名搜索"/>
+<title>全球海洋大气腐蚀环境评估平台 V3.2.6</title>
 <link rel="preconnect" href="https://unpkg.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<link rel="stylesheet" href="./styles.css?v=3.2.5"/>
+<link rel="stylesheet" href="./styles.css?v=3.2.6"/>
 <script type="importmap">{"imports":{"https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/gis.js":"./gis-browser-v324.js?v=3.2.5","https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/browser-sources.js":"./browser-sources-v325.js?v=3.2.5"}}</script>
 <style>
 .loader-card-wide{width:min(620px,calc(100vw - 32px));padding:22px 24px}.loader-head{display:flex;gap:14px;align-items:flex-start}.loader-head h3{margin:0 0 4px}.loader-head p{margin:0}.load-meta{display:flex;justify-content:space-between;gap:12px;margin:16px 0 8px;padding:9px 11px;background:#f7fafc;border:1px solid var(--line);font-size:12px;color:var(--muted)}.load-meta b{color:var(--blue);font-size:13px}.load-stages{margin-top:14px;border:1px solid var(--line)}.load-stage{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #edf1f5;background:#fff}.load-stage:last-child{border-bottom:0}.load-num{font-size:10px;font-weight:800;color:#91a0b4}.load-stage strong{display:block;font-size:12px;color:#29425f}.load-stage small{display:block;margin-top:2px;color:#8390a1;font-size:10px}.load-stage em{font-style:normal;font-size:10px;font-weight:800;padding:3px 6px;border:1px solid #d7e0e9;color:#7c8998;background:#f8fafc}.load-stage[data-status="active"]{background:#f1f7fd}.load-stage[data-status="active"] .load-num,.load-stage[data-status="active"] strong{color:var(--blue)}.load-stage[data-status="active"] em{color:#15528d;border-color:#b8d1e8;background:#eff6fc}.load-stage[data-status="done"] em{color:#176c4f;border-color:#a8d9c7;background:#eff9f5}.load-stage[data-status="warn"] em{color:#9a5c0b;border-color:#e6c996;background:#fff7e9}.load-stage[data-status="error"] em{color:#a32323;border-color:#e4b6b6;background:#fff2f2}.load-foot{margin-top:13px}.load-foot>span{font-size:10px;color:#7f8b9a;line-height:1.5}.loading-overlay .progress i#progressBar{animation:none!important;transition:width .35s ease}.home-load-note{font-size:11px;color:#5d6d80;margin-top:6px}.home-load-note b{color:var(--blue)}@media(max-width:640px){.loader-card-wide{padding:18px}.load-meta{flex-direction:column;gap:4px}.load-stage{grid-template-columns:30px 1fr auto}}
@@ -16,7 +16,7 @@
 <body>
 <div id="app">
 <header class="topbar">
-  <div class="brand"><div class="brand-mark">GE</div><div><div class="brand-title">全球海洋大气腐蚀环境评估平台 V3.2.5</div><div class="brand-sub">Real Data · Dynamic Fetch · Multi-Zone · Benchmark</div></div></div>
+  <div class="brand"><div class="brand-mark">GE</div><div><div class="brand-title">全球海洋大气腐蚀环境评估平台 V3.2.6</div><div class="brand-sub">Real Data · Dynamic Fetch · Multi-Zone · Benchmark</div></div></div>
   <div class="top-project"><span class="muted">当前项目</span><strong id="projectNameTop">沿海环境评估项目</strong></div>
   <nav class="topnav"><button data-page="overview" class="active">项目总览</button><button data-page="data">真实数据</button><button data-page="model">物理模型</button><button data-page="validation">模型验证</button><button data-page="design">设计建议</button></nav>
   <div class="top-status"><span id="sourceDot" class="dot warn"></span><span id="sourceText">检查数据源…</span><button id="adminTop" class="ghost">管理员</button></div>
@@ -41,9 +41,15 @@
 </aside>
 <main class="main">
 <section class="project-strip v32">
+  <div class="place-search-field" role="search" aria-label="项目地名搜索">
+    <label for="placeSearch">地名搜索</label>
+    <div class="place-search-controls"><input id="placeSearch" type="search" placeholder="输入城市或区县，如三亚、天津、Singapore" autocomplete="off" maxlength="160" aria-controls="placeResults" aria-describedby="placeSearchStatus"/><button id="placeSearchBtn" type="button" class="primary">搜索地点</button></div>
+    <div class="place-search-meta"><p id="placeSearchStatus" role="status" aria-live="polite">搜索后选择地点，自动填写经纬度；可在地图上微调具体位置。</p><a href="https://open-meteo.com/en/docs/geocoding-api" target="_blank" rel="noopener noreferrer">地名数据：Open-Meteo / GeoNames</a></div>
+    <ul id="placeResults" class="place-results" aria-label="候选地点" hidden></ul>
+  </div>
   <div><span>项目名称</span><input id="projectName" value="沿海环境评估项目"/></div>
-  <div><span>纬度</span><input id="latitude" type="number" step="0.0001" value="18.2528"/></div>
-  <div><span>经度</span><input id="longitude" type="number" step="0.0001" value="109.5119"/></div>
+  <div><label for="latitude">纬度</label><input id="latitude" type="number" min="-90" max="90" step="0.0001" value="18.2528" required/></div>
+  <div><label for="longitude">经度</label><input id="longitude" type="number" min="-180" max="180" step="0.0001" value="109.5119" required/></div>
   <div><span>分析模式</span><select id="mode"><option value="historical">Historical</option><option value="current">Current</option></select></div>
   <div id="periodCell"><span>统计周期</span><select id="period"><option value="1">1年</option><option value="3">3年</option><option value="5">5年</option></select></div>
   <div id="yearCell"><span>截至完整年度</span><select id="year"></select></div>
@@ -53,7 +59,7 @@
   <div><span>设计寿命</span><select id="designLife"><option>20</option><option selected>25</option><option>30</option></select><em>年</em></div>
   <div class="action-cell"><button id="runBtn" class="primary">自动获取真实数据并计算</button></div>
 </section>
-<section id="globalNotice" class="notice info"><strong>V3.2.5加载策略：</strong>首页不预加载年度数据。点击计算后执行 GIS → 气象/海洋 → 统一时间轴 → 物理模型。Direct不可用时，GIS采用Natural Earth 1:50m浏览器Fallback；Historical海浪按所选完整年度请求Open-Meteo ERA5-Ocean，不再把当前7天海浪错配到历史年份；盐度代理明确标记EST。<div class="home-load-note">默认1年：<b>8760 h</b>（闰年8784 h）；Direct请求最多等待约8秒即切换Fallback。</div></section>
+<section id="globalNotice" class="notice info"><strong>V3.2.6加载策略：</strong>首页不预加载年度数据。点击计算后执行 GIS → 气象/海洋 → 统一时间轴 → 物理模型。Direct不可用时，GIS采用Natural Earth 1:50m浏览器Fallback；Historical海浪按所选完整年度请求Open-Meteo ERA5-Ocean，不再把当前7天海浪错配到历史年份；盐度代理明确标记EST。<div class="home-load-note">默认1年：<b>8760 h</b>（闰年8784 h）；Direct请求最多等待约8秒即切换Fallback。</div></section>
 
 <div id="page-overview" class="page active">
   <div class="grid hero-grid">
@@ -102,5 +108,5 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
 <script src="./loading-v323.js?v=3.2.5"></script>
-<script type="module" src="./app-browser.js?v=3.2.5"></script>
+<script type="module" src="./app-browser.js?v=3.2.6"></script>
 </body></html>

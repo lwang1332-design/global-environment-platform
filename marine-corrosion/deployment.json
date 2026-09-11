@@ -1,6 +1,6 @@
 {
   "name": "全球海洋大气腐蚀环境评估平台",
-  "version": "3.2.5",
+  "version": "3.2.6",
   "frontendEntry": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "frontendRuntime": "GitHub Pages native static app",
   "frontendTarget": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
@@ -20,6 +20,14 @@
     "globalBenchmarkPoints": 26
   },
   "notes": "V3.2.5 restores browser-side calculation when Direct is unavailable. Direct endpoint currently returns Vercel DEPLOYMENT_NOT_FOUND, so the UI must not label fallback data as Direct RAW. Historical marine fallback follows the selected complete year; salinity 35 PSU remains explicit EST.",
+  "placeSearch": {
+    "provider": "Open-Meteo Geocoding / GeoNames",
+    "coordinateSystem": "WGS84",
+    "trigger": "Search button or Enter; select a candidate to update coordinates and map",
+    "resultLimit": 10,
+    "timeoutSeconds": 8,
+    "automaticEnvironmentCalculation": false
+  },
   "startupPolicy": {
     "annualDataOnInitialLoad": false,
     "healthCheckTimeoutSeconds": 4,
