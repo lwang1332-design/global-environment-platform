@@ -1,0 +1,24 @@
+{
+  "description": "空模板，不是实测数据。正式同期校准须核实以下元数据；坐标和结果可先做空间参考比对。日期使用UTC，endDate为不包含的终点。至少4个独立站点区域。",
+  "records": [
+    {
+      "sourceId": null,
+      "dataset": "field_measurement",
+      "metadataVerified": false,
+      "latitude": null,
+      "longitude": null,
+      "height": null,
+      "material": "carbon_steel",
+      "exposureZone": "atmospheric",
+      "unit": "μm/a",
+      "measurementMethod": null,
+      "startDate": null,
+      "endDate": null,
+      "predictionStartDate": null,
+      "predictionEndDate": null,
+      "observed": null,
+      "rawPrediction": null,
+      "modelVersion": "3.2.8"
+    }
+  ]
+}

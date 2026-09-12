@@ -3,12 +3,11 @@
 <head>
 <meta charset="utf-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
-<meta name="description" content="全球海洋大气腐蚀环境评估平台 V3.2.7 · 地名搜索与地图选点"/>
-<title>全球海洋大气腐蚀环境评估平台 V3.2.7</title>
+<meta name="description" content="全球海洋大气腐蚀环境评估平台 V3.2.8 · 数据质量、完整时序统计与地图选点"/>
+<title>全球海洋大气腐蚀环境评估平台 V3.2.8</title>
 <link rel="preconnect" href="https://unpkg.com">
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
-<link rel="stylesheet" href="./styles.css?v=3.2.7"/>
-<script type="importmap">{"imports":{"https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/gis.js":"./gis-browser-v324.js?v=3.2.5","https://cdn.jsdelivr.net/gh/lwang1332-design/global-environment-platform@marine-corrosion-v3.2.1-direct/marine-corrosion-v3.2.1/frontend/browser-sources.js":"./browser-sources-v325.js?v=3.2.5"}}</script>
+<link rel="stylesheet" href="./styles.css?v=3.2.8"/>
 <style>
 .loader-card-wide{width:min(620px,calc(100vw - 32px));padding:22px 24px}.loader-head{display:flex;gap:14px;align-items:flex-start}.loader-head h3{margin:0 0 4px}.loader-head p{margin:0}.load-meta{display:flex;justify-content:space-between;gap:12px;margin:16px 0 8px;padding:9px 11px;background:#f7fafc;border:1px solid var(--line);font-size:12px;color:var(--muted)}.load-meta b{color:var(--blue);font-size:13px}.load-stages{margin-top:14px;border:1px solid var(--line)}.load-stage{display:grid;grid-template-columns:36px 1fr auto;gap:10px;align-items:center;padding:10px 12px;border-bottom:1px solid #edf1f5;background:#fff}.load-stage:last-child{border-bottom:0}.load-num{font-size:10px;font-weight:800;color:#91a0b4}.load-stage strong{display:block;font-size:12px;color:#29425f}.load-stage small{display:block;margin-top:2px;color:#8390a1;font-size:10px}.load-stage em{font-style:normal;font-size:10px;font-weight:800;padding:3px 6px;border:1px solid #d7e0e9;color:#7c8998;background:#f8fafc}.load-stage[data-status="active"]{background:#f1f7fd}.load-stage[data-status="active"] .load-num,.load-stage[data-status="active"] strong{color:var(--blue)}.load-stage[data-status="active"] em{color:#15528d;border-color:#b8d1e8;background:#eff6fc}.load-stage[data-status="done"] em{color:#176c4f;border-color:#a8d9c7;background:#eff9f5}.load-stage[data-status="warn"] em{color:#9a5c0b;border-color:#e6c996;background:#fff7e9}.load-stage[data-status="error"] em{color:#a32323;border-color:#e4b6b6;background:#fff2f2}.load-foot{margin-top:13px}.load-foot>span{font-size:10px;color:#7f8b9a;line-height:1.5}.loading-overlay .progress i#progressBar{animation:none!important;transition:width .35s ease}.home-load-note{font-size:11px;color:#5d6d80;margin-top:6px}.home-load-note b{color:var(--blue)}@media(max-width:640px){.loader-card-wide{padding:18px}.load-meta{flex-direction:column;gap:4px}.load-stage{grid-template-columns:30px 1fr auto}}
 </style>
@@ -16,11 +15,12 @@
 <body>
 <div id="app">
 <header class="topbar">
-  <div class="brand"><div class="brand-mark">GE</div><div><div class="brand-title">全球海洋大气腐蚀环境评估平台 V3.2.7</div><div class="brand-sub">Real Data · Dynamic Fetch · Multi-Zone · Benchmark</div></div></div>
-  <div class="top-project"><span class="muted">当前项目</span><strong id="projectNameTop">沿海环境评估项目</strong></div>
+  <div class="brand"><div class="brand-mark">GE</div><div><div class="brand-title">全球海洋大气腐蚀环境评估平台 V3.2.8</div><div class="brand-sub">Real Data · Dynamic Fetch · Multi-Zone · Benchmark</div></div></div>
+  <button id="mobileMenuBtn" class="secondary mobile-menu-trigger" type="button" aria-expanded="false" aria-controls="mobileMenu">页面</button><div class="top-project"><span class="muted">当前项目</span><strong id="projectNameTop">沿海环境评估项目</strong></div>
   <nav class="topnav"><button data-page="overview" class="active">项目总览</button><button data-page="data">真实数据</button><button data-page="model">物理模型</button><button data-page="validation">模型验证</button><button data-page="design">设计建议</button></nav>
   <div class="top-status"><span id="sourceDot" class="dot warn"></span><span id="sourceText">检查数据源…</span><button id="adminTop" class="ghost">管理员</button></div>
 </header>
+<nav id="mobileMenu" class="mobile-menu hidden" aria-label="手机页面导航"><button type="button" data-page="overview">项目总览</button><button type="button" data-page="data">真实数据</button><button type="button" data-page="model">物理模型</button><button type="button" data-page="validation">模型验证</button><button type="button" data-page="design">设计建议</button><button type="button" data-page="report">报告与导出</button><button type="button" data-page="admin">管理员</button><button type="button" data-page="geo">地理分析</button><button type="button" data-page="ocean">海洋数据</button><button type="button" data-page="salt">海盐与沉降</button><button type="button" data-page="wet">湿润与凝露</button><button type="button" data-page="risk">腐蚀判定</button><button type="button" data-page="zones">暴露区带</button><button type="button" data-page="sources">来源与状态</button></nav>
 <div class="shell">
 <aside class="sidebar">
   <button class="nav-item active" data-page="overview"><span>01</span> 项目概览</button>
@@ -54,12 +54,16 @@
   <div id="periodCell"><span>统计周期</span><select id="period"><option value="1">1年</option><option value="3">3年</option><option value="5">5年</option></select></div>
   <div id="yearCell"><span>截至完整年度</span><select id="year"></select></div>
   <div><span>设备高度</span><input id="height" type="number" min="2" max="150" value="10"/><em>m</em></div>
-  <div><span>暴露区带</span><select id="exposureZone"><option value="atmospheric">Atmospheric</option><option value="splash">Splash</option><option value="tidal">Tidal</option><option value="submerged">Submerged</option></select></div>
+  <div><span>暴露区带</span><select id="exposureZone"><option value="atmospheric">大气区 Atmospheric</option><option value="splash">浪溅区 Splash</option><option value="tidal">潮差区 Tidal</option><option value="submerged">全浸区 Submerged</option></select></div>
   <div><span>材料</span><select id="material"><option value="carbon_steel">Carbon Steel</option><option value="zinc">Zinc</option><option value="copper">Copper</option><option value="aluminium">Aluminium</option></select></div>
   <div><span>设计寿命</span><select id="designLife"><option>20</option><option selected>25</option><option>30</option></select><em>年</em></div>
   <div class="action-cell"><button id="runBtn" class="primary">自动获取真实数据并计算</button></div>
 </section>
-<section id="globalNotice" class="notice info"><strong>V3.2.7加载策略：</strong>首页不预加载年度数据。点击计算后执行 GIS → 气象/海洋 → 统一时间轴 → 物理模型。Direct不可用时，GIS采用Natural Earth 1:50m浏览器Fallback；Historical海浪按所选完整年度请求Open-Meteo ERA5-Ocean，不再把当前7天海浪错配到历史年份；盐度代理明确标记EST。<div class="home-load-note">默认1年：<b>8760 h</b>（闰年8784 h）；Direct请求最多等待约8秒即切换Fallback。</div></section>
+<section id="globalNotice" class="notice info">V3.2.8：选址后点击计算。结果分别展示数据质量、工程估算和实测验证证据；Direct不可达时明确显示替代来源。</section>
+<section id="taskPanel" class="panel task-panel hidden" aria-label="计算任务">
+ <div class="panel-head"><div><h2>计算任务</h2><p id="taskSnapshot"></p></div><div class="task-actions"><button id="retryRun" type="button" class="secondary">继续 / 重试失败年度</button><button id="refreshRun" type="button" class="secondary">重新获取环境数据</button></div></div>
+ <ol id="yearStatus" class="year-status"></ol><p id="taskMessage" role="status" aria-live="polite"></p>
+</section>
 
 <div id="page-overview" class="page active">
   <div class="grid hero-grid">
@@ -79,7 +83,8 @@
 
 <div id="page-geo" class="page"><section class="panel"><div class="panel-head"><div><h2>自动GIS结果</h2><p>前端不再提供距海/海向输入；Production优先GSHHG Direct，浏览器Fallback使用Natural Earth 1:50m陆地掩膜与径向Fetch计算</p></div><span class="tag calc">CALC</span></div><div id="geoStats" class="stat-grid empty-state">计算后显示。</div></section><section class="panel"><div class="formula-box">每小时：WD(t) → 上风向射线 → D_upwind(t) → 连续海面长度 Fetch(t)。最近距海只用于项目描述，不直接替代盐雾输运距离。</div></section></div>
 
-<div id="page-data" class="page"><section class="panel"><div class="panel-head"><div><h2>ERA5 / 气象主数据</h2><p>Direct可用时使用ERA5；否则明确标记Open-Meteo Fallback</p></div><span class="tag raw">RAW</span></div><div id="dataStats" class="stat-grid empty-state">计算后显示。</div></section><section class="panel"><div id="weatherChart" class="chart tall"></div></section></div>
+<div id="page-data" class="page">
+<section class="panel"><div class="panel-head"><h2>数据质量与统计口径</h2><button id="recheckDirect" class="secondary" type="button">重查Direct状态</button></div><p id="serviceHealth"></p><div id="directDataStatus"></div><p id="qualityOverview">完成计算后显示逐变量有效率、插值、估算及人工覆盖比例。</p><p id="periodDetails"></p><div id="qualityTable"></div><h3>项目点与数据格点</h3><div id="gridDetails">尚未获取数据格点。</div></section><section class="panel"><div class="panel-head"><div><h2>ERA5 / 气象主数据</h2><p>Direct可用时使用ERA5；否则明确标记Open-Meteo Fallback</p></div><span class="tag raw">RAW</span></div><div id="dataStats" class="stat-grid empty-state">计算后显示。</div></section><section class="panel"><div id="weatherChart" class="chart tall"></div></section></div>
 
 <div id="page-ocean" class="page"><section class="panel"><div class="panel-head"><div><h2>CAMS海盐 + CMEMS波浪/盐度</h2><p>CAMS 0.03–20 μm作为背景；>20 μm保持局地EST项，避免重复计源</p></div></div><div id="oceanStats" class="stat-grid empty-state">计算后显示。</div></section><section class="panel"><div id="oceanStatus" class="source-table"></div></section></div>
 
@@ -91,13 +96,15 @@
 <div id="page-model" class="page"><section class="panel"><div class="panel-head"><div><h2>物理模型与公式中心</h2></div></div><div id="formulaList" class="formula-list"></div></section></div>
 
 <div id="page-validation" class="page">
-  <section class="panel"><div class="panel-head"><div><h2>26点 Benchmark Dataset</h2><p>参考腐蚀率来自用户给定表；固定高度2 m、Carbon Steel、Atmospheric。用于验证模型，不直接拟合ISO公式。</p></div><span class="tag calc">BENCHMARK</span></div><div class="button-row"><button id="benchmarkBtn" class="primary">运行26点验证</button><button id="benchmarkStop" class="secondary">停止</button></div><div class="progress"><i id="benchmarkBar" style="animation:none;width:0"></i></div><div id="benchmarkKpis" class="kpis-row"></div></section>
+<section class="panel"><div class="panel-head"><h2>已有实测坐标与结果对比</h2></div><p>直接使用 corrosionCalcData.csv 中去重后的121条坐标、高度和腐蚀结果。此处先做空间参考比对，26点Benchmark与正式同期校准保持独立。</p><label for="referencePoint">实测点位</label><select id="referencePoint"></select><label class="reference-assumptions"><input id="referenceAssumptions" type="checkbox">我理解本次暂按原始腐蚀结果单位μm/a、碳钢大气区、上方选定年份计算；年代标记不作为准确测量期，不将参考误差称为同期验证精度。</label><div class="button-row"><button id="referenceRun" class="primary">对比所选实测点</button><button id="referenceAll" class="secondary">顺序比对全部点位</button><button id="referenceStop" class="secondary">停止比对</button><button id="referenceExport" class="secondary">导出点位比对</button></div><p id="referenceStatus" role="status"></p><p id="referenceMetrics"></p><div id="referenceResults"></div><div id="referenceScatter" class="chart"></div></section>
+<section class="panel"><div class="panel-head"><h2>实测校核与验证证据</h2></div><p id="calibrationEvidence"></p><p id="calibrationStatus" role="status"></p><div id="calibrationMetrics"></div><div class="grid calibration-charts"><div id="calibrationScatter" class="chart"></div><div id="calibrationResidual" class="chart"></div></div></section>
+  <section class="panel"><div class="panel-head"><div><h2>26点参考数据比对</h2><p>参考值来自已有表格，测量日期与原始单位元数据尚未确认。按所选年份、假定2 m碳钢大气区进行参考比对；不是同期实测验证，不参与校准拟合。误差单位暂沿用参考表的μm/a口径。</p></div><span class="tag calc">BENCHMARK</span></div><div class="button-row"><button id="benchmarkBtn" class="primary">运行26点参考比对</button><button id="benchmarkStop" class="secondary">停止</button></div><div class="progress"><i id="benchmarkBar" style="animation:none;width:0"></i></div><div id="benchmarkKpis" class="kpis-row"></div></section>
   <section class="panel"><div class="source-table"><table class="table"><thead><tr><th>点位</th><th>坐标</th><th>参考 μm/a</th><th>平台 μm/a</th><th>偏差</th><th>相对误差</th><th>参考等级</th><th>平台等级</th><th>状态</th></tr></thead><tbody id="benchmarkBody"></tbody></table></div></section>
 </div>
 
 <div id="page-report" class="page"><section class="panel"><div class="panel-head"><div><h2>报告与数据输出</h2></div></div><div class="button-row"><button id="printBtn" class="primary">打印 / 保存PDF</button><button id="jsonBtn" class="secondary">导出计算JSON</button></div></section></div>
 <div id="page-sources" class="page"><section class="panel"><div class="panel-head"><div><h2>数据源状态与数据血缘</h2><p>Direct / Fallback / RAW / CALC / EST必须明确区分</p></div></div><div id="sourceTable" class="source-table"></div></section></div>
-<div id="page-admin" class="page"><section class="panel"><div class="panel-head"><div><h2>管理员 Override 与模型参数</h2><p>RAW永不覆盖：Original RAW + Override + Effective Value + Audit</p></div></div><div id="adminGate" class="admin-gate"><input id="adminPwd" type="password" placeholder="管理员密码"/><button id="adminLogin" class="primary">验证</button><span id="adminMsg" class="muted"></span></div><div id="adminPanel" class="hidden"><h3>数据Override</h3><div id="overrideTable" class="parameter-table"></div><h3>模型校准参数</h3><div id="parameterTable" class="parameter-table"></div><div class="button-row"><button id="saveParams" class="primary">保存Override/参数</button><button id="resetParams" class="secondary">恢复默认</button></div><h3>本地审计记录</h3><div id="auditTable" class="source-table"></div></div></section></div>
+<div id="page-admin" class="page"><section class="panel"><div class="panel-head"><div><h2>管理员 Override 与模型参数</h2><p>RAW永不覆盖：Original RAW + Override + Effective Value + Audit</p></div></div><div id="adminGate" class="admin-gate"><input id="adminPwd" type="password" placeholder="管理员密码"/><button id="adminLogin" class="primary">验证</button><span id="adminMsg" class="muted"></span></div><div id="adminPanel" class="hidden"><section class="panel"><h3>同期实测校核</h3><p>仅导入已核实单位、材料、日期及同期预测值的记录；按站点区域留出验证，不使用26点参考数据拟合。</p><label class="calibration-import">导入同期记录 JSON<input id="calibrationImport" type="file" accept=".json,application/json"></label><a href="./calibration-template.json" download>下载字段模板</a><button id="clearCalibration" class="secondary" type="button">停用局地校准</button></section><h3>数据Override</h3><div id="overrideTable" class="parameter-table"></div><h3>模型校准参数</h3><div id="parameterTable" class="parameter-table"></div><div class="button-row"><button id="saveParams" class="primary">保存Override/参数</button><button id="resetParams" class="secondary">恢复默认</button></div><h3>本地审计记录</h3><div id="auditTable" class="source-table"></div></div></section></div>
 </main></div></div>
 <div id="loading" class="loading-overlay hidden"><div class="loader-card loader-card-wide">
   <div class="loader-head"><div class="spinner"></div><div><h3 id="loadingTitle">正在获取数据</h3><p id="loadingText">同步数据源并执行物理模型…</p></div></div>
@@ -109,11 +116,10 @@
     <div class="load-stage" data-load-stage="2" data-status="pending"><span class="load-num">03</span><div><strong>统一逐小时时间轴</strong><small class="load-stage-detail">1年8760 h；闰年8784 h</small></div><em class="load-stage-status">等待</em></div>
     <div class="load-stage" data-load-stage="3" data-status="pending"><span class="load-num">04</span><div><strong>物理模型与工程判定</strong><small class="load-stage-detail">盐雾→Cl⁻→盐库存→湿润/凝露→ISO 9223</small></div><em class="load-stage-status">等待</em></div>
   </div>
-  <div class="load-foot"><span>Direct数据源不可达时，平台会明确标记Fallback/EST并继续计算；不会把代理数据标记为RAW。</span></div>
+  <div class="load-foot"><button id="cancelRun" type="button" class="secondary">取消计算</button><span>Direct数据源不可达时，平台会明确标记Fallback/EST并继续计算；不会把代理数据标记为RAW。</span></div>
 </div></div>
 <div id="drawer" class="drawer"><button id="drawerClose" class="drawer-close">×</button><div id="drawerBody"></div></div><div id="toast" class="toast hidden"></div>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
 <script src="https://cdn.jsdelivr.net/npm/echarts@5.5.1/dist/echarts.min.js"></script>
-<script src="./loading-v323.js?v=3.2.5"></script>
-<script type="module" src="./app-browser.js?v=3.2.7"></script>
+<script type="module" src="./app-browser.js?v=3.2.8"></script>
 </body></html>

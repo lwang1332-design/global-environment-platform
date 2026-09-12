@@ -1,0 +1,60 @@
+{
+  "file": "corrosionCalcData.csv",
+  "sha256": "0c8c6f8b778dad36ca2bfe3eb5dc4fc4e8adbe1e4b2300a07aa09d6ac0ed8843",
+  "rawRows": 641,
+  "uniqueRecords": 121,
+  "duplicateRows": 520,
+  "uniqueSites": 110,
+  "byRegion": {
+    "BrazilLand": 104,
+    "ChinaLand": 104,
+    "ChinaOcean": 17,
+    "IndiaLand": 104,
+    "SaudiLand": 104,
+    "ThailandLand": 104,
+    "VietnamLand": 104
+  },
+  "stamps": [
+    "2010s",
+    "2020s",
+    "2000s"
+  ],
+  "columns": [
+    "SourceFile",
+    "Region",
+    "Longitude",
+    "Latitude",
+    "Height",
+    "Stamp",
+    "SaltMist",
+    "SettleRate",
+    "CorrodeRate",
+    "CorrodeLevel"
+  ],
+  "heightDecay": {
+    "air": {
+      "pairs": 4,
+      "medianPerM": 0.0023260094673319444
+    },
+    "settlement": {
+      "pairs": 6,
+      "medianPerM": 0.0039938428329617005
+    },
+    "ambiguousGroupsExcluded": 1,
+    "rule": "同坐标同年代10m/120m唯一配对；同高度多条不同记录的站点排除，非正数不取对数"
+  },
+  "usage": {
+    "parameterDerivation": "探索性同坐标同年代高度比值",
+    "calibration": "未满足元数据条件，未拟合腐蚀残差",
+    "reference": "去重记录仅供参考",
+    "independentValidation": "26点另存，不用于拟合；同期日期仍缺失"
+  },
+  "missingMetadata": [
+    "准确测量起止日期",
+    "SaltMist/SettleRate/CorrodeRate原始单位",
+    "材料",
+    "暴露区带",
+    "测量方法"
+  ],
+  "eligibleContemporaneousValidationRecords": 0
+}

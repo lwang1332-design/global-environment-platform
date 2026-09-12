@@ -1,11 +1,11 @@
 {
   "name": "全球海洋大气腐蚀环境评估平台",
-  "version": "3.2.7",
+  "version": "3.2.8",
   "frontendEntry": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "frontendRuntime": "GitHub Pages native static app",
   "frontendTarget": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "directApi": "https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct",
-  "directApiStatus": "deployment_missing_2026-09-11",
+  "directApiStatus": "unrestored: existing deployment 404; Vercel connector production/preview deployment denied 403 on 2026-09-12",
   "dataChain": [
     "ERA5 Direct when gateway is restored",
     "CAMS EAC4 / Forecast when gateway is restored",
@@ -17,9 +17,14 @@
   "calibration": {
     "rawRows": 641,
     "independentRows": 121,
-    "globalBenchmarkPoints": 26
+    "globalBenchmarkPoints": 26,
+    "uniqueCoordinates": 110,
+    "ambiguousHeightSitesExcluded": 1,
+    "airHeightPairs": 4,
+    "settlementHeightPairs": 6,
+    "status": "spatial_reference_available; contemporaneous_calibration_not_applied"
   },
-  "notes": "V3.2.5 restores browser-side calculation when Direct is unavailable. Direct endpoint currently returns Vercel DEPLOYMENT_NOT_FOUND, so the UI must not label fallback data as Direct RAW. Historical marine fallback follows the selected complete year; salinity 35 PSU remains explicit EST.",
+  "notes": "Full-series UTC statistics, strict missing data, audited spatial references, local calibration with site holdout, run cancellation/checkpoints and mobile navigation. Formal measured validation remains conditional on metadata; Direct restoration is blocked by deployment permissions and missing worker/credentials.",
   "placeSearch": {
     "provider": "Open-Meteo Geocoding / GeoNames",
     "coordinateSystem": "WGS84",
@@ -30,17 +35,32 @@
   },
   "mapPicking": {
     "entry": "Map picker button next to place-name search",
-    "methods": ["map click", "marker drag", "map centre selection", "keyboard Enter"],
+    "methods": [
+      "map click",
+      "marker drag",
+      "map centre selection",
+      "keyboard Enter"
+    ],
     "coordinateSystem": "WGS84",
     "panOnlyChangesViewport": true,
     "automaticEnvironmentCalculation": false
   },
   "startupPolicy": {
     "annualDataOnInitialLoad": false,
-    "healthCheckTimeoutSeconds": 4,
-    "directCalculationTimeoutSeconds": 8,
-    "historicalPeriodsYears": [1, 3, 5],
-    "stages": ["GIS", "ERA5/CAMS/CMEMS or fallback", "Hourly timeline", "Physics / ISO 9223"],
-    "progressUnit": "hours"
+    "healthCheckTimeoutSeconds": 6,
+    "directCalculationTimeoutSeconds": 20,
+    "historicalPeriodsYears": [
+      1,
+      3,
+      5
+    ],
+    "stages": [
+      "GIS",
+      "ERA5/CAMS/CMEMS or fallback",
+      "Hourly timeline",
+      "Physics / ISO 9223"
+    ],
+    "progressUnit": "actual stage / completed annual packages",
+    "asyncJobPollingWindowSeconds": 300
   }
 }
