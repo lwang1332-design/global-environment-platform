@@ -1,0 +1,24 @@
+{
+  "modelVersion": "3.3.0",
+  "purpose": "regression_diagnostics_only",
+  "points": [
+    {
+      "id": "VN-10.9-106.6",
+      "name": "Vietnam diagnostic 2",
+      "latitude": 10.9,
+      "longitude": 106.6,
+      "heightM": 2,
+      "material": "carbon_steel",
+      "exposureZone": "atmospheric",
+      "referenceCorrosion": 46.4,
+      "referenceUnit": "unverified; temporarily treated as µm/a only for spatial comparison",
+      "useForCalibration": false,
+      "requiredRegressionAssertions": [
+        "missing SO2 must not become Pd=1",
+        "formal ISO corrosion requires ISO-equivalent Sd",
+        "V3.2.8 local corrosion calibration must not be applied",
+        "referenceCorrosion must never enter model parameters"
+      ]
+    }
+  ]
+}
