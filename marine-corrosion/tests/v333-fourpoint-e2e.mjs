@@ -20,7 +20,6 @@ await page.goto('http://127.0.0.1:4173/marine-corrosion/?v=3.3.3-fourpoint',{wai
 await page.waitForSelector('#runBtn',{timeout:30000});
 await page.waitForFunction(()=>document.title.includes('V3.3.3'),null,{timeout:30000});
 
-async function setValue(sel,value){await page.locator(sel).fill(String(value));await page.locator(sel).dispatchEvent('change');}
 async function runPoint(p){
   console.log(`\n===== START ${p.id} =====`);
   await page.selectOption('#mode','historical');
@@ -29,9 +28,24 @@ async function runPoint(p){
   await page.selectOption('#exposureZone','atmospheric');
   await page.selectOption('#material','carbon_steel');
   if(await page.locator('#v331So2Mode').count())await page.selectOption('#v331So2Mode','auto');
-  await setValue('#latitude',p.lat);
-  await setValue('#longitude',p.lon);
-  await setValue('#height',p.height);
+
+  // Write only the calculation inputs. Do not dispatch the map/GIS change handlers here:
+  // those handlers are a UI convenience and can race with test automation. snapshot()
+  // reads these DOM values directly at run time.
+  await page.evaluate(({lat,lon,height})=>{
+    const set=(sel,value)=>{
+      const el=document.querySelector(sel);
+      if(!el)throw new Error('Missing input '+sel);
+      el.value=String(value);
+      el.dispatchEvent(new Event('input',{bubbles:true}));
+    };
+    set('#latitude',lat);set('#longitude',lon);set('#height',height);
+  },{lat:p.lat,lon:p.lon,height:p.height});
+
+  const actual=await page.evaluate(()=>({lat:Number(document.querySelector('#latitude').value),lon:Number(document.querySelector('#longitude').value),height:Number(document.querySelector('#height').value)}));
+  console.log('INPUT_ASSERT',actual);
+  if(Math.abs(actual.lat-p.lat)>1e-9||Math.abs(actual.lon-p.lon)>1e-9||Math.abs(actual.height-p.height)>1e-9)throw new Error(`Input assertion failed: ${JSON.stringify(actual)} expected ${JSON.stringify(p)}`);
+
   await page.evaluate(()=>{globalThis.__MARINE_V333_LAST_RESULT__=null});
   await page.click('#runBtn');
   await page.waitForFunction(({lat,lon,height})=>{
@@ -39,6 +53,7 @@ async function runPoint(p){
     const q=r?.project;
     return !!q&&Math.abs(Number(q.latitude)-lat)<1e-6&&Math.abs(Number(q.longitude)-lon)<1e-6&&Math.abs(Number(q.height)-height)<1e-6;
   },{lat:p.lat,lon:p.lon,height:p.height},{timeout:540000});
+
   const data=await page.evaluate(async observed=>{
     const result=globalThis.__MARINE_V333_LAST_RESULT__;
     const mod=await import('./diagnostics-v333.js?e2e='+Date.now());
