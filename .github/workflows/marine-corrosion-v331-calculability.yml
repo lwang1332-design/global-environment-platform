@@ -1,0 +1,36 @@
+name: Marine Corrosion V3.3.1 Calculability
+
+on:
+  push:
+    branches:
+      - v3.3.1-calculability
+      - main
+    paths:
+      - 'marine-corrosion/input-policy-v331.js'
+      - 'marine-corrosion/gis-browser-v331.js'
+      - 'marine-corrosion/v331-ui-patch.js'
+      - 'marine-corrosion/gis-browser-v328.js'
+      - 'marine-corrosion/review-ui.js'
+      - 'marine-corrosion/deployment.json'
+      - 'marine-corrosion/README.md'
+      - 'marine-corrosion/tests/*.test.mjs'
+      - '.github/workflows/marine-corrosion-v331-calculability.yml'
+  workflow_dispatch:
+
+jobs:
+  calculability-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check V3.3.1 modules
+        run: |
+          node --check marine-corrosion/input-policy-v331.js
+          node --check marine-corrosion/gis-browser-v331.js
+          node --check marine-corrosion/v331-ui-patch.js
+          node --check marine-corrosion/tests/v331-calculability.test.mjs
+      - name: Run all marine corrosion regressions
+        run: node --test marine-corrosion/tests/*.test.mjs
