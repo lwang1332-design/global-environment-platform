@@ -43,5 +43,24 @@ class TestCamsSo2Requests(unittest.TestCase):
         now=datetime(2026,9,13,22,30,tzinfo=timezone.utc)
         self.assertEqual(so2._latest_cycle(now),datetime(2026,9,13,12,tzinfo=timezone.utc))
 
+    def test_resumable_job_token_round_trip(self):
+        payload={
+            'requestId':'7e7c72fc-2191-4cd6-86f0-18fa957435d2',
+            'lat':10.9,'lon':106.6,'mode':'current','year':None,
+            'dataset':'cams-global-atmospheric-composition-forecasts',
+            'modelLevel':'137','resolution':'~0.4° / 3 h / 5 d','back':0,
+            'cycle':'2026-09-13T00:00:00Z'
+        }
+        token=so2._encode_job(payload)
+        self.assertRegex(token,r'^[A-Za-z0-9_-]+$')
+        decoded=so2._decode_job(token)
+        self.assertEqual(decoded['requestId'],payload['requestId'])
+        self.assertEqual(decoded['mode'],'current')
+        self.assertEqual(decoded['cycle'],payload['cycle'])
+
+    def test_invalid_job_token_is_rejected(self):
+        with self.assertRaises(ValueError):
+            so2._decode_job('bad token!')
+
 if __name__=='__main__':
     unittest.main()
