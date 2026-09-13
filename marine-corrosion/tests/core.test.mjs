@@ -1,28 +1,69 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import {number,alignSeries,hourAxis,HOUR,abortError} from '../data-quality.js';
-import {computeModel,pct,doseResponse,MODEL_VERSION} from '../model-v328.js';
-import {convertUnit,requestJson,fetchDirectGateway,normalizeDirectCams,normalizeDirectWeather} from '../sources-v328.js';
-import {buildCalibration,localExperienceCalibration,validationMetrics} from '../calibration-v328.js';
-import {RunCoordinator,DataCache} from '../run-controller.js';
-import {traceData} from '../review-ui.js';
-export const weather=(time,changes={})=>{const data={time,flags:{},provenance:{source:'synthetic test fixture',type:'TEST'},fieldMeta:{}};for(const [key,value] of Object.entries({t:25,td:20,rh:85,rain:0,u10:5,u100:6,wd:180,pressure:1013.25,cloud:50,sw:100,blh:800,...changes})){data[key]=Array.isArray(value)?value:Array(time.length).fill(value);data.flags[key]=data[key].map(v=>number(v)===null?'MISSING':'RAW')}return data};
-const gis={distanceToCoastKm:1,siteMedium:'land',bearingBins:[{bearing:180,seaDistanceKm:1,fetchKm:100}],provenance:{source:'synthetic test fixture'}};
-const input=(times,cfg={},changes={})=>({weather:weather(times,changes),gis,cfg:{latitude:20,longitude:110,height:10,material:'carbon_steel',mode:'current',...cfg}});
-test('missing and valid zero are distinct; invalid values never silently become zero',()=>{for(const value of [null,undefined,'',' ',NaN,Infinity,{},[],false])assert.equal(number(value),null);assert.equal(number(0),0);assert.equal(number('0'),0);assert.equal(doseResponse('carbon_steel',null,3,85,25),null);assert.equal(doseResponse('carbon_steel',0,0,85,25),0)});
-test('alignment: sort/deduplicate, bounded gaps, circular wind, no rainfall interpolation or extrapolation',()=>{const time=hourAxis(2024).slice(0,7),a=alignSeries(time,{time:[time[3],time[1],time[1]],hs:[4,0,99],wd:[10,350,270],rain:[2,0,9]},['hs','wd','rain'],{circularFields:['wd'],accumulatedFields:['rain']});assert.deepEqual(a.hs,[null,0,2,4,null,null,null]);assert.equal(a.wd[2],0);assert.equal(a.rain[2],null);assert.equal(a.audit.duplicates,1);assert.equal(alignSeries(time,{time:[time[0],time[6]],hs:[0,4]},['hs']).hs[3],null);assert.equal(alignSeries(time,{time:[time[0]],hs:[null]},['hs']).hs[0],null)});
-test('units: K/Pa/kmh and mixing ratio; unknown units reject',()=>{assert.ok(Math.abs(convertUnit(298.15,'K','°C')-25)<1e-9);assert.equal(convertUnit(101325,'Pa','hPa'),1013.25);assert.equal(convertUnit(36,'km/h','m/s'),10);assert.equal(convertUnit(null,'m','mm'),null);assert.throws(()=>convertUnit(1,'ppm','kg/kg'),/单位/)});
-test('CAMS does not extend last value beyond coverage; weather preserves null rain',()=>{const t=hourAxis(2024).slice(0,3),c=normalizeDirectCams({time:t.slice(0,1),ss1:[0],ss2:[1e-9],ss3:[null]},t);assert.deepEqual(c.ss1,[0,null,null]);assert.equal(normalizeDirectWeather({time:t,rain:[null,0,1]}).rain[0],null)});
-test('Current window reports actual durations; missing waves EST is separate from raw zero',()=>{const t=hourAxis(2024).slice(0,4),w=input(t),o={time:t,hs:[null,0,1,2],flags:{hs:['MISSING','RAW','RAW','RAW']}};const r=computeModel({...w,ocean:o});assert.equal(r.summary.hours,4);assert.equal(r.summary.firstYearCorrosion,null);assert.equal(r.summary.annualCl,null);assert.equal(r.hourly[0].rawInputs.hs,null);assert.equal(r.hourly[0].effectiveInputs.hs,1.5);assert.equal(r.hourly[0].flags.hs,'EST');assert.equal(r.hourly[1].hs,0);assert.equal(r.hourly[1].flags.hs,'RAW');assert.equal(r.hourly[1].rawInputs.rain,0);assert.equal(r.summary.confidenceInterval,undefined)});
-test('actual half-hour duration and missing-weather continuity',()=>{const t=['2024-12-31T23:00Z','2024-12-31T23:30Z','2025-01-01T00:00Z'];const r=computeModel(input(t));assert.equal(r.summary.hours,1.5);assert.equal(r.summary.towHours,1.5);assert.ok(r.hourly[2].surfaceCl>r.hourly[1].surfaceCl);const bad=computeModel(input(t,{}, {t:[25,null,25]}));assert.equal(bad.hourly[1].valid,false);assert.equal(bad.hourly[2].surfaceCl,null);assert.equal(bad.summary.stateContinuity.continuous,false)});
-test('1/3/5-year and leap-year full-series stats, continuous state, no chart sampling in statistics',()=>{for(const n of [1,3,5]){const years=Array.from({length:n},(_,i)=>2025-n+i),time=years.flatMap(hourAxis),r=computeModel(input(time,{mode:'historical',requestedYears:years},{u10:time.map((_,i)=>i%137===0?45:5)}));const expected=years.reduce((s,y)=>s+hourAxis(y).length,0);assert.equal(r.summary.hours,expected);assert.equal(r.summary.expectedHours,expected);assert.ok(time.includes('2024-02-29T00:00:00.000Z'));assert.equal(r.summary.airSaltP99,pct(r.hourly.map(x=>x.airSalt),.99));assert.equal(r.summary.annualCl,r.summary.cumulativeCl/n);assert.equal(r.summary.annualTowHours,expected/n);assert.equal(r.annual.length,n);assert.ok(r.summary.firstYearCorrosion>0);assert.ok(r.timeline.length<=1100);for(let i=1;i<time.length;i++)if(time[i].includes('01-01T00:00'))assert.equal(r.hourly[i].previousSurfaceCl,r.hourly[i-1].surfaceCl)}});
-test('partial requested cycle never becomes a complete multi-year annual estimate',()=>{const r=computeModel(input(hourAxis(2024),{mode:'historical',requestedYears:[2023,2024,2025]}));assert.equal(r.summary.firstYearCorrosion,null);assert.equal(r.summary.annualCl,null);assert.ok(r.summary.coveragePercent<34)});
-test('trace formulas use the actual values and immutable parameter snapshot',()=>{const r=computeModel(input(hourAxis(2024).slice(0,3),{chlorideFraction:.4}));assert.equal(r.hourly[0].clDep,r.hourly[0].saltDep*.4);const trace=traceData(r,'clDep');assert.ok(trace.parts.some(([k,v])=>k==='氯离子换算'&&v.includes('× 0.4')));assert.equal(r.inputSnapshot.modelVersion,MODEL_VERSION);assert.equal(r.hourly[0].effectiveInputs.ss1,null)});
-test('calibration execution and deterministic site holdout; missing metadata and benchmark excluded',()=>{const records=Array.from({length:12},(_,i)=>({sourceId:'synthetic-'+i,dataset:'synthetic_test_only',metadataVerified:true,material:'carbon_steel',exposureZone:'atmospheric',unit:'μm/a',measurementMethod:'synthetic test only',latitude:20+i,longitude:100+i,height:10,startDate:'2024-01-01T00:00:00Z',endDate:'2025-01-01T00:00:00Z',predictionStartDate:'2024-01-01T00:00:00Z',predictionEndDate:'2025-01-01T00:00:00Z',modelVersion:'3.2.8',observed:(i+1)*20,rawPrediction:(i+1)*10}));const m=buildCalibration([...records,...records,{...records[0],dataset:'benchmark26',observed:1e6}]);assert.equal(m.factor,2);assert.equal(m.training.length+m.validation.length,12);assert.equal(m.metricsAfter.mae,0);assert.equal(m.metricsAfter.rmse,0);assert.ok(!m.trainingGroups.some(g=>m.validationGroups.includes(g)));const p=m.training[0];assert.equal(localExperienceCalibration({...p,rawCorrosion:50},m).calibratedCorrosion,100);assert.equal(localExperienceCalibration({...p,rawCorrosion:50,validationMode:true},m).applied,false);assert.equal(buildCalibration(records.map(p=>({...p,startDate:null}))).status,'insufficient_metadata_or_sites');assert.equal(validationMetrics([{observed:0,predicted:1}]).mape,null);assert.equal(validationMetrics([{observed:3,predicted:3}]).r2,null)});
-test('HTTP errors, timeout, retry classification and incomplete response',async()=>{const original=fetch;try{let count=0;globalThis.fetch=async()=>{count++;return new Response('DEPLOYMENT_NOT_FOUND',{status:404})};await assert.rejects(requestJson('https://fixture.invalid'),e=>e.code==='DEPLOYMENT_MISSING');assert.equal(count,1);globalThis.fetch=async()=>new Response('denied',{status:403});await assert.rejects(requestJson('https://fixture.invalid'),e=>e.code==='AUTH');globalThis.fetch=async()=>new Response('{}',{status:200});await assert.rejects(fetchDirectGateway({}),e=>e.code==='INVALID_RESPONSE');globalThis.fetch=async(url,{signal})=>new Promise((_,reject)=>signal.addEventListener('abort',()=>reject(abortError())));await assert.rejects(requestJson('https://fixture.invalid',{timeout:5,retries:0}),e=>e.code==='TIMEOUT');count=0;globalThis.fetch=async()=>++count===1?new Response('slow',{status:429}):new Response('{"ok":true}');assert.equal((await requestJson('https://fixture.invalid')).data.ok,true);assert.equal(count,2)}finally{globalThis.fetch=original}});
-test('Direct async job poll returns real result and supports abort',async()=>{const original=fetch;try{let count=0;globalThis.fetch=async()=>++count===1?new Response('{"jobId":"abc-123","status":"queued","retryAfterSeconds":0}',{status:202}):new Response('{"status":"succeeded","result":{"services":{}}}');assert.deepEqual(await fetchDirectGateway({url:'https://fixture.invalid'}),{services:{}});globalThis.fetch=async()=>new Response('{"jobId":"abc","status":"running"}',{status:202});const ac=new AbortController();setTimeout(()=>ac.abort(),20);await assert.rejects(fetchDirectGateway({signal:ac.signal,url:'https://fixture.invalid'}),e=>e.name==='AbortError')}finally{globalThis.fetch=original}});
-test('cache identity, failed-year retry, parameter isolation and stale-result cancellation',async()=>{const counts={weather:0,compute:0},cache=new DataCache({persistent:false,maxEntries:100});let fail=true;
- const runner=new RunCoordinator({cache,resolveGis:async()=>gis,direct:async()=>{const e=new Error('missing');e.code='DEPLOYMENT_MISSING';throw e},historical:async(lat,lon,y)=>{counts.weather++;if(y===2023&&fail)throw new Error('annual failure');return weather(hourAxis(y).slice(0,2))},marine:async()=>({time:[],flags:{},provenance:{source:'missing'}}),compute:async args=>{counts.compute++;return computeModel(args)}});
- const snap={capturedAt:'first',cfg:{latitude:20,longitude:110,height:10,material:'carbon_steel',mode:'historical',requestedYears:[2023,2024]},overrides:{},calibrationModel:null};let r=await runner.run(snap);assert.deepEqual(r.run.completedYears,[2024]);assert.equal(r.run.complete,false);assert.equal(r.environmentByYear[0].services.era5.coveragePercent,0);fail=false;r=await runner.run({...snap,capturedAt:'second'});assert.equal(r.run.complete,true);assert.equal(counts.weather,3);const before=counts.compute;await runner.run({...snap,capturedAt:'third'});assert.equal(counts.compute,before);await runner.run({...snap,cfg:{...snap.cfg,material:'zinc'}});assert.equal(counts.weather,3);assert.equal(counts.compute,before+1);
- let release;runner.compute=()=>new Promise(resolve=>release=()=>resolve(computeModel(input(hourAxis(2024).slice(0,1)))));const task=runner.run({...snap,cfg:{...snap.cfg,material:'copper'}});while(!release)await new Promise(r=>setTimeout(r,1));runner.cancel();release();await assert.rejects(task,e=>e.name==='AbortError');
+import {number,alignSeries,hourAxis,HOUR} from '../data-quality.js';
+import {computeModel,pct,doseResponse,MODEL_VERSION,validateParameters} from '../model-v330.js';
+import {convertUnit,normalizeDirectCams,normalizeDirectWeather} from '../sources-v330.js';
+import {traceData} from '../review-ui-v330.js';
+
+const weather=(time,changes={})=>{const data={time,flags:{},provenance:{source:'synthetic V3.3 core test',type:'TEST'},fieldMeta:{}};for(const [key,value] of Object.entries({t:25,td:20,rh:85,rain:0,u10:5,u100:6,wd:180,pressure:1013.25,cloud:50,sw:100,blh:800,...changes})){data[key]=Array.isArray(value)?value:Array(time.length).fill(value);data.flags[key]=data[key].map(v=>number(v)===null?'MISSING':'RAW')}return data};
+const ocean=(time,changes={})=>{const data={time,flags:{},provenance:{source:'synthetic ocean',type:'TEST'},fieldMeta:{}};for(const [key,value] of Object.entries({hs:1.5,tp:7,salinity:35,...changes})){data[key]=Array.isArray(value)?value:Array(time.length).fill(value);data.flags[key]=data[key].map(v=>number(v)===null?'MISSING':'RAW')}return data};
+const cams=(time,changes={})=>{const data={time,flags:{},provenance:{source:'synthetic CAMS RH80',type:'TEST'},fieldMeta:{}};for(const [key,value] of Object.entries({ss1:1e-9,ss2:2e-9,ss3:3e-9,so2:2e-9,...changes})){data[key]=Array.isArray(value)?value:Array(time.length).fill(value);data.flags[key]=data[key].map(v=>number(v)===null?'MISSING':'RAW')}return data};
+const gis={distanceToCoastKm:1,siteMedium:'land',bearingBins:[{bearing:175,seaDistanceKm:1,fetchKm:90},{bearing:185,seaDistanceKm:2,fetchKm:110}],provenance:{source:'synthetic GIS',confidence:'A'}};
+const input=(time,cfg={},changes={},overrides={})=>({weather:weather(time,changes),ocean:ocean(time),cams:cams(time),gis,cfg:{latitude:20,longitude:110,height:10,material:'carbon_steel',mode:'current',exposureZone:'atmospheric',...cfg},overrides});
+
+test('V3.3 core keeps missing and valid zero distinct',()=>{
+  for(const value of [null,undefined,'',' ',NaN,Infinity,{},[],false])assert.equal(number(value),null);
+  assert.equal(number(0),0);assert.equal(number('0'),0);
+  assert.equal(doseResponse('carbon_steel',null,3,85,25),null);
+  assert.equal(MODEL_VERSION,'3.3.0');
+});
+
+test('time alignment still sorts/deduplicates, bounds gaps, handles circular wind and never interpolates rain',()=>{
+  const time=hourAxis(2024).slice(0,7),a=alignSeries(time,{time:[time[3],time[1],time[1]],hs:[4,0,99],wd:[10,350,270],rain:[2,0,9]},['hs','wd','rain'],{circularFields:['wd'],accumulatedFields:['rain']});
+  assert.deepEqual(a.hs,[null,0,2,4,null,null,null]);assert.equal(a.wd[2],0);assert.equal(a.rain[2],null);assert.equal(a.audit.duplicates,1);
+});
+
+test('unit normalization remains strict and unknown units reject',()=>{
+  assert.ok(Math.abs(convertUnit(298.15,'K','°C')-25)<1e-9);assert.equal(convertUnit(101325,'Pa','hPa'),1013.25);assert.equal(convertUnit(36,'km/h','m/s'),10);assert.throws(()=>convertUnit(1,'ppm','kg/kg'),/单位/);
+});
+
+test('Direct CAMS alignment preserves partial bins instead of extending values',()=>{
+  const t=hourAxis(2024).slice(0,3),c=normalizeDirectCams({time:t.slice(0,1),ss1:[0],ss2:[1e-9],ss3:[null],so2:[2e-9],units:{ss1:'kg/kg',ss2:'kg/kg',ss3:'kg/kg',so2:'kg/kg'}},t);
+  assert.deepEqual(c.ss1,[0,null,null]);assert.equal(c.ss3[0],null);assert.equal(c.provenance.seaSaltMassBasis,'RH80');
+  assert.equal(normalizeDirectWeather({time:t,rain:[null,0,1]}).rain[0],null);
+});
+
+test('Current reports real duration and never emits annual ISO corrosion',()=>{
+  const t=hourAxis(2024).slice(0,4),r=computeModel(input(t,{}, {},{isoChlorideDep:30,so2Dep:12.63}));
+  assert.equal(r.summary.hours,4);assert.equal(r.summary.firstYearCorrosion,null);assert.equal(r.summary.annualCl,null);
+});
+
+test('1/3/5-year historical statistics remain full-series and formal ISO is gated by standard-equivalent inputs',()=>{
+  for(const n of [1,3,5]){
+    const years=Array.from({length:n},(_,i)=>2025-n+i),time=years.flatMap(hourAxis);
+    const r=computeModel(input(time,{mode:'historical',requestedYears:years},{u10:time.map((_,i)=>i%137===0?45:5)},{isoChlorideDep:30,so2Dep:12.63}));
+    const expected=years.reduce((s,y)=>s+hourAxis(y).length,0);
+    assert.equal(r.summary.hours,expected);assert.equal(r.summary.expectedHours,expected);assert.equal(r.summary.airSaltP99,pct(r.hourly.map(x=>x.airSalt),.99));assert.equal(r.annual.length,n);assert.ok(r.summary.firstYearCorrosion>0);assert.equal(r.summary.isoClDepMean,30);assert.equal(r.summary.meanSo2Dep,12.63);
+  }
+  const missingIso=computeModel(input(hourAxis(2025),{mode:'historical',requestedYears:[2025]}));
+  assert.equal(missingIso.summary.firstYearCorrosion,null);assert.ok(Number.isFinite(missingIso.summary.screeningFirstYearCorrosion));
+});
+
+test('partial requested multi-year cycle never becomes a complete annual estimate',()=>{
+  const r=computeModel(input(hourAxis(2024),{mode:'historical',requestedYears:[2023,2024,2025]}, {},{isoChlorideDep:30,so2Dep:12.63}));
+  assert.equal(r.summary.firstYearCorrosion,null);assert.equal(r.summary.annualCl,null);assert.ok(r.summary.coveragePercent<34);
+});
+
+test('V3.3 trace exposes new scientific interfaces and contains no legacy Pd=1 or old wet formula',()=>{
+  const r=computeModel(input(hourAxis(2025).slice(0,3),{}, {},{isoChlorideDep:30,so2Dep:12.63}));
+  const so2=traceData(r,'so2').parts.map(x=>x.join(' ')).join(' '),cl=traceData(r,'clDep').parts.map(x=>x.join(' ')).join(' '),air=traceData(r,'airSalt').parts.map(x=>x.join(' ')).join(' ');
+  assert.match(so2,/0\.8|ISO 9223接口/);assert.doesNotMatch(so2,/缺测使用1 mg/);
+  assert.match(cl,/工程Cl|ISO Sd|Wet V3\.3/);assert.doesNotMatch(cl,/0\.022/);
+  assert.match(air,/RH80/);assert.match(air,/Fetch仅作用一次/);
+});
+
+test('V3.3 parameter validation covers new science parameters',()=>{
+  assert.doesNotThrow(()=>validateParameters({height:10,isoSo2ConcentrationFactor:.8,localSprayScale35Km:12,localSprayScale75Km:6},{}));
+  assert.throws(()=>validateParameters({height:10,proxyDistanceFloor:.9},{}),/参数超出范围/);
+  assert.doesNotThrow(()=>validateParameters({height:10},{isoChlorideDep:30}));
 });
