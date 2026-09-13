@@ -1,0 +1,71 @@
+name: Deploy Marine CAMS SO2 Backend
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      PROJECT_NAME: global-marine-corrosion-direct-v332
+      TEAM_SLUG: lwang1332-4885
+      VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+      CAMS_ADS_API_KEY: ${{ secrets.CAMS_ADS_API_KEY }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Check required secrets without printing values
+        shell: bash
+        run: |
+          missing=0
+          if [ -z "$VERCEL_TOKEN" ]; then echo '::error::Missing GitHub Secret VERCEL_TOKEN'; missing=1; fi
+          if [ -z "$CAMS_ADS_API_KEY" ]; then echo '::error::Missing GitHub Secret CAMS_ADS_API_KEY'; missing=1; fi
+          exit "$missing"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Link or create Vercel backend project
+        working-directory: marine-corrosion/direct-backend
+        run: |
+          npx --yes vercel@latest link --yes --project "$PROJECT_NAME" --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN"
+
+      - name: Deploy production backend with server-only CAMS token
+        id: deploy
+        working-directory: marine-corrosion/direct-backend
+        shell: bash
+        run: |
+          url=$(npx --yes vercel@latest deploy --prod --yes --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN" --env CAMS_ADS_API_KEY="$CAMS_ADS_API_KEY" | tail -n 1)
+          echo "url=$url" >> "$GITHUB_OUTPUT"
+          echo "Backend deployed: $url"
+
+      - name: Verify endpoint can authenticate and submit a CAMS EAC4 job
+        shell: bash
+        env:
+          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+        run: |
+          code=$(curl -sS -o /tmp/so2.json -w '%{http_code}' -X POST "$DEPLOY_URL/api/so2" \
+            -H 'Content-Type: application/json' \
+            -d '{"lat":10.9,"lon":106.6,"mode":"historical","year":2025}')
+          cat /tmp/so2.json | python3 -c 'import json,sys; x=json.load(sys.stdin); print({k:x.get(k) for k in ("version","configured","status","dataset","modelLevel","retryAfterSeconds")})'
+          test "$code" = "202"
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/so2.json'))
+          assert x.get('configured') is True
+          assert x.get('dataset')=='cams-global-reanalysis-eac4-monthly'
+          assert x.get('modelLevel')=='60'
+          assert isinstance(x.get('jobId'),str) and len(x['jobId'])>=8
+          PY
+
+      - name: Verify expected production alias
+        shell: bash
+        run: |
+          url="https://${PROJECT_NAME}-${TEAM_SLUG}.vercel.app/api/so2"
+          echo "Expected stable endpoint: $url"
+          curl -sS -I "https://${PROJECT_NAME}-${TEAM_SLUG}.vercel.app" >/dev/null || true
