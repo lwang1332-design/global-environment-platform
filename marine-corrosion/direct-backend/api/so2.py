@@ -1,5 +1,7 @@
+import base64
 import json
 import os
+import re
 import tempfile
 import zipfile
 from datetime import datetime, timezone, timedelta
@@ -9,6 +11,8 @@ from urllib.parse import parse_qs, urlparse
 ALLOWED_ORIGINS = {"https://lwang1332-design.github.io"}
 ADS_URL = os.environ.get("CAMS_ADS_URL", "https://ads.atmosphere.copernicus.eu/api")
 ADS_KEY = os.environ.get("CAMS_ADS_API_KEY")
+JOB_RE = re.compile(r"^[A-Za-z0-9_-]{8,4096}$")
+REQUEST_ID_RE = re.compile(r"^[A-Za-z0-9-]{8,200}$")
 
 
 def _num(v):
@@ -20,11 +24,7 @@ def _num(v):
 
 
 def _area(lat, lon, half=0.8):
-    north = min(90.0, lat + half)
-    south = max(-90.0, lat - half)
-    west = max(-180.0, lon - half)
-    east = min(180.0, lon + half)
-    return [north, west, south, east]
+    return [min(90.0, lat + half), max(-180.0, lon - half), max(-90.0, lat - half), min(180.0, lon + half)]
 
 
 def build_eac4_request(year, lat, lon):
@@ -47,7 +47,6 @@ def build_eac4_request(year, lat, lon):
 
 def _latest_cycle(now=None):
     now = now or datetime.now(timezone.utc)
-    # ADS can lag the nominal production cycle. Start from a cycle at least 8 h old.
     safe = now - timedelta(hours=8)
     hour = 12 if safe.hour >= 12 else 0
     return safe.replace(hour=hour, minute=0, second=0, microsecond=0)
@@ -73,9 +72,59 @@ def build_forecast_request(lat, lon, cycle=None):
     }
 
 
+def _client():
+    if not ADS_KEY:
+        raise RuntimeError("CAMS_ADS_API_KEY is not configured")
+    from ecmwf.datastores import Client
+    return Client(url=ADS_URL, key=ADS_KEY, progress=False, cleanup=False, timeout=30, maximum_tries=3, retry_after=2, sleep_max=5)
+
+
+def _encode_job(payload):
+    raw = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    return base64.urlsafe_b64encode(raw).decode("ascii").rstrip("=")
+
+
+def _decode_job(token):
+    if not isinstance(token, str) or not JOB_RE.match(token):
+        raise ValueError("invalid job token")
+    raw = base64.urlsafe_b64decode(token + "=" * (-len(token) % 4))
+    p = json.loads(raw.decode("utf-8"))
+    if not isinstance(p, dict) or not REQUEST_ID_RE.match(str(p.get("requestId", ""))):
+        raise ValueError("invalid request id")
+    lat, lon = _num(p.get("lat")), _num(p.get("lon"))
+    if lat is None or lon is None or abs(lat) > 90 or abs(lon) > 180 or p.get("mode") not in {"historical", "current"}:
+        raise ValueError("invalid job metadata")
+    return p
+
+
+def _submit(lat, lon, mode, year=None, cycle=None, back=0):
+    if mode == "historical":
+        spec = build_eac4_request(year, lat, lon)
+    else:
+        cycle = cycle or (_latest_cycle() - timedelta(hours=12 * back))
+        spec = build_forecast_request(lat, lon, cycle)
+    remote = _client().submit(spec["dataset"], spec["request"])
+    rid = str(remote.request_id)
+    if not REQUEST_ID_RE.match(rid):
+        raise RuntimeError("ADS did not return a valid request id")
+    meta = {
+        "requestId": rid,
+        "lat": lat,
+        "lon": lon,
+        "mode": mode,
+        "year": year,
+        "dataset": spec["dataset"],
+        "modelLevel": spec["model_level"],
+        "resolution": spec["resolution"],
+        "back": back,
+    }
+    if mode == "current":
+        meta["cycle"] = spec["cycle"].isoformat().replace("+00:00", "Z")
+    return _encode_job(meta), str(remote.status or "accepted"), meta
+
+
 def _open_dataset(path):
     import xarray as xr
-
     if zipfile.is_zipfile(path):
         tmpdir = tempfile.mkdtemp(prefix="cams-so2-")
         with zipfile.ZipFile(path) as zf:
@@ -110,22 +159,17 @@ def _nearest_point(ds, lat, lon):
         return ds, {"latitude": None, "longitude": None}
     lon_values = ds[lon_name].values
     try:
-        lon_min = float(lon_values.min())
-        lon_max = float(lon_values.max())
+        lon_min, lon_max = float(lon_values.min()), float(lon_values.max())
     except Exception:
         lon_min, lon_max = -180.0, 180.0
     qlon = lon % 360 if lon_min >= 0 and lon_max > 180 else lon
     picked = ds.sel({lat_name: lat, lon_name: qlon}, method="nearest")
-    return picked, {
-        "latitude": float(picked[lat_name].values),
-        "longitude": float(picked[lon_name].values),
-    }
+    return picked, {"latitude": float(picked[lat_name].values), "longitude": float(picked[lon_name].values)}
 
 
 def _time_values(ds, count, mode, year=None, cycle=None):
     import numpy as np
     import pandas as pd
-
     if "valid_time" in ds.coords:
         vals = np.asarray(ds["valid_time"].values).reshape(-1)
         if len(vals) == count:
@@ -134,11 +178,7 @@ def _time_values(ds, count, mode, year=None, cycle=None):
         base = pd.Timestamp(np.asarray(ds["forecast_reference_time"].values).reshape(-1)[0])
         periods = np.asarray(ds["forecast_period"].values).reshape(-1)
         if len(periods) == count:
-            out = []
-            for p in periods:
-                td = pd.to_timedelta(p)
-                out.append((base + td).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z"))
-            return out
+            return [(base + pd.to_timedelta(p)).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00", "Z") for p in periods]
     for name in ("time", "forecast_reference_time"):
         if name in ds.coords:
             vals = np.asarray(ds[name].values).reshape(-1)
@@ -153,7 +193,6 @@ def _time_values(ds, count, mode, year=None, cycle=None):
 
 def _extract(path, lat, lon, mode, year=None, cycle=None):
     import numpy as np
-
     ds = _open_dataset(path)
     try:
         point, grid = _nearest_point(ds, lat, lon)
@@ -163,75 +202,50 @@ def _extract(path, lat, lon, mode, year=None, cycle=None):
         times = _time_values(point, len(good), mode, year=year, cycle=cycle)
         if len(times) != len(good):
             raise RuntimeError(f"CAMS time/value length mismatch: {len(times)} vs {len(good)}")
-        unit = str(point[key].attrs.get("units", "kg kg**-1"))
-        return times, good, unit, grid
+        return times, good, str(point[key].attrs.get("units", "kg kg**-1")), grid
     finally:
         ds.close()
 
 
-def retrieve_so2(lat, lon, mode, year=None):
-    if not ADS_KEY:
-        raise RuntimeError("CAMS_ADS_API_KEY is not configured")
-    import cdsapi
-
-    client = cdsapi.Client(url=ADS_URL, key=ADS_KEY, quiet=True, wait_until_complete=True, delete=False)
-    if mode == "historical":
-        spec = build_eac4_request(year, lat, lon)
-        with tempfile.NamedTemporaryFile(suffix=".nc", delete=False) as f:
-            target = f.name
+def _result_from_remote(meta):
+    remote = _client().get_remote(meta["requestId"])
+    status = str(remote.status or "unknown").lower()
+    if status in {"accepted", "running", "queued"} or not remote.results_ready:
+        return "pending", {"status": status, "retryAfterSeconds": 5}
+    if status in {"failed", "rejected"}:
+        if meta["mode"] == "current" and int(meta.get("back", 0)) < 3:
+            prev_cycle = datetime.fromisoformat(meta["cycle"].replace("Z", "+00:00")) - timedelta(hours=12)
+            job, new_status, new_meta = _submit(meta["lat"], meta["lon"], "current", cycle=prev_cycle, back=int(meta.get("back", 0)) + 1)
+            return "resubmitted", {"jobId": job, "status": new_status, "retryAfterSeconds": 5, "cycle": new_meta.get("cycle")}
+        raise RuntimeError(f"ADS request {meta['requestId']} ended with status {status}")
+    suffix = ".zip" if meta["mode"] == "current" else ".nc"
+    with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+        target = f.name
+    try:
+        remote.download(target)
+        cycle = datetime.fromisoformat(meta["cycle"].replace("Z", "+00:00")) if meta.get("cycle") else None
+        time, so2, unit, grid = _extract(target, meta["lat"], meta["lon"], meta["mode"], year=meta.get("year"), cycle=cycle)
+        return "complete", {
+            "version": "3.3.2",
+            "configured": True,
+            "source": "CAMS EAC4 monthly reanalysis" if meta["mode"] == "historical" else "CAMS Global atmospheric composition forecast",
+            "dataset": meta["dataset"],
+            "productType": "REANALYSIS" if meta["mode"] == "historical" else "FORECAST",
+            "modelLevel": meta["modelLevel"],
+            "resolution": meta["resolution"],
+            **({"cycle": meta["cycle"]} if meta.get("cycle") else {}),
+            "time": time,
+            "so2": so2,
+            "units": {"so2": "kg/kg", "upstream": unit},
+            "grid": grid,
+            "coverage": sum(x is not None for x in so2) / max(1, len(so2)),
+            "retrievedAt": datetime.now(timezone.utc).isoformat().replace("+00:00", "Z"),
+        }
+    finally:
         try:
-            client.retrieve(spec["dataset"], spec["request"]).download(target)
-            time, so2, unit, grid = _extract(target, lat, lon, mode, year=year)
-            return {
-                "version": "3.3.2",
-                "source": "CAMS EAC4 monthly reanalysis",
-                "dataset": spec["dataset"],
-                "productType": "REANALYSIS",
-                "modelLevel": spec["model_level"],
-                "resolution": spec["resolution"],
-                "time": time,
-                "so2": so2,
-                "units": {"so2": "kg/kg", "upstream": unit},
-                "grid": grid,
-                "coverage": sum(x is not None for x in so2) / max(1, len(so2)),
-            }
-        finally:
-            try:
-                os.remove(target)
-            except OSError:
-                pass
-
-    last_error = None
-    for back in range(4):
-        cycle = _latest_cycle() - timedelta(hours=12 * back)
-        spec = build_forecast_request(lat, lon, cycle)
-        with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as f:
-            target = f.name
-        try:
-            client.retrieve(spec["dataset"], spec["request"]).download(target)
-            time, so2, unit, grid = _extract(target, lat, lon, mode, cycle=cycle)
-            return {
-                "version": "3.3.2",
-                "source": "CAMS Global atmospheric composition forecast",
-                "dataset": spec["dataset"],
-                "productType": "FORECAST",
-                "modelLevel": spec["model_level"],
-                "resolution": spec["resolution"],
-                "cycle": cycle.isoformat().replace("+00:00", "Z"),
-                "time": time,
-                "so2": so2,
-                "units": {"so2": "kg/kg", "upstream": unit},
-                "grid": grid,
-                "coverage": sum(x is not None for x in so2) / max(1, len(so2)),
-            }
-        except Exception as exc:
-            last_error = exc
-        finally:
-            try:
-                os.remove(target)
-            except OSError:
-                pass
-    raise RuntimeError(f"CAMS forecast unavailable for recent cycles: {last_error}")
+            os.remove(target)
+        except OSError:
+            pass
 
 
 class handler(BaseHTTPRequestHandler):
@@ -261,8 +275,7 @@ class handler(BaseHTTPRequestHandler):
     def _params(self):
         if self.command == "POST":
             length = int(self.headers.get("Content-Length", "0") or "0")
-            body = json.loads(self.rfile.read(length) or b"{}")
-            return body
+            return json.loads(self.rfile.read(length) or b"{}")
         q = parse_qs(urlparse(self.path).query)
         return {k: v[-1] for k, v in q.items()}
 
@@ -270,25 +283,33 @@ class handler(BaseHTTPRequestHandler):
         origin = self.headers.get("Origin")
         if origin and origin not in ALLOWED_ORIGINS:
             return self._json(403, {"error": {"code": "ORIGIN", "message": "Origin not allowed"}})
+        if not ADS_KEY:
+            return self._json(503, {"version": "3.3.2", "configured": False, "error": {"code": "NOT_CONFIGURED", "message": "CAMS_ADS_API_KEY is not configured on the server"}})
         try:
             p = self._params()
-            lat = _num(p.get("lat"))
-            lon = _num(p.get("lon"))
+            if self.command == "GET" and p.get("job"):
+                meta = _decode_job(p["job"])
+                state, data = _result_from_remote(meta)
+                if state in {"pending", "resubmitted"}:
+                    if state == "pending":
+                        data["jobId"] = p["job"]
+                    return self._json(202, {"version": "3.3.2", "configured": True, **data})
+                cache = "public, s-maxage=21600, stale-while-revalidate=86400" if meta["mode"] == "current" else "public, s-maxage=2592000, stale-while-revalidate=604800"
+                return self._json(200, data, cache=cache)
+
+            lat, lon = _num(p.get("lat")), _num(p.get("lon"))
             mode = str(p.get("mode", "")).lower()
             year = int(p.get("year")) if p.get("year") not in (None, "") else None
             if lat is None or lon is None or abs(lat) > 90 or abs(lon) > 180 or mode not in {"historical", "current"}:
                 return self._json(400, {"error": {"code": "INPUT", "message": "Invalid lat/lon/mode"}})
             if mode == "historical" and (year is None or year < 2003 or year > 2025):
                 return self._json(400, {"error": {"code": "INPUT", "message": "EAC4 historical year must be 2003-2025"}})
-            if not ADS_KEY:
-                return self._json(503, {"version": "3.3.2", "configured": False, "error": {"code": "NOT_CONFIGURED", "message": "CAMS_ADS_API_KEY is not configured on the server"}})
-            data = retrieve_so2(lat, lon, mode, year)
-            data["configured"] = True
-            data["retrievedAt"] = datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
-            cache = "public, s-maxage=21600, stale-while-revalidate=86400" if mode == "current" else "public, s-maxage=2592000, stale-while-revalidate=604800"
-            return self._json(200, data, cache=cache)
+            job, status, meta = _submit(lat, lon, mode, year=year)
+            return self._json(202, {"version": "3.3.2", "configured": True, "status": status, "jobId": job, "retryAfterSeconds": 5, "dataset": meta["dataset"], "modelLevel": meta["modelLevel"], **({"cycle": meta["cycle"]} if meta.get("cycle") else {})})
+        except ValueError as exc:
+            return self._json(400, {"error": {"code": "INPUT", "message": str(exc)}})
         except Exception as exc:
-            return self._json(502, {"version": "3.3.2", "configured": bool(ADS_KEY), "error": {"code": "CAMS_UPSTREAM", "message": str(exc)[:500]}})
+            return self._json(502, {"version": "3.3.2", "configured": True, "error": {"code": "CAMS_UPSTREAM", "message": str(exc)[:500]}})
 
     def do_GET(self):
         self._handle()
