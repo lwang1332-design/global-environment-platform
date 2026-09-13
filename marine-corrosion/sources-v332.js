@@ -28,10 +28,10 @@ function forecastToHourly(data,baseTimes){
   return a;
 }
 
-export async function fetchCamsSo2Auto({lat,lon,mode,year,baseTimes,signal,url,onProgress=()=>{}}={}){
+export async function fetchCamsSo2Auto({lat,lon,mode,year,baseTimes,signal,url,onProgress=()=>{},resumeJob=null}={}){
   if(!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon))||!['historical','current'].includes(mode)||!Array.isArray(baseTimes)||!baseTimes.length)throw new SourceError('INPUT','CAMS SO₂ Auto 输入无效');
   const endpoint=configuredUrl(url),payload={lat:Number(lat),lon:Number(lon),mode,...(mode==='historical'?{year:Number(year)}:{})};
-  let response=await requestJson(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal,timeout:30000,retries:0});
+  let response=await requestJson(resumeJob?`${endpoint}?job=${encodeURIComponent(resumeJob)}`:endpoint,{method:resumeJob?'GET':'POST',...(!resumeJob?{headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}:{}),signal,timeout:30000,retries:0});
   const started=Date.now();
   while(response.status===202||['accepted','queued','running'].includes(String(response.data?.status||'').toLowerCase())){
     checkAbort(signal);
