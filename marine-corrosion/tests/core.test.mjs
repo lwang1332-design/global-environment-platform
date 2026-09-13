@@ -43,7 +43,7 @@ test('1/3/5-year historical statistics remain full-series and formal ISO is gate
     const years=Array.from({length:n},(_,i)=>2025-n+i),time=years.flatMap(hourAxis);
     const r=computeModel(input(time,{mode:'historical',requestedYears:years},{u10:time.map((_,i)=>i%137===0?45:5)},{isoChlorideDep:30,so2Dep:12.63}));
     const expected=years.reduce((s,y)=>s+hourAxis(y).length,0);
-    assert.equal(r.summary.hours,expected);assert.equal(r.summary.expectedHours,expected);assert.equal(r.summary.airSaltP99,pct(r.hourly.map(x=>x.airSalt),.99));assert.equal(r.annual.length,n);assert.ok(r.summary.firstYearCorrosion>0);assert.equal(r.summary.isoClDepMean,30);assert.equal(r.summary.meanSo2Dep,12.63);
+    assert.equal(r.summary.hours,expected);assert.equal(r.summary.expectedHours,expected);assert.equal(r.summary.airSaltP99,pct(r.hourly.map(x=>x.airSalt),.99));assert.equal(r.annual.length,n);assert.ok(r.summary.firstYearCorrosion>0);assert.equal(r.summary.isoClDepMean,30);assert.ok(Math.abs(r.summary.meanSo2Dep-12.63)<1e-9);
   }
   const missingIso=computeModel(input(hourAxis(2025),{mode:'historical',requestedYears:[2025]}));
   assert.equal(missingIso.summary.firstYearCorrosion,null);assert.ok(Number.isFinite(missingIso.summary.screeningFirstYearCorrosion));
