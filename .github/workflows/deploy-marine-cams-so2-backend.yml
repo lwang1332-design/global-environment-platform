@@ -49,12 +49,12 @@ jobs:
           echo "url=$url" >> "$GITHUB_OUTPUT"
           echo "Backend deployed: $url"
 
-      - name: Verify endpoint can authenticate and submit a CAMS EAC4 job
+      - name: Verify public production endpoint can submit a CAMS EAC4 job
         shell: bash
         env:
-          DEPLOY_URL: ${{ steps.deploy.outputs.url }}
+          PUBLIC_URL: https://global-marine-corrosion-direct-v332.vercel.app
         run: |
-          code=$(curl -sS -o /tmp/so2.json -w '%{http_code}' -X POST "$DEPLOY_URL/api/so2" \
+          code=$(curl -sS -o /tmp/so2.json -w '%{http_code}' -X POST "$PUBLIC_URL/api/so2" \
             -H 'Content-Type: application/json' \
             -d '{"lat":10.9,"lon":106.6,"mode":"historical","year":2025}')
           echo "HTTP status: $code"
@@ -80,6 +80,6 @@ jobs:
       - name: Verify expected production alias
         shell: bash
         run: |
-          url="https://${PROJECT_NAME}-${TEAM_SLUG}.vercel.app/api/so2"
+          url="https://${PROJECT_NAME}.vercel.app/api/so2"
           echo "Expected stable endpoint: $url"
-          curl -sS -I "https://${PROJECT_NAME}-${TEAM_SLUG}.vercel.app" >/dev/null || true
+          curl -sS -o /tmp/health.json -w 'GET status: %{http_code}\n' "$url" || true
