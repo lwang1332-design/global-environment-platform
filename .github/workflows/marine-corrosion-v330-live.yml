@@ -1,4 +1,4 @@
-name: Marine Corrosion V3.3 Live Check
+name: Marine Corrosion V3.3.1 Live Check
 
 on:
   push:
@@ -9,24 +9,24 @@ on:
   workflow_dispatch:
 
 jobs:
-  live-v330:
+  live-v331:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
       - uses: actions/checkout@v4
-      - name: Wait for V3.3 public assets
+      - name: Wait for V3.3.1 public assets
         run: |
-          LOCAL_SHA=$(sha256sum marine-corrosion/model-v330.js | awk '{print $1}')
+          LOCAL_SHA=$(sha256sum marine-corrosion/input-policy-v331.js | awk '{print $1}')
           for i in $(seq 1 36); do
-            URL="https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/model-v330.js?wait=${GITHUB_SHA}-${i}-$(date +%s)"
-            if curl -fsSL --retry 2 --max-time 20 "$URL" -o /tmp/model-v330.js && [ "$(sha256sum /tmp/model-v330.js | awk '{print $1}')" = "$LOCAL_SHA" ]; then
-              echo "V3.3.0 model asset is live on GitHub Pages"
+            URL="https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/input-policy-v331.js?wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            if curl -fsSL --retry 2 --max-time 20 "$URL" -o /tmp/input-policy-v331.js && [ "$(sha256sum /tmp/input-policy-v331.js | awk '{print $1}')" = "$LOCAL_SHA" ]; then
+              echo "V3.3.1 calculability asset is live on GitHub Pages"
               exit 0
             fi
-            echo "Waiting for V3.3.0 Pages deployment ($i/36)..."
+            echo "Waiting for V3.3.1 Pages deployment ($i/36)..."
             sleep 10
           done
-          echo "V3.3.0 model asset not live after waiting"
+          echo "V3.3.1 calculability asset not live after waiting"
           exit 1
       - uses: actions/setup-node@v4
         with:
@@ -36,12 +36,12 @@ jobs:
           npm init -y >/dev/null 2>&1
           npm i -D playwright@1.55.0 >/dev/null
           npx playwright install chromium >/dev/null
-      - name: Verify public V3.3 runtime and science guards
+      - name: Verify public V3.3.1 runtime, calculability and science guards
         run: |
-          cat > marine-v330-live.mjs <<'JS'
+          cat > marine-v331-live.mjs <<'JS'
           import { chromium } from 'playwright';
           const browser=await chromium.launch({headless:true});
-          const page=await browser.newPage({viewport:{width:1440,height:1000}});
+          const page=await browser.newPage({viewport:{width:1440,height:1100}});
           const errors=[];
           page.on('pageerror',e=>errors.push('pageerror:'+e.message));
           page.on('console',m=>{
@@ -50,31 +50,39 @@ jobs:
             const knownDirectUnavailable=/global-marine-corrosion-direct-v322|blocked by CORS policy|Access-Control-Allow-Origin/i.test(text);
             if(!/Failed to load resource/i.test(text)&&!knownDirectUnavailable)errors.push('console:'+text);
           });
-          const url='https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/?v=3.3.0-live-'+Date.now();
+          const url='https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/?v=3.3.1-live-'+Date.now();
           await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
-          await page.waitForSelector('.brand-title',{timeout:60000});
-          await page.waitForTimeout(1500);
+          await page.waitForSelector('#v331InputPanel',{timeout:60000});
+          await page.waitForTimeout(1200);
           const ui=await page.evaluate(()=>({
             title:document.title,
             brand:document.querySelector('.brand-title')?.textContent||'',
-            notice:document.querySelector('#globalNotice')?.textContent||'',
+            panel:!!document.querySelector('#v331InputPanel'),
+            l1:document.querySelector('#v331L1')?.textContent||'',
+            l2:document.querySelector('#v331L2')?.textContent||'',
+            l3:document.querySelector('#v331L3')?.textContent||'',
+            mode:document.querySelector('#v331So2Mode')?.value,
             overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
             runButton:!!document.querySelector('#runBtn'),
-            map:!!document.querySelector('#map'),
-            sourceText:document.querySelector('#sourceText')?.textContent||''
+            map:!!document.querySelector('#map')
           }));
           console.log('UI',ui);
-          if(!ui.title.includes('V3.3.0')||!ui.brand.includes('V3.3.0'))throw new Error('Runtime branding is not V3.3.0: '+JSON.stringify(ui));
-          if(!ui.runButton||!ui.map||ui.overflow>2)throw new Error('Marine corrosion shell regression: '+JSON.stringify(ui));
-          const science=await page.evaluate(async()=>{
+          if(!ui.title.includes('V3.3.1')||!ui.brand.includes('V3.3.1'))throw new Error('Runtime branding is not V3.3.1: '+JSON.stringify(ui));
+          if(!ui.panel||!/环境Screening/.test(ui.l1)||!/腐蚀Screening/.test(ui.l2)||!/正式ISO/.test(ui.l3))throw new Error('Calculability ladder missing');
+          if(ui.mode!=='auto'||!ui.runButton||!ui.map||ui.overflow>2)throw new Error('Marine corrosion shell regression: '+JSON.stringify(ui));
+          const guards=await page.evaluate(async()=>{
             const m=await import('./model-v330.js?live='+Date.now());
+            const p=await import('./input-policy-v331.js?live='+Date.now());
+            const auto=p.deriveManagedOverrides({so2Mode:'auto'},{so2Dep:1,camsSo2:1e-9});
             return {
-              version:m.MODEL_VERSION,
-              pd:m.isoSo2DepFromConcentration(10,.8),
+              appVersion:p.APP_VERSION,
+              scienceVersion:m.MODEL_VERSION,
+              pdFromPc:p.deriveManagedOverrides({so2Mode:'pc',so2Pc:10},{}).so2Dep,
+              autoInventsPd:Object.prototype.hasOwnProperty.call(auto,'so2Dep'),
+              autoKeepsCams:auto.camsSo2,
+              formalReady:p.inputReadiness({so2Mode:'pc',so2Pc:10,isoSd:20}).formalIsoManualReady,
               wetMissing:m.wetDepositionFlux(10,5,1,null,null),
-              wetConfigured:m.wetDepositionFlux(10,5,1,.01,100),
               distanceJump:Math.abs(m.distanceFactor(99)-m.distanceFactor(101)),
-              hasOldSprayScale:Object.prototype.hasOwnProperty.call(m.DEFAULTS,'localSprayScaleKm'),
               spray35:m.DEFAULTS.localSprayScale35Km,
               spray75:m.DEFAULTS.localSprayScale75Km,
               isoClDefault:m.DEFAULTS.isoChlorideEquivalentFactor,
@@ -83,15 +91,16 @@ jobs:
               d90:m.camsAmbientDiameter(1,90,1.1)
             };
           });
-          console.log('SCIENCE',science);
-          if(science.version!=='3.3.0')throw new Error('Wrong model version '+JSON.stringify(science));
-          if(Math.abs(science.pd-8)>1e-12)throw new Error('Pd=0.8Pc guard failed');
-          if(science.wetMissing!==null||!(science.wetConfigured>0))throw new Error('Wet-deposition gating failed');
-          if(science.distanceJump>=.02)throw new Error('Proxy distance continuity failed');
-          if(science.hasOldSprayScale||science.spray35!==12||science.spray75!==6)throw new Error('Local Spray split-scale guard failed');
-          if(science.isoClDefault!==null)throw new Error('ISO Sd must default to missing');
-          if(science.camsDryFactor!==4.3||!(science.d90>science.d80))throw new Error('CAMS RH80 guard failed');
+          console.log('GUARDS',guards);
+          if(guards.appVersion!=='3.3.1'||guards.scienceVersion!=='3.3.0')throw new Error('Version split guard failed');
+          if(Math.abs(guards.pdFromPc-8)>1e-12||guards.autoInventsPd||guards.autoKeepsCams!==1e-9)throw new Error('SO2 calculability guard failed');
+          if(!guards.formalReady)throw new Error('Formal readiness guard failed');
+          if(guards.wetMissing!==null)throw new Error('Wet-deposition gating failed');
+          if(guards.distanceJump>=.02)throw new Error('Proxy distance continuity failed');
+          if(guards.spray35!==12||guards.spray75!==6)throw new Error('Local Spray split-scale guard failed');
+          if(guards.isoClDefault!==null)throw new Error('ISO Sd must default to missing');
+          if(guards.camsDryFactor!==4.3||!(guards.d90>guards.d80))throw new Error('CAMS RH80 guard failed');
           if(errors.length)throw new Error('Browser errors: '+errors.join(' | '));
           await browser.close();
           JS
-          node marine-v330-live.mjs
+          node marine-v331-live.mjs
