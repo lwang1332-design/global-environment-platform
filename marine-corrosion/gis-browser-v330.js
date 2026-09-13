@@ -1,0 +1,22 @@
+import {checkAbort,delay,number} from './data-quality.js';
+import {requestJson} from './sources-v330.js';
+import {feature} from 'https://cdn.jsdelivr.net/npm/topojson-client@3/+esm';
+import {geoContains} from 'https://cdn.jsdelivr.net/npm/d3-geo@3/+esm';
+
+const R=6371;
+const LAND_URL='https://cdn.jsdelivr.net/npm/world-atlas@2/land-50m.json';
+let landPromise=null;
+function dest(lat,lon,bearing,km){const br=bearing*Math.PI/180,p1=lat*Math.PI/180,l1=lon*Math.PI/180,d=km/R;const p2=Math.asin(Math.sin(p1)*Math.cos(d)+Math.cos(p1)*Math.sin(d)*Math.cos(br));const l2=l1+Math.atan2(Math.sin(br)*Math.sin(d)*Math.cos(p1),Math.cos(d)-Math.sin(p1)*Math.sin(p2));return [p2*180/Math.PI,((l2*180/Math.PI+540)%360)-180]}
+async function loadLand(){if(!landPromise)landPromise=fetch(LAND_URL,{cache:'force-cache',signal:AbortSignal.timeout(30000)}).then(async r=>{if(!r.ok)throw new Error(`Natural Earth land mask ${r.status}`);const topo=await r.json();if(!topo?.objects?.land)throw new Error('Natural Earth land object missing');return feature(topo,topo.objects.land)}).catch(e=>{landPromise=null;throw e});return landPromise}
+function onLand(land,lat,lon){return geoContains(land,[lon,lat])}
+function refineTransition(land,lat,lon,bearing,lo,hi,loState){let a=lo,b=hi;for(let i=0;i<10;i++){const m=(a+b)/2,p=dest(lat,lon,bearing,m),state=onLand(land,p[0],p[1]);if(state===loState)a=m;else b=m}return b}
+async function siteElevation(lat,lon,siteLand,signal){if(!siteLand)return null;try{const u=new URL('https://api.open-meteo.com/v1/elevation');u.searchParams.set('latitude',String(lat));u.searchParams.set('longitude',String(lon));const {data:d}=await requestJson(u,{signal,timeout:10000,retries:0});return number(d?.elevation?.[0])}catch(e){if(e.name==='AbortError')throw e;return null}}
+function addDirectionalSpread(bins){const n=bins.length;return bins.map((b,i)=>{const near=[bins[(i-2+n)%n],bins[(i-1+n)%n],b,bins[(i+1)%n],bins[(i+2)%n]];const ds=near.map(x=>x.seaDistanceKm).filter(Number.isFinite),fs=near.map(x=>x.fetchKm).filter(Number.isFinite);const dSpread=ds.length?Math.max(...ds)-Math.min(...ds):null,fSpread=fs.length?Math.max(...fs)-Math.min(...fs):null;return {...b,directionalSpreadKm:dSpread,fetchSpreadKm:fSpread}})}
+export async function fallbackGisContext(lat,lon,signal){
+  const land=await loadLand(),siteLand=onLand(land,lat,lon),bearings=[...Array(72)].map((_,i)=>i*5),dists=[0.1,0.25,0.5,1,2,5,10,20,40,80,150,300,600,1000],raw=[];
+  for(const bearing of bearings){checkAbort(signal);await delay(0,signal);let prevD=0,prevState=siteLand,firstChange=null,secondChange=null;for(const d of dists){const p=dest(lat,lon,bearing,d),state=onLand(land,p[0],p[1]);if(state!==prevState){const refined=refineTransition(land,lat,lon,bearing,prevD,d,prevState);if(firstChange===null)firstChange=refined;else{secondChange=refined;break}prevState=state}prevD=d}if(siteLand){const seaDistance=firstChange??1200,fetch=firstChange===null?0:Math.max(0,(secondChange??1000)-firstChange);raw.push({bearing,seaDistanceKm:seaDistance,fetchKm:fetch})}else raw.push({bearing,seaDistanceKm:0,fetchKm:firstChange??1000})}
+  const bins=addDirectionalSpread(raw);let distanceToCoastKm,coastBearing;if(siteLand){const best=bins.reduce((a,b)=>b.seaDistanceKm<a.seaDistanceKm?b:a,bins[0]);distanceToCoastKm=best.seaDistanceKm;coastBearing=best.bearing}else{const best=bins.reduce((a,b)=>b.fetchKm<a.fetchKm?b:a,bins[0]);distanceToCoastKm=best.fetchKm;coastBearing=best.bearing}
+  const elevation=await siteElevation(lat,lon,siteLand,signal),maxSpread=Math.max(...bins.map(b=>Number(b.directionalSpreadKm)||0)),complexCoast=maxSpread>50;
+  return {elevation,siteMedium:siteLand?'land':'sea',distanceToCoastKm,coastBearing,bearingBins:bins,gisUncertainty:{bearingResolutionDeg:5,maxDirectionalDistanceSpreadKm:maxSpread,complexCoast},provenance:{type:'CALC/FALLBACK',source:'Natural Earth 1:50m land mask + 5° radial fetch (V3.3.0)',resolution:'1:50m coastline; 5° bearings; transition bisection ×10',confidence:complexCoast?'D':'C',note:'Production仍应优先GSHHG高分辨率Direct。5°方向敏感性用于识别河口/岛屿/港池不稳定点。'}}
+}
+export async function resolveGis(lat,lon,direct,signal){if(direct?.gis?.bearingBins?.length)return {...direct.gis,provenance:{...direct.gis.provenance,type:direct.gis.provenance?.type||'DIRECT',note:[direct.gis.provenance?.note,'V3.3.0模型按实际风向对bearing bins插值；建议Direct使用GSHHG high/full resolution'].filter(Boolean).join('；')}};return fallbackGisContext(Number(lat),Number(lon),signal)}
