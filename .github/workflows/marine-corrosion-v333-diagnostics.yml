@@ -1,0 +1,75 @@
+name: Marine Corrosion V3.3.3 Diagnostics
+
+on:
+  push:
+    branches:
+      - v3.3.3-diagnostics
+    paths:
+      - 'marine-corrosion/**'
+      - '.github/workflows/marine-corrosion-v333-diagnostics.yml'
+  pull_request:
+    paths:
+      - 'marine-corrosion/**'
+      - '.github/workflows/marine-corrosion-v333-diagnostics.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check V3.3.3 diagnostic modules
+        run: |
+          node --check marine-corrosion/diagnostics-v333.js
+          node --check marine-corrosion/run-controller-v333.js
+          node --check marine-corrosion/input-policy-v333.js
+          node --check marine-corrosion/v333-ui-runtime.js
+          node --check marine-corrosion/tests/v333-diagnostics.test.mjs
+      - name: Run JavaScript regressions
+        run: node --test marine-corrosion/tests/*.test.mjs
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Start local app
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/marine-v333-http.log 2>&1 &
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/marine-corrosion/ >/dev/null && exit 0; sleep 1; done
+          cat /tmp/marine-v333-http.log
+          exit 1
+      - name: Verify V3.3.3 diagnostic UI guardrails
+        run: |
+          cat > marine-v333-browser.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:1440,height:1100}});
+          const errors=[];
+          page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+          page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource|global-marine-corrosion-direct-v3|open-meteo|unpkg|CORS/i.test(m.text()))errors.push('console:'+m.text())});
+          await page.goto('http://127.0.0.1:4173/marine-corrosion/?v=3.3.3-ci',{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForSelector('#v333DiagnosticPanel',{timeout:30000});
+          await page.waitForTimeout(800);
+          const ui=await page.evaluate(()=>({title:document.title,brand:document.querySelector('.brand-title')?.textContent||'',head:document.querySelector('#v333DiagnosticPanel h2')?.textContent||'',text:document.querySelector('#v333DiagnosticPanel')?.textContent||'',overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}));
+          console.log(ui);
+          if(!ui.title.includes('V3.3.3')||!ui.brand.includes('V3.3.3')||!ui.head.includes('V3.3.3'))throw new Error('V3.3.3 branding missing');
+          if(!/只诊断，不校准/.test(ui.text)||!/实测值只用于最终差额比较/.test(ui.text))throw new Error('diagnostic guardrail copy missing');
+          const policy=await page.evaluate(async()=>{const p=await import('./input-policy-v333.js?ci='+Date.now());return {app:p.APP_VERSION,science:p.SCIENCE_MODEL_VERSION,data:p.DATA_LAYER_VERSION,diag:p.DIAGNOSTIC_LAYER_VERSION,cal:p.DIAGNOSTIC_POLICY.calibration,obs:p.DIAGNOSTIC_POLICY.observedAsModelInput}});
+          if(policy.app!=='3.3.3'||policy.science!=='3.3.0'||policy.data!=='3.3.2'||policy.diag!=='3.3.3'||policy.cal!==false||policy.obs!==false)throw new Error('V3.3.3 version/policy guard failed');
+          if(ui.overflow>2||errors.length)throw new Error('Browser regression: '+errors.join(' | '));
+          await browser.close();
+          JS
+          node marine-v333-browser.mjs
