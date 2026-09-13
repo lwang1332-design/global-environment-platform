@@ -23,7 +23,7 @@ jobs:
         run: |
           node --check marine-corrosion/input-policy-v331.js
           node --check marine-corrosion/gis-browser-v331.js
-          node --check marine-corrosion/v331-ui-patch.js
+          node --check marine-corrosion/v331-ui-runtime.js
           node --check marine-corrosion/tests/v331-calculability.test.mjs
       - name: Run all marine corrosion regressions
         run: node --test marine-corrosion/tests/*.test.mjs
