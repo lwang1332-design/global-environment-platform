@@ -1,0 +1,91 @@
+name: Marine Corrosion V3.3 Live Check
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'marine-corrosion/**'
+      - '.github/workflows/marine-corrosion-v330-live.yml'
+  workflow_dispatch:
+
+jobs:
+  live-v330:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - name: Wait for V3.3 public assets
+        run: |
+          LOCAL_SHA=$(sha256sum marine-corrosion/model-v330.js | awk '{print $1}')
+          for i in $(seq 1 36); do
+            URL="https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/model-v330.js?wait=${GITHUB_SHA}-${i}-$(date +%s)"
+            if curl -fsSL --retry 2 --max-time 20 "$URL" -o /tmp/model-v330.js && [ "$(sha256sum /tmp/model-v330.js | awk '{print $1}')" = "$LOCAL_SHA" ]; then
+              echo "V3.3.0 model asset is live on GitHub Pages"
+              exit 0
+            fi
+            echo "Waiting for V3.3.0 Pages deployment ($i/36)..."
+            sleep 10
+          done
+          echo "V3.3.0 model asset not live after waiting"
+          exit 1
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Verify public V3.3 runtime and science guards
+        run: |
+          cat > marine-v330-live.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:1440,height:1000}});
+          const errors=[];
+          page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+          page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource/i.test(m.text()))errors.push('console:'+m.text())});
+          const url='https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/?v=3.3.0-live-'+Date.now();
+          await page.goto(url,{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForSelector('.brand-title',{timeout:60000});
+          await page.waitForTimeout(1500);
+          const ui=await page.evaluate(()=>({
+            title:document.title,
+            brand:document.querySelector('.brand-title')?.textContent||'',
+            notice:document.querySelector('#globalNotice')?.textContent||'',
+            overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth,
+            runButton:!!document.querySelector('#runBtn'),
+            map:!!document.querySelector('#map')
+          }));
+          console.log('UI',ui);
+          if(!ui.title.includes('V3.3.0')||!ui.brand.includes('V3.3.0'))throw new Error('Runtime branding is not V3.3.0: '+JSON.stringify(ui));
+          if(!ui.runButton||!ui.map||ui.overflow>2)throw new Error('Marine corrosion shell regression: '+JSON.stringify(ui));
+          const science=await page.evaluate(async()=>{
+            const m=await import('./model-v330.js?live='+Date.now());
+            return {
+              version:m.MODEL_VERSION,
+              pd:m.isoSo2DepFromConcentration(10,.8),
+              wetMissing:m.wetDepositionFlux(10,5,1,null,null),
+              wetConfigured:m.wetDepositionFlux(10,5,1,.01,100),
+              distanceJump:Math.abs(m.distanceFactor(99)-m.distanceFactor(101)),
+              hasOldSprayScale:Object.prototype.hasOwnProperty.call(m.DEFAULTS,'localSprayScaleKm'),
+              spray35:m.DEFAULTS.localSprayScale35Km,
+              spray75:m.DEFAULTS.localSprayScale75Km,
+              isoClDefault:m.DEFAULTS.isoChlorideEquivalentFactor,
+              camsDryFactor:m.DEFAULTS.camsDryMassFactor,
+              d80:m.camsAmbientDiameter(1,80,1.1),
+              d90:m.camsAmbientDiameter(1,90,1.1)
+            };
+          });
+          console.log('SCIENCE',science);
+          if(science.version!=='3.3.0')throw new Error('Wrong model version '+JSON.stringify(science));
+          if(Math.abs(science.pd-8)>1e-12)throw new Error('Pd=0.8Pc guard failed');
+          if(science.wetMissing!==null||!(science.wetConfigured>0))throw new Error('Wet-deposition gating failed');
+          if(science.distanceJump>=.02)throw new Error('Proxy distance continuity failed');
+          if(science.hasOldSprayScale||science.spray35!==12||science.spray75!==6)throw new Error('Local Spray split-scale guard failed');
+          if(science.isoClDefault!==null)throw new Error('ISO Sd must default to missing');
+          if(science.camsDryFactor!==4.3||!(science.d90>science.d80))throw new Error('CAMS RH80 guard failed');
+          if(errors.length)throw new Error('Browser errors: '+errors.join(' | '));
+          await browser.close();
+          JS
+          node marine-v330-live.mjs
