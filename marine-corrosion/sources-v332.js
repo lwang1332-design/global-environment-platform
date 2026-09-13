@@ -1,4 +1,4 @@
-import {number} from './data-quality.js';
+import {number,delay,checkAbort} from './data-quality.js';
 import {alignSeries,requestJson,SourceError,normalizeDirectCams as normalizeDirectCams330} from './sources-v330.js';
 export * from './sources-v330.js';
 
@@ -28,10 +28,21 @@ function forecastToHourly(data,baseTimes){
   return a;
 }
 
-export async function fetchCamsSo2Auto({lat,lon,mode,year,baseTimes,signal,url}={}){
+export async function fetchCamsSo2Auto({lat,lon,mode,year,baseTimes,signal,url,onProgress=()=>{}}={}){
   if(!Number.isFinite(Number(lat))||!Number.isFinite(Number(lon))||!['historical','current'].includes(mode)||!Array.isArray(baseTimes)||!baseTimes.length)throw new SourceError('INPUT','CAMS SO₂ Auto 输入无效');
   const endpoint=configuredUrl(url),payload={lat:Number(lat),lon:Number(lon),mode,...(mode==='historical'?{year:Number(year)}:{})};
-  const {data}=await requestJson(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal,timeout:60000,retries:0});
+  let response=await requestJson(endpoint,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload),signal,timeout:30000,retries:0});
+  const started=Date.now();
+  while(response.status===202||['accepted','queued','running'].includes(String(response.data?.status||'').toLowerCase())){
+    checkAbort(signal);
+    const job=String(response.data?.jobId||'');
+    if(!/^[A-Za-z0-9_-]{8,4096}$/.test(job))throw new SourceError('INVALID_RESPONSE','CAMS SO₂ Auto任务缺少有效编号');
+    onProgress({status:response.data?.status||'running',jobId:job,cycle:response.data?.cycle||null,detail:'CAMS ADS正在准备SO₂数据'});
+    if(Date.now()-started>300000){const e=new SourceError('PENDING','CAMS SO₂任务仍在准备，可重试继续');e.jobId=job;throw e}
+    await delay(Math.max(2000,Math.min(10000,Number(response.data?.retryAfterSeconds||5)*1000)),signal);
+    response=await requestJson(`${endpoint}?job=${encodeURIComponent(job)}`,{signal,timeout:30000,retries:0});
+  }
+  const data=response.data;
   if(!data?.configured)throw new SourceError('NOT_CONFIGURED',data?.error?.message||'CAMS SO₂ Auto服务未配置');
   if(!Array.isArray(data.time)||!Array.isArray(data.so2)||!data.time.length||data.time.length!==data.so2.length)throw new SourceError('INVALID_RESPONSE','CAMS SO₂ Auto未返回有效时间序列');
   return mode==='historical'?monthlyToHourly(data,baseTimes):forecastToHourly(data,baseTimes);
