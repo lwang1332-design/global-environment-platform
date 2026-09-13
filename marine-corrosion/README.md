@@ -130,9 +130,9 @@ Direct未恢复时：
 V3.3.1 可计算性层：
 
 - `input-policy-v331.js`：输入规范、Pc→Pd、L1/L2/L3、Wet/GIS策略；
-- `v331-ui-patch.js`：普通用户补齐卡、Screening显示、版本与输入同步；
+- `v331-ui-runtime.js`：稳定的普通用户补齐卡、Screening显示、版本与输入同步；不使用全DOM MutationObserver；
 - `gis-browser-v331.js`：人工GIS Screening Override；
-- `review-ui.js`：加载V3.3.1 UI；
+- `review-ui.js`：加载V3.3.1稳定运行层；
 - `gis-browser-v328.js`：兼容入口转发到V3.3.1 GIS。
 
 ## 6. 测试
@@ -149,12 +149,14 @@ V3.3.1新增回归：
 - Wet启停；
 - GIS人工覆盖72个5°方向Bin；
 - L1/L2/L3输入就绪逻辑；
-- 工程Screening腐蚀率带非正式警告。
+- 工程Screening腐蚀率带非正式警告；
+- 浏览器首屏、输入切换、版本分离和页面可响应性。
 
 CI：
 
 - `.github/workflows/marine-corrosion-v330-science.yml`
 - `.github/workflows/marine-corrosion-v331-calculability.yml`
+- `.github/workflows/marine-corrosion-v330-live.yml`（已升级为V3.3.1公网Live Check）
 
 ## 7. 版本定位
 
