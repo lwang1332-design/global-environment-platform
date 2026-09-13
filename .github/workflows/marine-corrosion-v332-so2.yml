@@ -1,0 +1,84 @@
+name: Marine Corrosion V3.3.2 CAMS SO2
+
+on:
+  push:
+    branches:
+      - v3.3.2-cams-so2
+      - main
+    paths:
+      - 'marine-corrosion/**'
+      - '.github/workflows/marine-corrosion-v332-so2.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Syntax check V3.3.2 modules
+        run: |
+          node --check marine-corrosion/sources-v332.js
+          node --check marine-corrosion/run-controller-v332.js
+          node --check marine-corrosion/input-policy-v332.js
+          node --check marine-corrosion/v332-ui-runtime.js
+          node --check marine-corrosion/tests/v332-so2-auto.test.mjs
+          python3 -m py_compile marine-corrosion/direct-backend/api/so2.py
+      - name: Run JavaScript regressions
+        run: node --test marine-corrosion/tests/*.test.mjs
+      - name: Verify CAMS backend dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check -q -r marine-corrosion/direct-backend/requirements.txt
+          python3 - <<'PY'
+          from ecmwf.datastores import Client
+          for name in ('submit','get_remote','get_results'):
+              assert hasattr(Client,name), name
+          print('ecmwf-datastores-client async API available')
+          PY
+      - name: Run CAMS request contract tests
+        run: python3 -m unittest marine-corrosion/tests/test_so2_backend.py
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Start local app
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/marine-v332-http.log 2>&1 &
+          for i in $(seq 1 20); do curl -fsS http://127.0.0.1:4173/marine-corrosion/ >/dev/null && exit 0; sleep 1; done
+          cat /tmp/marine-v332-http.log
+          exit 1
+      - name: Verify V3.3.2 UI and data policy
+        run: |
+          cat > marine-v332-browser.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:1440,height:1100}});
+          const errors=[];
+          page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+          page.on('console',m=>{if(m.type()==='error'&&!/Failed to load resource|global-marine-corrosion-direct-v3|open-meteo|unpkg|CORS/i.test(m.text()))errors.push('console:'+m.text())});
+          await page.goto('http://127.0.0.1:4173/marine-corrosion/?v=3.3.2-ci',{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForSelector('#v331InputPanel',{timeout:30000});
+          await page.waitForTimeout(1000);
+          const ui=await page.evaluate(()=>({title:document.title,brand:document.querySelector('.brand-title')?.textContent||'',head:document.querySelector('#v331InputPanel .v331-head h2')?.textContent||'',auto:document.querySelector('#v331So2Mode option[value="auto"]')?.textContent||'',note:document.querySelector('#v332So2AutoNote')?.textContent||'',overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}));
+          console.log(ui);
+          if(!ui.title.includes('V3.3.2')||!ui.brand.includes('V3.3.2')||!ui.head.includes('V3.3.2'))throw new Error('V3.3.2 branding missing');
+          if(!/EAC4/.test(ui.auto)||!/Forecast/.test(ui.auto)||!/ML60/.test(ui.note)||!/ML137/.test(ui.note))throw new Error('SO2 Auto source explanation missing');
+          const policy=await page.evaluate(async()=>{const p=await import('./input-policy-v332.js?ci='+Date.now());return {app:p.APP_VERSION,science:p.SCIENCE_MODEL_VERSION,h:p.SO2_AUTO_POLICY.historical.dataset,c:p.SO2_AUTO_POLICY.current.dataset}});
+          if(policy.app!=='3.3.2'||policy.science!=='3.3.0'||!/eac4/.test(policy.h)||!/forecasts/.test(policy.c))throw new Error('V3.3.2 policy guard failed');
+          if(ui.overflow>2||errors.length)throw new Error('Browser regression: '+errors.join(' | '));
+          await browser.close();
+          JS
+          node marine-v332-browser.mjs
