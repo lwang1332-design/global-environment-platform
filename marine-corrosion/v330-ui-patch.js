@@ -4,8 +4,8 @@ const readJson=(key,def={})=>{try{return JSON.parse(localStorage.getItem(key)||'
 const esc=v=>String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 
 function patchVersion(){
-  document.title=document.title.replaceAll('V3.2.8','V3.3.0');
-  document.querySelectorAll('.brand-title').forEach(el=>{el.textContent=el.textContent.replaceAll('V3.2.8','V3.3.0')});
+  if(document.title.includes('V3.2.8'))document.title=document.title.replaceAll('V3.2.8','V3.3.0');
+  document.querySelectorAll('.brand-title').forEach(el=>{if(el.textContent.includes('V3.2.8'))el.textContent=el.textContent.replaceAll('V3.2.8','V3.3.0')});
   const notice=document.querySelector('#globalNotice');
   if(notice&&/V3\.2\.8/.test(notice.textContent))notice.textContent=notice.textContent.replaceAll('V3.2.8','V3.3.0').replace('数据质量、完整时序统计与地图选点','科学模型修正版：标准Pd/Sd门控、CAMS RH80修正、单Fetch与量纲闭合沉降');
   try{const u=new URL(location.href);if(u.searchParams.get('v')!=='3.3.0'){u.searchParams.set('v','3.3.0');history.replaceState({},'',u.pathname+'?'+u.searchParams.toString()+u.hash)}}catch{}
