@@ -22,17 +22,21 @@ export class RunCoordinator extends RunCoordinator330{
     checkAbort(signal);
     const {latitude:lat,longitude:lon,mode}=snapshot.cfg;
     const cacheKey='cams-so2|'+stableStringify({v:DATA_VERSION,lat,lon,mode,year:year||null,axisStart:env.weather.time[0],axisEnd:env.weather.time.at(-1)});
+    const jobKey='cams-so2-job|'+cacheKey;
     let so2=!options.fresh&&await this.cache.get(cacheKey),so2Error=null;
     if(!so2){
-      emit({stage:'cams-so2',year,detail:mode==='historical'?'CAMS EAC4：获取月平均SO₂并映射到小时轴':'CAMS Forecast：获取最低模式层SO₂预报'});
+      if(options.fresh){await this.cache.delete(cacheKey);await this.cache.delete(jobKey)}
+      const resume=!options.fresh&&await this.cache.get(jobKey);
+      emit({stage:'cams-so2',year,detail:resume?.jobId?'继续已有CAMS ADS SO₂任务':mode==='historical'?'CAMS EAC4：提交月平均SO₂任务':'CAMS Forecast：提交最低模式层SO₂任务'});
       try{
-        so2=await this.camsSo2Auto({lat,lon,mode,year,baseTimes:env.weather.time,signal});
+        so2=await this.camsSo2Auto({lat,lon,mode,year,baseTimes:env.weather.time,signal,resumeJob:resume?.jobId||null,onProgress:ev=>{emit({stage:'cams-so2',year,...ev});if(ev.jobId)this.cache.put(jobKey,{jobId:ev.jobId},86400000).catch(()=>{})}});
         const ttl=mode==='historical'?30*86400000:3*3600000;
-        await this.cache.put(cacheKey,so2,ttl);
+        await this.cache.put(cacheKey,so2,ttl);await this.cache.delete(jobKey);
       }catch(e){
         if(e.name==='AbortError')throw e;
-        so2Error={code:e.code||'CAMS_SO2_UNAVAILABLE',message:e.message};
-        emit({stage:'cams-so2',year,detail:'CAMS SO₂ Auto不可用；不制造Pd，保持L1并允许人工Pc/Pd',status:'warn'});
+        if(e.jobId)await this.cache.put(jobKey,{jobId:e.jobId},86400000);
+        so2Error={code:e.code||'CAMS_SO2_UNAVAILABLE',message:e.message,...(e.jobId?{jobId:e.jobId}:{})};
+        emit({stage:'cams-so2',year,detail:e.code==='PENDING'?'CAMS SO₂任务仍在ADS队列；下次计算将继续该任务':'CAMS SO₂ Auto不可用；不制造Pd，保持L1并允许人工Pc/Pd',status:'warn'});
       }
     }else emit({stage:'cams-so2',year,detail:'已复用CAMS SO₂ Auto缓存',cached:true});
 
@@ -40,14 +44,14 @@ export class RunCoordinator extends RunCoordinator330{
     const ratio=coverage(so2);
     env.services={...(env.services||{}),camsSo2:{
       configured:so2?true:so2Error?.code==='NOT_CONFIGURED'?false:null,
-      status:ratio>=.95?'valid_data':ratio>0?'partial_data':'missing',
+      status:ratio>=.95?'valid_data':ratio>0?'partial_data':so2Error?.code==='PENDING'?'pending':'missing',
       coveragePercent:100*ratio,
       source:so2?.provenance?.source||'CAMS SO₂ Auto',
       dataset:so2?.provenance?.dataset||null,
       modelLevel:so2?.provenance?.modelLevel||null,
       retrievedAt:so2?.provenance?.retrievedAt||null,
       error:so2Error,
-      policy:'缺失时保持MISSING；不恢复Pd=1固定Fallback'
+      policy:'缺失时保持MISSING；不恢复Pd=1固定Fallback；ADS长任务可恢复续跑'
     }};
     env.retrievedAt=new Date().toISOString();
     return env;
