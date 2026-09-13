@@ -2,6 +2,11 @@ name: Deploy Marine CAMS SO2 Backend
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - v3.3.2-cams-so2
+    paths:
+      - .github/workflows/deploy-marine-cams-so2-backend.yml
 
 permissions:
   contents: read
@@ -9,7 +14,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     env:
       PROJECT_NAME: global-marine-corrosion-direct-v332
       TEAM_SLUG: lwang1332-4885
@@ -36,40 +41,117 @@ jobs:
           npx --yes vercel@latest link --yes --project "$PROJECT_NAME" --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN"
 
       - name: Deploy production backend with server-only CAMS token
-        id: deploy
         working-directory: marine-corrosion/direct-backend
         shell: bash
         run: |
-          url=$(npx --yes vercel@latest deploy --prod --yes --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN" --env CAMS_ADS_API_KEY="$CAMS_ADS_API_KEY" | tail -n 1)
-          echo "url=$url" >> "$GITHUB_OUTPUT"
-          echo "Backend deployed: $url"
+          npx --yes vercel@latest deploy --prod --yes --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN" --env CAMS_ADS_API_KEY="$CAMS_ADS_API_KEY"
 
-      - name: Verify public production endpoint can submit a CAMS EAC4 job
-        shell: bash
+      - name: Verify CAMS EAC4 and Forecast end-to-end
         env:
           PUBLIC_URL: https://global-marine-corrosion-direct-v332.vercel.app
+        shell: bash
         run: |
-          code=$(curl -sS -o /tmp/so2.json -w '%{http_code}' -X POST "$PUBLIC_URL/api/so2" \
-            -H 'Content-Type: application/json' \
-            -d '{"lat":10.9,"lon":106.6,"mode":"historical","year":2025}')
-          echo "HTTP status: $code"
           python3 - <<'PY'
-          import json
-          x=json.load(open('/tmp/so2.json'))
-          e=x.get('error') if isinstance(x,dict) else None
-          safe={k:x.get(k) for k in ('version','configured','status','dataset','modelLevel','retryAfterSeconds')} if isinstance(x,dict) else {}
-          if isinstance(e,dict):
-              safe['error']={'code':e.get('code'),'message':e.get('message')}
-          print(safe)
-          PY
-          test "$code" = "202"
-          python3 - <<'PY'
-          import json
-          x=json.load(open('/tmp/so2.json'))
-          assert x.get('configured') is True
-          assert x.get('dataset')=='cams-global-reanalysis-eac4-monthly'
-          assert x.get('modelLevel')=='60'
-          assert isinstance(x.get('jobId'),str) and len(x['jobId'])>=8
+          import json, math, sys, time
+          from urllib.error import HTTPError
+          from urllib.parse import quote
+          from urllib.request import Request, urlopen
+
+          BASE = "https://global-marine-corrosion-direct-v332.vercel.app/api/so2"
+
+          def request_json(method, url, payload=None, timeout=300):
+              data = None if payload is None else json.dumps(payload).encode("utf-8")
+              req = Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+              try:
+                  with urlopen(req, timeout=timeout) as r:
+                      return r.status, json.loads(r.read().decode("utf-8"))
+              except HTTPError as e:
+                  body = e.read().decode("utf-8", "replace")
+                  try:
+                      parsed = json.loads(body)
+                  except Exception:
+                      parsed = {"raw": body[:1000]}
+                  raise RuntimeError(f"HTTP {e.code}: {parsed}") from None
+
+          def submit_and_wait(label, payload, expected_dataset, expected_level, max_wait=720):
+              code, body = request_json("POST", BASE, payload, timeout=60)
+              if code != 202:
+                  raise RuntimeError(f"{label} submit expected 202, got {code}: {body}")
+              if body.get("configured") is not True:
+                  raise RuntimeError(f"{label} backend not configured: {body}")
+              if body.get("dataset") != expected_dataset or str(body.get("modelLevel")) != expected_level:
+                  raise RuntimeError(f"{label} submit metadata mismatch: {body}")
+              job = body.get("jobId")
+              if not isinstance(job, str) or len(job) < 8:
+                  raise RuntimeError(f"{label} missing job id")
+              print(f"{label}: submitted, upstream status={body.get('status')}")
+
+              deadline = time.time() + max_wait
+              polls = 0
+              while time.time() < deadline:
+                  polls += 1
+                  wait_s = max(2, min(15, int(body.get("retryAfterSeconds") or 5)))
+                  time.sleep(wait_s)
+                  code, body = request_json("GET", BASE + "?job=" + quote(job, safe=""), timeout=300)
+                  if code == 202:
+                      if isinstance(body.get("jobId"), str) and len(body["jobId"]) >= 8:
+                          job = body["jobId"]
+                      if polls % 6 == 0:
+                          print(f"{label}: polling, status={body.get('status')}, polls={polls}")
+                      continue
+                  if code != 200:
+                      raise RuntimeError(f"{label} poll expected 200/202, got {code}: {body}")
+
+                  times = body.get("time")
+                  vals = body.get("so2")
+                  if body.get("configured") is not True:
+                      raise RuntimeError(f"{label} completed response not configured")
+                  if body.get("dataset") != expected_dataset or str(body.get("modelLevel")) != expected_level:
+                      raise RuntimeError(f"{label} completed metadata mismatch: {body}")
+                  if body.get("units", {}).get("so2") != "kg/kg":
+                      raise RuntimeError(f"{label} unit mismatch: {body.get('units')}")
+                  if not isinstance(times, list) or not isinstance(vals, list) or not times or len(times) != len(vals):
+                      raise RuntimeError(f"{label} invalid time/value arrays")
+                  finite = [float(v) for v in vals if isinstance(v, (int, float)) and math.isfinite(float(v)) and float(v) >= 0]
+                  if not finite:
+                      raise RuntimeError(f"{label} has no finite non-negative SO2 values")
+                  coverage = body.get("coverage")
+                  if not isinstance(coverage, (int, float)) or coverage <= 0:
+                      raise RuntimeError(f"{label} invalid coverage: {coverage}")
+                  print(json.dumps({
+                      "label": label,
+                      "source": body.get("source"),
+                      "dataset": body.get("dataset"),
+                      "modelLevel": body.get("modelLevel"),
+                      "samples": len(vals),
+                      "finiteSamples": len(finite),
+                      "coverage": coverage,
+                      "grid": body.get("grid"),
+                      "cycle": body.get("cycle"),
+                      "units": body.get("units"),
+                  }, ensure_ascii=False))
+                  return body
+              raise RuntimeError(f"{label} timed out after {max_wait}s")
+
+          historical = submit_and_wait(
+              "EAC4",
+              {"lat": 10.9, "lon": 106.6, "mode": "historical", "year": 2025},
+              "cams-global-reanalysis-eac4-monthly",
+              "60",
+          )
+          if len(historical["time"]) < 12:
+              raise RuntimeError(f"EAC4 expected at least 12 monthly samples, got {len(historical['time'])}")
+
+          forecast = submit_and_wait(
+              "Forecast",
+              {"lat": 10.9, "lon": 106.6, "mode": "current"},
+              "cams-global-atmospheric-composition-forecasts",
+              "137",
+          )
+          if len(forecast["time"]) < 20:
+              raise RuntimeError(f"Forecast expected at least 20 samples, got {len(forecast['time'])}")
+
+          print("CAMS SO2 V3.3.2 LIVE E2E PASS")
           PY
 
       - name: Verify expected production alias
