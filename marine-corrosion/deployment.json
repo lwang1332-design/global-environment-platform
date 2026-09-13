@@ -1,46 +1,56 @@
 {
   "name": "全球海洋大气腐蚀环境评估平台",
-  "version": "3.3.1",
-  "releaseName": "可计算性修正版",
+  "version": "3.3.2",
+  "releaseName": "SO2 Auto 数据接入版",
   "frontendEntry": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "frontendRuntime": "GitHub Pages native static app",
   "frontendTarget": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
-  "directApi": "https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct",
-  "directApiStatus": "unrestored: production Direct worker/gateway remains unverified; V3.3.1 uses explicit calculability levels and never restores Pd=1 fallback",
+  "scienceModelVersion": "3.3.0",
+  "dataLayerVersion": "3.3.2",
+  "so2AutoBackend": {
+    "target": "https://global-marine-corrosion-direct-v332-lwang1332-4885.vercel.app/api/so2",
+    "runtime": "Vercel Python Function + Fluid Compute",
+    "status": "code-ready; production requires CAMS_ADS_API_KEY and Vercel deployment",
+    "secret": "CAMS_ADS_API_KEY",
+    "secretPolicy": "server-only; never exposed to GitHub Pages/browser/result JSON",
+    "async": "ADS submit -> jobId -> browser polling/resume -> NetCDF download/parse",
+    "historical": {
+      "dataset": "cams-global-reanalysis-eac4-monthly",
+      "variable": "sulphur_dioxide",
+      "modelLevel": "60",
+      "period": "2003-2025",
+      "resolution": "0.75 degree monthly mean"
+    },
+    "current": {
+      "dataset": "cams-global-atmospheric-composition-forecasts",
+      "variable": "sulphur_dioxide",
+      "modelLevel": "137",
+      "leadtimeHours": "0-120 by 3 h",
+      "cyclePolicy": "safe latest cycle; on ADS rejection back off by 12 h up to 3 cycles"
+    }
+  },
   "scienceModel": {
-    "modelVersion": "3.3.0",
-    "releasePolicyVersion": "3.3.1",
     "camsSeaSaltBasis": "RH80 mass and size; /4.3 dry-mass conversion; RH-normalized diameter",
     "camsMissingBinPolicy": "CAMS-valid bins retained; only missing bins use Proxy fill; missing is never zero",
     "proxy": "continuous distance factor + single fetch factor",
     "localSpray": "independent 35um and 75um decay scales; calibration required",
     "wetDeposition": "dimensionally closed scavenging-column model; disabled until Lambda/H explicitly supplied",
-    "isoSo2": "automatic CAMS when available; user may supplement Pc or Pd; Pc is converted by Pd=0.8Pc; missing remains missing",
+    "isoSo2": "CAMS Auto qSO2 -> Pc=q*rho*1e9 -> Pd=0.8Pc; manual Pc/Pd remains explicit override; missing remains missing",
     "isoChloride": "engineering JCl separated from ISO 9225-equivalent Sd; user may supplement measured/equivalent Sd for formal ISO",
     "oldCorrosionCalibration": "disabled; V3.3 contemporaneous recalibration required"
   },
   "calculabilityLevels": {
-    "L1": "Environment Screening: weather, sea salt, engineering chloride, surface salt, wetness and GIS remain computable without Pd/Sd",
-    "L2": "Engineering Corrosion Screening: traceable SO2 Pd available; engineering chloride is used only as a relative screening input and result is marked with *",
-    "L3": "Formal ISO 9223: traceable Pd plus ISO 9225-equivalent Sd and complete Historical coverage"
+    "L1": "Environment Screening remains computable when SO2/Sd are unavailable",
+    "L2": "Engineering Corrosion Screening when traceable SO2 Pd exists",
+    "L3": "Formal ISO 9223 requires traceable Pd plus ISO 9225-equivalent Sd and complete Historical coverage"
   },
   "manualInputs": {
-    "so2Pc": "ug/m3; recommended user-facing SO2 input; converted to Pd by factor 0.8",
-    "so2Pd": "mg/(m2*d); direct advanced input",
+    "so2Pc": "ug/m3; manual override only when Auto unavailable or project measurement preferred",
+    "so2Pd": "mg/(m2*d); direct advanced override",
     "isoSd": "mg/(m2*d); ISO 9225 wet-candle equivalent chloride deposition",
     "gis": "optional fixed upwind sea distance/fetch override for engineering screening only",
     "wet": "optional scavenging rate and effective column height; remains off by default"
   },
-  "dataChain": [
-    "ERA5 Direct when gateway is restored",
-    "CAMS Direct when gateway is restored; sea-salt RH80 metadata retained",
-    "CMEMS when gateway is restored",
-    "Open-Meteo Historical / Forecast fallback",
-    "Open-Meteo Marine wave fallback",
-    "Natural Earth 1:50m browser GIS fallback with 5-degree directional sensitivity",
-    "Optional V3.3.1 manual GIS screening override",
-    "GSHHG high/full resolution required for production complex-coast review"
-  ],
   "calibration": {
     "rawRows": 641,
     "independentRows": 121,
@@ -56,11 +66,10 @@
   },
   "startupPolicy": {
     "annualDataOnInitialLoad": false,
-    "healthCheckTimeoutSeconds": 6,
-    "directCalculationTimeoutSeconds": 20,
     "historicalPeriodsYears": [1, 3, 5],
     "formalIsoOutputRule": "Historical complete coverage + traceable Pd + ISO-equivalent Sd",
     "screeningRule": "L1 always remains available; L2 may use engineering chloride only when explicitly labelled non-formal",
-    "asyncJobPollingWindowSeconds": 300
+    "camsAdsPollingWindowSeconds": 300,
+    "camsAdsJobResumeTtlHours": 24
   }
 }
