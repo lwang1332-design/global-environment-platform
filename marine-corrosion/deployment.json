@@ -1,66 +1,50 @@
 {
   "name": "全球海洋大气腐蚀环境评估平台",
-  "version": "3.2.8",
+  "version": "3.3.0",
   "frontendEntry": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "frontendRuntime": "GitHub Pages native static app",
   "frontendTarget": "https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/",
   "directApi": "https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct",
-  "directApiStatus": "unrestored: existing deployment 404; Vercel connector production/preview deployment denied 403 on 2026-09-12",
+  "directApiStatus": "unrestored: production Direct worker/gateway remains unverified; V3.3.0 never substitutes missing SO2 with Pd=1",
+  "scienceModel": {
+    "modelVersion": "3.3.0",
+    "camsSeaSaltBasis": "RH80 mass and size; /4.3 dry-mass conversion; RH-normalized diameter",
+    "proxy": "continuous distance factor + single fetch factor",
+    "localSpray": "independent 35um and 75um decay scales; calibration required",
+    "wetDeposition": "dimensionally closed scavenging-column model; disabled until Lambda/H calibrated",
+    "isoSo2": "Pd≈0.8Pc or measured override; missing remains null",
+    "isoChloride": "engineering JCl separated from ISO 9225-equivalent Sd; formal ISO result gated",
+    "oldCorrosionCalibration": "disabled; V3.3 contemporaneous recalibration required"
+  },
   "dataChain": [
     "ERA5 Direct when gateway is restored",
-    "CAMS EAC4 / Forecast when gateway is restored",
+    "CAMS Direct when gateway is restored; sea-salt RH80 metadata retained",
     "CMEMS when gateway is restored",
     "Open-Meteo Historical / Forecast fallback",
-    "Open-Meteo ERA5-Ocean historical wave fallback",
-    "Natural Earth 1:50m browser GIS fallback"
+    "Open-Meteo Marine wave fallback",
+    "Natural Earth 1:50m browser GIS fallback with 5-degree directional sensitivity",
+    "GSHHG high/full resolution required for production complex-coast review"
   ],
   "calibration": {
     "rawRows": 641,
     "independentRows": 121,
     "globalBenchmarkPoints": 26,
     "uniqueCoordinates": 110,
-    "ambiguousHeightSitesExcluded": 1,
-    "airHeightPairs": 4,
-    "settlementHeightPairs": 6,
-    "status": "spatial_reference_available; contemporaneous_calibration_not_applied"
-  },
-  "notes": "Full-series UTC statistics, strict missing data, audited spatial references, local calibration with site holdout, run cancellation/checkpoints and mobile navigation. Formal measured validation remains conditional on metadata; Direct restoration is blocked by deployment permissions and missing worker/credentials.",
-  "placeSearch": {
-    "provider": "Open-Meteo Geocoding / GeoNames",
-    "coordinateSystem": "WGS84",
-    "trigger": "Search button or Enter; select a candidate to update coordinates and map",
-    "resultLimit": 10,
-    "timeoutSeconds": 8,
-    "automaticEnvironmentCalculation": false
-  },
-  "mapPicking": {
-    "entry": "Map picker button next to place-name search",
-    "methods": [
-      "map click",
-      "marker drag",
-      "map centre selection",
-      "keyboard Enter"
-    ],
-    "coordinateSystem": "WGS84",
-    "panOnlyChangesViewport": true,
-    "automaticEnvironmentCalculation": false
+    "status": "V3.2.8 evidence retained; V3.3.0 corrosion calibration disabled pending contemporaneous metadata",
+    "vietnamDiagnostic": {
+      "latitude": 10.9,
+      "longitude": 106.6,
+      "referenceCorrosion": 46.4,
+      "useForCalibration": false
+    }
   },
   "startupPolicy": {
     "annualDataOnInitialLoad": false,
     "healthCheckTimeoutSeconds": 6,
     "directCalculationTimeoutSeconds": 20,
-    "historicalPeriodsYears": [
-      1,
-      3,
-      5
-    ],
-    "stages": [
-      "GIS",
-      "ERA5/CAMS/CMEMS or fallback",
-      "Hourly timeline",
-      "Physics / ISO 9223"
-    ],
-    "progressUnit": "actual stage / completed annual packages",
+    "historicalPeriodsYears": [1, 3, 5],
+    "formalIsoOutputRule": "Historical complete coverage + traceable Pd + ISO-equivalent Sd",
+    "screeningRule": "Engineering chloride may produce screening output but is never labeled formal ISO",
     "asyncJobPollingWindowSeconds": 300
   }
 }
