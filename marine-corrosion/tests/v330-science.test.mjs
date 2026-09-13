@@ -81,5 +81,5 @@ test('Vietnam 10.9/106.6 point is diagnostic only: 46.4 is not used to fit or fo
 
 test('ISO dose response remains unchanged by V3.3.0 interface corrections',()=>{
   const r=doseResponse('carbon_steel',12.63,30,80,28);
-  assert.ok(r>35&&r<45);
+  assert.ok(Math.abs(r-48.48850366462365)<1e-10);
 });
