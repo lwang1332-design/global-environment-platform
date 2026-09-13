@@ -25,7 +25,7 @@
 - [x] 实测值只进入 bias waterfall，不改变平台预测。
 - [x] Wet deposition 缺失与 Wetness 未耦合可被自动识别。
 - [x] 全量 JavaScript regression。
-- [ ] Browser：V3.3.3 页面、版本三层分离与“只诊断不校准”文案。
+- [x] Browser：V3.3.3 页面、版本三层分离与“只诊断不校准”文案。GitHub Actions run `34786823235`，regression / browser 均 PASS。
 - [ ] 真实点 E2E：越南 10.9/106.6、海南/福建高腐蚀点至少各 1 个。
 - [ ] 121 点顺序诊断导出完整性。
 - [ ] 26 点 Benchmark 诊断导出完整性。
