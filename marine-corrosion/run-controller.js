@@ -1,2 +1,2 @@
-// V3.3.0 compatibility entry. The V3.2.8 implementation is archived under legacy-v328/.
-export * from './run-controller-v330.js';
+// V3.3.2 compatibility entry. Science kernel remains V3.3.0; data layer adds CAMS EAC4/Forecast SO₂ Auto.
+export * from './run-controller-v332.js';
