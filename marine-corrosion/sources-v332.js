@@ -2,7 +2,7 @@ import {number,delay,checkAbort} from './data-quality.js';
 import {alignSeries,requestJson,SourceError,normalizeDirectCams as normalizeDirectCams330} from './sources-v330.js';
 export * from './sources-v330.js';
 
-export const CAMS_SO2_AUTO_URL='https://global-marine-corrosion-direct-v332-lwang1332-4885.vercel.app/api/so2';
+export const CAMS_SO2_AUTO_URL='https://global-marine-corrosion-direct-v332.vercel.app/api/so2';
 
 function configuredUrl(explicit){
   if(explicit)return explicit;
