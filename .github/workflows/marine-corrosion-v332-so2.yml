@@ -29,6 +29,15 @@ jobs:
           python3 -m py_compile marine-corrosion/direct-backend/api/so2.py
       - name: Run JavaScript regressions
         run: node --test marine-corrosion/tests/*.test.mjs
+      - name: Verify CAMS backend dependencies
+        run: |
+          python3 -m pip install --disable-pip-version-check -q -r marine-corrosion/direct-backend/requirements.txt
+          python3 - <<'PY'
+          from ecmwf.datastores import Client
+          for name in ('submit','get_remote','get_results'):
+              assert hasattr(Client,name), name
+          print('ecmwf-datastores-client async API available')
+          PY
       - name: Run CAMS request contract tests
         run: python3 -m unittest marine-corrosion/tests/test_so2_backend.py
 
