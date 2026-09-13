@@ -16,7 +16,7 @@ on:
       - 'marine-corrosion/run-controller.js'
       - 'marine-corrosion/gis-browser-v328.js'
       - 'marine-corrosion/review-ui.js'
-      - 'marine-corrosion/tests/v330-science.test.mjs'
+      - 'marine-corrosion/tests/*.test.mjs'
       - '.github/workflows/marine-corrosion-v330-science.yml'
   workflow_dispatch:
 
@@ -37,6 +37,8 @@ jobs:
           node --check marine-corrosion/model-worker-v330.js
           node --check marine-corrosion/review-ui-v330.js
           node --check marine-corrosion/v330-ui-patch.js
+          node --check marine-corrosion/tests/core.test.mjs
+          node --check marine-corrosion/tests/gateway.test.mjs
           node --check marine-corrosion/tests/v330-science.test.mjs
-      - name: Run V3.3 science regressions
-        run: node --test marine-corrosion/tests/v330-science.test.mjs
+      - name: Run all V3.3 marine corrosion regressions
+        run: node --test marine-corrosion/tests/*.test.mjs
