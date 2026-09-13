@@ -7,6 +7,9 @@ export class RunCoordinator extends RunCoordinator332{
   async run(input,onProgress=()=>{},options={}){
     const result=await super.run(input,onProgress,options);
     try{
+      // Read-only diagnostic hook for browser E2E / engineering audit.
+      // It does not feed back into computeModel and is never used as a model input.
+      globalThis.__MARINE_V333_LAST_RESULT__=result;
       globalThis.dispatchEvent?.(new CustomEvent('marine:result',{detail:{result,diagnosticVersion:DIAGNOSTIC_VERSION,scienceModelVersion:result?.inputSnapshot?.modelVersion||'3.3.0'}}));
     }catch{}
     return result;
