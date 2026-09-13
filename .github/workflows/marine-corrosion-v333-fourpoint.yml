@@ -1,0 +1,43 @@
+name: Marine Corrosion V3.3.3 Four Point Live Diagnostics
+
+on:
+  push:
+    branches:
+      - v3.3.3-diagnostics
+    paths:
+      - 'marine-corrosion/run-controller-v333.js'
+      - 'marine-corrosion/diagnostics-v333.js'
+      - 'marine-corrosion/tests/v333-fourpoint-e2e.mjs'
+      - '.github/workflows/marine-corrosion-v333-fourpoint.yml'
+  workflow_dispatch:
+
+jobs:
+  fourpoint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Start V3.3.3 local app
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/marine-v333-fourpoint-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/marine-corrosion/ >/dev/null && exit 0; sleep 1; done
+          cat /tmp/marine-v333-fourpoint-http.log
+          exit 1
+      - name: Run four representative points
+        run: node marine-corrosion/tests/v333-fourpoint-e2e.mjs
+      - name: Preserve diagnostics JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v333-fourpoint-results
+          path: /tmp/v333-fourpoint-results.json
+          if-no-files-found: warn
+          retention-days: 14
