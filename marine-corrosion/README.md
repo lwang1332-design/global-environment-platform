@@ -1,166 +1,127 @@
-# 全球海洋大气腐蚀环境评估平台 V3.3.1
+# 全球海洋大气腐蚀环境评估平台 V3.3.2
 
-线上目标：<https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/>
+线上前端：<https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/>
 
-V3.3.1 是在 V3.3.0 **科学模型修正版**之上的**可计算性修正版**。科学内核继续保持 V3.3.0 的单位、CAMS RH80、SO₂、ISO Sd、Proxy/Fetch、Wet 等修正；V3.3.1 不退回任何旧Fallback，而是增加用户友好的输入补齐与三层计算等级，使缺失 Pd/Sd 时平台仍然能给出有边界声明的工程结果。
+V3.3.2 是 **SO₂ Auto 数据接入版**。科学内核继续保持 V3.3.0；V3.3.1 的 L1/L2/L3 可计算性与人工 Pc/Pd/Sd 补齐继续保留。本版不增加 SO₂ 经验Fallback，而是把 CAMS 官方数据接入自动链。
 
-Vietnam 10.9°N / 106.6°E / 46.4 仍只作为诊断回归点，禁止参与参数拟合。
+Vietnam 10.9°N / 106.6°E / 46.4 仍只作为诊断回归点，`useForCalibration=false`。
 
-## 1. 三层计算等级
+## 1. SO₂ Auto 正式数据链
 
-### L1 环境 Screening（默认，始终可算）
+### Historical
 
-即使 SO₂、ISO Sd、Wet 参数、GSHHG Direct 缺失，也继续输出：
+`CAMS EAC4 monthly reanalysis → sulphur_dioxide → lowest model level 60 → kg/kg → 平台空气密度 → Pc [μg/m³] → Pd = 0.8 Pc`
 
-- 气温、湿度、风、雨、波浪、盐度；
-- CAMS有效粒径 + 缺失粒径逐Bin Proxy；
-- Air Salt；
-- Dry / Impaction；
-- 工程 Cl⁻沉降 `JCl,equipment`；
-- Surface Cl；
-- TOW / 凝露 / Salt-Wet；
-- Browser GIS / 人工GIS Screening。
+- ADS dataset：`cams-global-reanalysis-eac4-monthly`
+- 时间覆盖：2003–2025
+- 空间分辨率：0.75°
+- 时间分辨率：月平均
+- V3.3.2 将每个月的 SO₂ 月平均混合比映射到该月小时气象轴；ISO 年平均 Pc/Pd 因而仍由真实月平均数据加权得到，不制造小时波动。
 
-L1 不输出正式ISO腐蚀率，但不会把整次计算标成失败。
+### Current
 
-### L2 工程腐蚀 Screening
+`CAMS Global atmospheric composition forecast → sulphur_dioxide → lowest model level 137 → kg/kg → 平台空气密度 → Pc → Pd = 0.8 Pc`
 
-当 SO₂ `Pd` 可追溯时，可使用：
+- ADS dataset：`cams-global-atmospheric-composition-forecasts`
+- 模式层：137（最低模式层）
+- 预报步长：3 h
+- 请求窗口：0–120 h
+- V3.3.2 只在相邻有效预报点之间做有界小时插值，不外推缺失时段。
 
-`Pd + engineering JCl + RH + T`
+## 2. ADS 异步任务
 
-计算一个**工程相对腐蚀筛查值**。页面等级加 `*`，明确写成 `ENGINEERING SCREENING`：
+CAMS ADS 请求可能排队，因此后端不再同步阻塞等待：
 
-- 可用于地点比较、模型诊断、参数敏感性；
-- 不得作为正式 ISO 9223 等级；
-- 因工程 `JCl` 尚未等效到 ISO 9225 湿烛 `Sd`。
+`POST提交 → 返回jobId → 浏览器轮询 → ADS完成 → 后端下载NetCDF → 最近网格点解析 → 返回SO₂`
 
-### L3 正式 ISO 9223
+任务 ID 保存在浏览器 IndexedDB；如果一次运行超过轮询窗口，下一次计算继续原 ADS 任务，不重复提交。Current 若最近生产周期被ADS拒绝，后端最多自动退回3个更早的12 h生产周期；这属于数据发布时效处理，不是 SO₂ 数值Fallback。
 
-只有同时满足：
+## 3. 安全与凭据
 
-- Historical完整周期满足覆盖率；
-- `Pd,ISO` 可追溯；
-- `Sd,ISO` 为 ISO 9225湿烛等效值或已验证转换；
-- RH / T 等输入有效；
+GitHub Pages **不得**保存 Copernicus ADS token。后端仅从服务端环境变量读取：
 
-才标记为 `FORMAL ISO 9223`。
+- `CAMS_ADS_API_KEY`：必需，Copernicus/ECMWF Data Store个人访问令牌；
+- `CAMS_ADS_URL`：可选，默认 `https://ads.atmosphere.copernicus.eu/api`。
 
-## 2. V3.3.1 用户补齐卡
+用户账号还必须在 ADS 网页接受 EAC4 与 CAMS Forecast 对应数据集许可。令牌不进入浏览器、日志、结果JSON或仓库。
 
-页面新增“缺失数据补齐与计算级别”卡，不要求普通用户进入管理员页输入 `kg/kg`。
+## 4. 结果等级
 
-### SO₂
+- **L1 Environment Screening**：SO₂仍不可用时继续计算环境、海盐、工程Cl⁻、Surface Cl、TOW、GIS等；
+- **L2 Engineering Corrosion Screening**：CAMS SO₂ Auto得到可追溯 Pd，或人工补 Pc/Pd 后可计算工程腐蚀筛查；
+- **L3 Formal ISO 9223**：除可追溯 Pd 外，仍必须具备 ISO 9225等效 Sd 与完整 Historical 覆盖。
 
-三种方式：
+SO₂ Auto失败时保持 `MISSING`，绝不恢复 `Pd=1`。
 
-1. **自动**：优先使用可用 CAMS SO₂；缺失则停留L1；
-2. **人工 Pc（推荐）**：单位 `μg/m³`，系统自动按 `Pd = 0.8 × Pc` 换算；
-3. **人工 Pd**：单位 `mg/(m²·d)`，作为高级直接输入。
+## 5. V3.3.0/V3.3.1科学边界继续有效
 
-SO₂缺失时绝不恢复 `Pd=1`。
-
-### ISO Cl⁻ Sd
-
-可选输入：
-
-`ISO 9225 湿烛等效 Sd [mg/(m²·d)]`
-
-未输入时，工程 `JCl,equipment` 仍计算，但只能用于 L1/L2 Screening。
-
-### GIS人工覆盖
-
-复杂河口、港池或用户已有高精度GIS结果时，可以输入：
-
-- 最近距海 km（可选）；
-- 上风向海距 km；
-- 有效 Fetch km。
-
-该覆盖会明确标记 `OVERRIDE/SCREENING`，并固定应用到全部风向，只用于工程筛查；Production 复杂海岸仍要求 GSHHG high/full Direct。
-
-### Wet deposition
-
-默认关闭。只有用户明确输入：
-
-- `wetScavengingRatePerMm`；
-- `wetScavengingHeightM`；
-
-才进入量纲闭合Wet模型。未标定时继续采用 Dry + Impaction，不使用 V3.2.8 的量纲错误公式。
-
-## 3. V3.3.0科学修正继续有效
-
-| 模块 | V3.3.x规则 |
+| 模块 | 规则 |
 | --- | --- |
-| Wet Deposition | `M=C×H×[1-exp(-ΛΔt)]`；Λ/H缺失则不并入 |
-| SO₂缺失 | 保持MISSING，绝不固定Pd=1 |
-| ISO SO₂ | `Pd≈0.8Pc` 或明确Override |
-| CAMS海盐质量 | RH80 `q80/4.3` 转干盐 |
-| CAMS粒径 | `d(RH)=d80×GF(RH)/GF(80)` |
-| CAMS缺Bin | 逐Bin保留；只补缺失Bin |
-| Proxy | Distance与Fetch只作用一次 |
+| CAMS海盐 | RH80质量 `/4.3` 转干盐；粒径按 `GF(RH)/GF(80)` 修正 |
+| CAMS缺Bin | 仅缺失Bin用Proxy补齐；缺测不当零 |
+| Proxy | Distance与Fetch各作用一次 |
 | Local Spray | 35/75 μm 独立衰减尺度 |
-| GIS Fallback | Natural Earth 1:50m + 5° bearing + 方向敏感性 |
-| Cl⁻ → ISO | `JCl,equipment ≠ Sd,ISO` |
-| 旧腐蚀校准 | 不迁移V3.2.8残差校准 |
+| Wet | `M=C×H×[1-exp(-ΛΔt)]`；Λ/H未提供则不并入 |
+| SO₂ | CAMS Auto或人工Pc/Pd；缺失保持MISSING |
+| ISO SO₂ | `Pd ≈ 0.8 Pc` |
+| ISO Cl⁻ | `JCl,equipment ≠ Sd,ISO` |
+| GIS | Browser Natural Earth为Screening；复杂河口正式评价仍需GSHHG Direct |
+| 旧腐蚀校准 | V3.2.8残差校准不迁移 |
 
-## 4. 数据源退化规则
+## 6. 代码入口
 
-Direct未恢复时：
+科学内核 V3.3.0：`model-v330.js`。
 
-- Weather：Open-Meteo ERA5 / forecast fallback；
-- Wave：Open-Meteo Marine fallback；
-- CAMS sea salt：缺失Bin使用Proxy；
-- SO₂：保持MISSING，用户可补Pc/Pd；
-- Salinity：缺失时35 PSU EST；
-- GIS：Natural Earth Browser Fallback，用户可做Screening Override。
+V3.3.1可计算性层：`input-policy-v331.js`、`v331-ui-runtime.js`、`gis-browser-v331.js`。
 
-原则：**缺失数据降低结论等级，不把缺失当零，也不把经验值伪装成RAW。**
+V3.3.2 SO₂ Auto层：
 
-## 5. 代码入口
+- `sources-v332.js`：CAMS SO₂异步任务适配、EAC4月平均映射、Forecast小时对齐；
+- `run-controller-v332.js`：任务缓存/续跑、来源与覆盖率状态；
+- `input-policy-v332.js`：版本与SO₂ Auto数据策略；
+- `v332-ui-runtime.js`：页面来源说明；
+- `direct-backend/api/so2.py`：ADS submit/poll/download/NetCDF解析；
+- `direct-backend/requirements.txt`：`ecmwf-datastores-client`、xarray/netCDF依赖。
 
-科学内核 V3.3.0：
+兼容入口 `run-controller.js` 与 `review-ui.js` 已转发至V3.3.2。
 
-- `model-v330.js`
-- `sources-v330.js`
-- `gis-browser-v330.js`
-- `run-controller-v330.js`
-- `model-worker-v330.js`
-- `review-ui-v330.js`
+## 7. 后端部署
 
-V3.3.1 可计算性层：
+推荐项目名：`global-marine-corrosion-direct-v332`。
 
-- `input-policy-v331.js`：输入规范、Pc→Pd、L1/L2/L3、Wet/GIS策略；
-- `v331-ui-runtime.js`：稳定的普通用户补齐卡、Screening显示、版本与输入同步；不使用全DOM MutationObserver；
-- `gis-browser-v331.js`：人工GIS Screening Override；
-- `review-ui.js`：加载V3.3.1稳定运行层；
-- `gis-browser-v328.js`：兼容入口转发到V3.3.1 GIS。
+Vercel Python Function启用 Fluid Compute，`api/so2.py` 最大执行300 s；ADS排队本身通过异步job处理，不依赖函数一直占用300 s。
 
-## 6. 测试
+发布完成后前端默认请求：
+
+`https://global-marine-corrosion-direct-v332-lwang1332-4885.vercel.app/api/so2`
+
+也可通过浏览器本地配置 `marineCamsSo2Url` 或 `window.__MARINE_CAMS_SO2_URL__` 指向其它受控后端。
+
+## 8. 测试
 
 ```bash
 node --test marine-corrosion/tests/*.test.mjs
+python3 -m unittest marine-corrosion/tests/test_so2_backend.py
 ```
 
-V3.3.1新增回归：
+V3.3.2新增守卫：
 
-- Pc → `Pd=0.8Pc`；
-- Auto模式不造Pd；
-- ISO Sd输入；
-- Wet启停；
-- GIS人工覆盖72个5°方向Bin；
-- L1/L2/L3输入就绪逻辑；
-- 工程Screening腐蚀率带非正式警告；
-- 浏览器首屏、输入切换、版本分离和页面可响应性。
+- EAC4 dataset / SO₂ / ML60 / 月平均请求契约；
+- Forecast dataset / SO₂ / ML137 / 0–120 h请求契约；
+- 月平均映射到小时轴；
+- 3 h Forecast有界小时对齐；
+- 仅替换SO₂、不破坏ss1/ss2/ss3；
+- ADS任务ID可安全续跑；
+- 未配置后端拒绝请求，不制造Pd；
+- ECMWF datastores异步API依赖可用；
+- 浏览器V3.3.2来源与版本检查。
 
-CI：
+CI：`.github/workflows/marine-corrosion-v332-so2.yml`。
 
-- `.github/workflows/marine-corrosion-v330-science.yml`
-- `.github/workflows/marine-corrosion-v331-calculability.yml`
-- `.github/workflows/marine-corrosion-v330-live.yml`（已升级为V3.3.1公网Live Check）
+## 9. 版本定位
 
-## 7. 版本定位
+- **V3.3.0：科学模型修正版**；
+- **V3.3.1：可计算性修正版**；
+- **V3.3.2：SO₂ Auto 数据接入版**。
 
-- **V3.3.0：科学模型修正版** —— 修物理、单位、数据语义；
-- **V3.3.1：可计算性修正版** —— 在不牺牲科学边界的前提下恢复工程可用性。
-
-正式发布前必须通过全量单元回归、浏览器UI检查和GitHub Pages在线检查。
+V3.3.2只有在后端已部署、`CAMS_ADS_API_KEY`有效、数据集条款已接受且公网实测通过后，才允许标记为“SO₂ Auto生产可用”。
