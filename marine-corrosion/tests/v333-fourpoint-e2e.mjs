@@ -1,12 +1,15 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 
-const points=[
+const allPoints=[
   {id:'VN-10.9-106.6-2m',name:'越南 10.9/106.6',lat:10.9,lon:106.6,height:2,observed:46.4},
   {id:'HN-18.300797-109.26452-5m',name:'海南 18.300797/109.264520',lat:18.300797,lon:109.26452,height:5,observed:86.8},
   {id:'FJ-25.42234-119.489225-5m',name:'福建 25.422340/119.489225 5m',lat:25.42234,lon:119.489225,height:5,observed:100.2},
   {id:'FJ-25.42234-119.489225-100m',name:'福建 25.422340/119.489225 100m',lat:25.42234,lon:119.489225,height:100,observed:49.7}
 ];
+const pointId=process.env.POINT_ID||'';
+const points=pointId?allPoints.filter(p=>p.id===pointId):allPoints;
+if(!points.length)throw new Error('Unknown POINT_ID: '+pointId);
 
 const browser=await chromium.launch({headless:true,args:['--disable-web-security','--disable-features=IsolateOrigins,site-per-process']});
 const page=await browser.newPage({viewport:{width:1440,height:1100}});
@@ -93,9 +96,10 @@ for(const p of points){
     console.error(`FAILED ${p.id}`,error);
   }
 }
-const payload={version:'3.3.3',scienceModel:'3.3.0',dataLayer:'3.3.2',year:2025,generatedAt:new Date().toISOString(),points:results,consoleErrors};
-fs.writeFileSync('/tmp/v333-fourpoint-results.json',JSON.stringify(payload,null,2));
-console.log('\n===== FOUR POINT SUMMARY =====');
+const payload={version:'3.3.3',scienceModel:'3.3.0',dataLayer:'3.3.2',year:2025,generatedAt:new Date().toISOString(),pointFilter:pointId||null,points:results,consoleErrors};
+const suffix=pointId?'-'+pointId:'';
+fs.writeFileSync(`/tmp/v333-fourpoint-results${suffix}.json`,JSON.stringify(payload,null,2));
+console.log('\n===== POINT SUMMARY =====');
 console.log(JSON.stringify(payload,null,2));
 await browser.close();
 if(results.some(x=>x.error))process.exitCode=2;
