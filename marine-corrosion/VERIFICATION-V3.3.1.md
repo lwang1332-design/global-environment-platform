@@ -95,3 +95,7 @@ Pd/Sd缺失时仍输出气象、海盐、工程Cl⁻沉降、Surface Cl、湿润
 3. 公网Playwright显示V3.3.1补齐面板；
 4. Science model仍为V3.3.0；
 5. SO₂、Wet、Sd、CAMS、Proxy等科学守卫全部保持。
+
+## 9. Main发布验证触发
+
+`main` 已快进到经分支回归验证的V3.3.1提交。本次提交仅用于触发main上的GitHub Pages、V3.3.1 Calculability与公网Live Check发布闸门，不改变科学模型或计算策略。
