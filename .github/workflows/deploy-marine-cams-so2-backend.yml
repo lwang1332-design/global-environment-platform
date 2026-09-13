@@ -2,11 +2,6 @@ name: Deploy Marine CAMS SO2 Backend
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - v3.3.2-cams-so2
-    paths:
-      - '.github/workflows/deploy-marine-cams-so2-backend.yml'
 
 permissions:
   contents: read
