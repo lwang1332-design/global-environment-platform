@@ -2,6 +2,11 @@ name: Deploy Marine CAMS SO2 Backend
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - v3.3.2-cams-so2
+    paths:
+      - '.github/workflows/deploy-marine-cams-so2-backend.yml'
 
 permissions:
   contents: read
@@ -52,7 +57,16 @@ jobs:
           code=$(curl -sS -o /tmp/so2.json -w '%{http_code}' -X POST "$DEPLOY_URL/api/so2" \
             -H 'Content-Type: application/json' \
             -d '{"lat":10.9,"lon":106.6,"mode":"historical","year":2025}')
-          cat /tmp/so2.json | python3 -c 'import json,sys; x=json.load(sys.stdin); print({k:x.get(k) for k in ("version","configured","status","dataset","modelLevel","retryAfterSeconds")})'
+          echo "HTTP status: $code"
+          python3 - <<'PY'
+          import json
+          x=json.load(open('/tmp/so2.json'))
+          e=x.get('error') if isinstance(x,dict) else None
+          safe={k:x.get(k) for k in ('version','configured','status','dataset','modelLevel','retryAfterSeconds')} if isinstance(x,dict) else {}
+          if isinstance(e,dict):
+              safe['error']={'code':e.get('code'),'message':e.get('message')}
+          print(safe)
+          PY
           test "$code" = "202"
           python3 - <<'PY'
           import json
