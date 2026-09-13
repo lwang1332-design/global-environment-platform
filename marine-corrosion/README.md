@@ -1,54 +1,200 @@
-# 全球海洋大气腐蚀环境评估平台 V3.2.8
+# 全球海洋大气腐蚀环境评估平台 V3.3.0
 
-原地址：https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/?v=3.2.8
+线上目标：<https://lwang1332-design.github.io/global-environment-platform/marine-corrosion/>
 
-以 main 的 V3.2.7（e90f8e9）为基线，沿用 GitHub Pages 原生静态前端；Direct 凭据仅在服务端保存。
+V3.3.0 是基于 V3.2.8 模型审计形成的**科学模型修正版**。本版本优先修复标准接口、单位一致性和数据语义问题，不以追平某个实测点为目标。Vietnam 10.9°N / 106.6°E / 46.4 仅作为诊断回归点，禁止参与参数拟合。
 
-| 项目 | 原问题 | V3.2.8行为 |
+## 1. V3.3.0 核心变化
+
+| 模块 | V3.2.8 | V3.3.0 |
 | --- | --- | --- |
-| Direct | 404、健康检查可能被当有效数据 | ERA5/CAMS/CMEMS分别显示实际覆盖、覆盖时间、来源、失败类型、本机最近成功时间；永久错误熔断、短暂错误重试、真实任务编号轮询 |
-| 缺测 | null变0、范围外沿用末值 | 严格数值和范围；UTC排序、去重、步长审计；限定缺口，禁止外推；风向环形插值，降水不插值 |
-| 统计 | 年度分位数合并、抽样影响、跨年清零 | 完整序列R7分位；逐年腐蚀估算均值与多年环境均值代入分列；库存跨年连续，断档后未知 |
-| Current | 短期量当全年量 | 实际UTC窗口累计；不输出年度腐蚀率、年度累计或寿命推算 |
-| 实测 | 数量重复、校准状态不清 | 实际审计641→121条、110坐标；接入坐标/高度/腐蚀结果空间参考比对；正式同期校准与参考分开 |
-| 可信度 | 输入质量等同模型验证 | A/B/C/D规则及降级原因；逐变量有效/缺测/插值/估算/覆盖；无伪造95%置信区间 |
-| 手机 | 导航缺失 | 全页面手机菜单，中英文区带，表格滚动，保留搜索/点击/拖标记/中心选点 |
-| 控制 | 重复下载、旧请求覆盖 | 输入快照、Worker取消、任务代次保护、环境/结果缓存分离、年度重试、恢复已完成数据 |
-| 溯源 | 仅通用链 | 实际UTC小时公式、数值、中间项、单位、来源、参数/校准/人工修改；JSON保留完整时序和原始输入 |
+| Wet Deposition | `Ci × [1-exp(-0.022R)] × 0.65` 直接与表面通量相加 | 改为量纲闭合的 `M=C×H×[1-exp(-ΛΔt)]`；Λ/H 未标定时不并入总沉降 |
+| SO₂ 缺失 | 固定 `Pd=1 mg/(m²·d)` | **取消固定值**；缺失即 `Pd=null`，正式 ISO 腐蚀率不输出 |
+| ISO SO₂ 输入 | `C×v×86.4` 直接作为 Pd | ISO 接口采用 `Pd≈0.8Pc` 或实测 Override；物理沉降另列 |
+| CAMS 海盐质量 | RH80 混合比直接进入质量浓度 | `q80/4.3` 转干盐质量后计算 |
+| CAMS 粒径 | 代表粒径后再次完整 κ 吸湿 | 以 RH80 粒径为基准：`d(RH)=d80×GF(RH)/GF(80)` |
+| CAMS 缺 Bin | ss1/ss2/ss3 任一缺失则全部改 Proxy | **逐 Bin 使用**；仅缺失 Bin 用 Proxy 补齐 |
+| Proxy Fetch | Marine Factor 内一次 + 外层再一次 | 距海与 Fetch 拆开，Fetch **只作用一次** |
+| Proxy 距海 | 100 km 处存在 0.08→0.02 跳变 | 连续 `floor+(1-floor)exp(-D/L)` |
+| Local Spray | 35/75 μm 共用 12 km | 35 μm / 75 μm 独立衰减尺度，默认仅为待校准 CONFIG |
+| GIS Fallback | Natural Earth 1:50m + 15° bearing | Natural Earth 1:50m + **5° bearing** + 方向离散度；复杂河口降级可信度 |
+| Cl⁻ → ISO | 工程设备表面 `JCl` 直接作为 `Sd` | **双通道**：`JCl,equipment ≠ Sd,ISO`；Sd 只来自 ISO 9225 等效实测或经验证转换 |
+| 旧腐蚀校准 | 可使用 V3.2.8 局地残差修正 | **禁用**；V3.3 必须重新做同期训练/留出验证 |
 
-## Direct真实阻塞
+## 2. 正式 ISO 与工程 Screening 分离
 
-旧URL：`https://global-marine-corrosion-direct-v322-lwang1332-4885.vercel.app/api/direct`，仍返回404 / DEPLOYMENT_NOT_FOUND。现有Vercel连接查询不到项目；对原项目生产和预览部署均403。**未恢复Direct。**
+V3.3.0 将结果拆成两个层级：
 
-`direct-backend/` 是可测试的Vercel网关修复代码：CORS、输入校验、服务端令牌、原同步路由及可选真实持久任务协议。生产发布未成功。网关健康不表示有效数据。
+### 正式 ISO 9223
 
-最少需要恢复原Vercel项目部署权限，并确认原数据工作服务HTTPS地址及服务端令牌；如工作服务也不存在，还需部署该服务及配置CDS/ADS/CMEMS凭据。不要在网页、仓库、聊天或日志填写密钥。
+只有同时满足以下条件才输出：
 
-网关服务端变量：`ENGINEERING_DATA_API_URL`、`ENGINEERING_DATA_API_TOKEN`；原路由 `/v1/health`、`/v1/historical/context`、`/v1/current/context`。只有工作服务真正提供持久 `/v1/tasks` 和 `/v1/tasks/{jobId}` 后才启用 `DIRECT_TASK_PROTOCOL=async`。当前未配置或验证持久工作服务；客户端轮询不能代替服务器队列，旧年度同步请求仍可能超时。
+- Historical 完整周期满足覆盖率要求；
+- `Pd,ISO` 可追溯：CAMS SO₂ 浓度换算或实测 Override；
+- `Sd,ISO` 可追溯：ISO 9225 湿烛等效实测 Override 或经过验证的等效转换；
+- RH、T 等气象输入有效。
 
-## 实测的四种用途
+否则：
 
-1. 参数推导：CSV641行去除520条数值重复，121条/110坐标。排除1个歧义高度站点后，4组空气海盐、6组沉降高度比值用于探索性高度因子；其实际进入模型，但不是腐蚀率同期校准。见 `calibration-audit.json`。
-2. 空间参考：`reference-points.json` 包含去重坐标、高度、年代及原始腐蚀值。确认暂按“μm/a、碳钢大气区、所选气候年”的假设后可逐点/顺序比较与导出；不自动拟合腐蚀公式。
-3. 正式校准：空模板 `calibration-template.json`。需核实单位、材料、区带、测量方法、起止期和同期原始预测。至少4个1°站点区域，固定25%区域留出，仅训练区域的对数残差中位数修正。应用限训练点10km内、高度差≤10m、碳钢大气区；ISO原值另列。
-4. 独立验证：留出区域不参与拟合，26点Benchmark独立于CSV且不调参。26点单位、准确时间未确认，当前称参考比对。无合格现场数据不生成验证指标；已有坐标和结果仍可做空间参考。
+`summary.isoFirstYearCorrosion = null`
 
-MAE、RMSE、平均偏差、适用时MAPE/R²及等级命中均注明样本数和条件。合成测试不属于实测证据。
+页面必须显示缺失原因，而不是伪造一个精确值。
 
-## 统计/质量约定
+### 工程 Screening
 
-内部UTC，Historical完整1/3/5日历年包含闰日；降水是源服务每小时累计mm，小时轴积分，不插值。P95/P99采用完整有效序列R7分位，约1100图表点不参与统计。累计盐/Cl为有效时段积分；年均累计=各完整年度累计之和/年数，独立于表面库存。
+工程海盐链仍计算：
 
-关键气象覆盖≥95%且全部请求年满足门槛才输出年度工程腐蚀估算；累计不自动补足缺测。多年度主值为逐年首年估算均值，另列环境均值代入值。非大气区仅筛查。
+`Air salt → Dry / Impaction / optional Wet → JCl,equipment → screeningFirstYearCorrosion`
 
-缺测波高1.5m、盐度35PSU、SO₂沉降1mg/(m²·d)等均标EST，原始null保留；CAMS三粒径任一缺失时用完整背景代理，局地粗颗粒始终EST。输入质量与模型验证证据分开；未验证误差分布，不给95%置信区间。
+Screening 仅用于模型诊断和工程筛查，不得标成 ISO 标准腐蚀率。
 
-库存仅统计起点假设0，跨年不清零，关键缺测后未知；湿润时长按有效步长，缺测不当干燥。保留项目点和实际格点及距离；GIS判海选sea，距岸≤5km选nearest，其余陆上选land。低分辨率海岸线不能替代港池/小岛现场判断。
+## 3. CAMS RH80 处理
 
-## 使用、缓存与验证
+CAMS ss1 / ss2 / ss3 的海盐质量和粒径以 RH=80% 表示。V3.3.0：
 
-地名搜索、点图、拖标记、中心选点及手动坐标互相同步，选点不自动请求年度数据。修改参数后需重新计算，旧结果仍属旧快照。
+- 质量：`Cdry = (q80 / 4.3) × rho × 1e9 × Fheight`
+- 粒径：用三个 CAMS RH80 半径区间 `0.03–0.5 / 0.5–5 / 5–20 μm` 的几何中心作为代表径；
+- 环境 RH 修正：`d(RH)=d80×GF(RH)/GF(80)`；
+- 若某个 CAMS Bin 缺失，只补该 Bin，不放弃其他有效 Bin。
 
-环境缓存含版本/坐标/年/模式/高度/选格策略；结果另含模型版本、参数、覆盖值、校准模型与环境修订号。材料变化复用环境。历史缓存7天，Current1小时，准备中任务1分钟；持久缓存只属于当前浏览器，容量不足会提示。
+## 4. Proxy / Local Spray
 
-运行 `node --test marine-corrosion/tests/*.test.mjs`（Node22+），`node marine-corrosion/scripts/audit-reference.mjs <CSV路径>`。实际接口、浏览器和上线核对记录见 `VERIFICATION-V3.2.8.md`。
+Proxy：
+
+`Cproxy = K × FU × FHs × FS × Fdistance × Ffetch × Fheight`
+
+其中：
+
+- `Fdistance = floor + (1-floor) exp(-D/L)`；
+- `Ffetch = 0.35 + 0.65 clamp(Fetch/250,0,1)`；
+- 距离与 Fetch 各只出现一次。
+
+Local Spray：
+
+- 35 μm：`exp(-D/localSprayScale35Km)`；
+- 75 μm：`exp(-D/localSprayScale75Km)`；
+- 默认 12 km / 6 km 只是待校准 CONFIG，不声明为全球物理常数。
+
+## 5. Wet Deposition
+
+V3.3.0 不再使用 V3.2.8 的量纲不闭合公式。
+
+当且仅当以下两个参数经过项目/文献标定：
+
+- `wetScavengingRatePerMm`
+- `wetScavengingHeightM`
+
+才计算：
+
+`fraction = 1-exp(-Lambda×Δt)`
+
+`Mwet = C × Heff × fraction`
+
+并转换为 `mg/(m²·d)`。
+
+未配置时，降雨 Wet 项不并入总沉降，并在质量原因中明确提示。
+
+## 6. SO₂
+
+- `Cso2 = qso2 × rho × 1e9`，单位 μg/m³；
+- ISO 9223 接口：`Pd,ISO ≈ 0.8 × Pc`，或使用明确的实测 `so2Dep` Override；
+- 物理沉降 `C×v×86.4` 保留为诊断量 `physicalSo2Dep`；
+- CAMS SO₂ 缺失时不再设 `Pd=1`。
+
+## 7. ISO Cl⁻ 双通道
+
+工程量：
+
+`JCl,equipment = Jsalt × chlorideFraction`
+
+标准量：
+
+`Sd,ISO`
+
+默认情况下两者**不等同**。V3.3.0 只有两种方式获得 `Sd,ISO`：
+
+1. 管理员输入 `isoChlorideDep` 实测/标准等效值；
+2. 后续完成同点同期 ISO 9225 湿烛校准后启用 `isoChlorideEquivalentFactor`。
+
+在第二种方式完成验证前，该系数默认 `null`。
+
+## 8. GIS
+
+浏览器 Fallback：
+
+- Natural Earth 1:50m；
+- 5° bearing，共 72 个方向；
+- 海陆转换二分 10 次；
+- 计算 ±10° 范围的距海 / Fetch 离散度；
+- 方向距离离散过大时标记复杂海岸、可信度降级。
+
+Production 仍建议恢复 GSHHG high/full resolution Direct，特别是河口、港池、小岛和复杂海湾。
+
+## 9. 数据源与 Direct
+
+Direct 网关仍指向原服务地址。若生产 Direct 未恢复：
+
+- Weather：Open-Meteo ERA5 / forecast fallback；
+- Wave：Open-Meteo Marine fallback；
+- CAMS sea salt：缺失 Bin 使用 Proxy；
+- SO₂：保持 MISSING；
+- Salinity：缺失时 35 PSU EST；
+- GIS：Natural Earth browser fallback。
+
+V3.3.0 的原则是：**缺失数据可以降低结论等级，但不能用未声明的固定值伪装成真实数据。**
+
+## 10. 校准和验证
+
+V3.2.8 的 641 行 CSV 审计、121 条去重记录和高度探索参数仍作为历史证据保留，但由于 V3.3.0 改变了 CAMS 湿基、SO₂ 和 Cl⁻ 标准接口：
+
+- V3.2.8 腐蚀残差校准禁止直接迁移；
+- 必须补齐准确测量起止日期、原始单位、材料、区带、测量方法；
+- Training / Hold-out 必须按站点区域隔离；
+- 26 点 Benchmark 和 Vietnam 46.4 点不得参与拟合。
+
+Vietnam 诊断点见 `diagnostic-points-v330.json`。
+
+## 11. 代码入口
+
+V3.3.0 主文件：
+
+- `model-v330.js`
+- `sources-v330.js`
+- `gis-browser-v330.js`
+- `run-controller-v330.js`
+- `model-worker-v330.js`
+- `review-ui-v330.js`
+- `v330-ui-patch.js`
+
+为减少一次性重写 UI 的风险，旧入口名在 V3.3 分支中作为兼容转发：
+
+- `model-v328.js → model-v330.js`
+- `run-controller.js → run-controller-v330.js`
+- `gis-browser-v328.js → gis-browser-v330.js`
+- `review-ui.js → review-ui-v330.js + V3.3 UI patch`
+
+V3.2.8 原始核心已归档在 `legacy-v328/`。
+
+## 12. 测试
+
+```bash
+node --test marine-corrosion/tests/*.test.mjs
+```
+
+CI：`.github/workflows/marine-corrosion-v330-science.yml`
+
+测试覆盖：
+
+- Missing / zero / UTC / 插值 / 单位；
+- 1 / 3 / 5 年完整序列；
+- CAMS RH80 质量与粒径；
+- 逐 Bin CAMS / Proxy；
+- Wet 量纲闭环；
+- SO₂ `Pd=1` 取消；
+- `Pd=0.8Pc`；
+- 工程 Cl 与 ISO Sd 双通道；
+- Proxy 单 Fetch；
+- Vietnam 诊断点不参与拟合；
+- Gateway CORS / token / async protocol。
+
+详细变更和待办见 `VERIFICATION-V3.3.0.md`。
