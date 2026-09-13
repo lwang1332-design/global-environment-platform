@@ -35,7 +35,7 @@ test('current CAMS forecast 3-hour SO2 is boundedly aligned to hourly platform a
   assert.ok(Math.abs(out.so2[1]-2e-9)<1e-15);
   assert.ok(Math.abs(out.so2[2]-3e-9)<1e-15);
   assert.ok(Math.abs(out.so2[3]-4e-9)<1e-15);
-  assert.match(out.provenance.source,/Forecast/);
+  assert.match(out.provenance.source,/forecast/i);
 });
 
 test('SO2 Auto merge replaces only SO2 and preserves CAMS sea-salt bins',()=>{
