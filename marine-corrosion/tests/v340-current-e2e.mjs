@@ -1,0 +1,27 @@
+import fs from 'node:fs';
+import { chromium } from 'playwright';
+const p={id:'CURRENT_HN',lat:18.300797,lon:109.26452,height:5};
+const browser=await chromium.launch({headless:true,args:['--disable-web-security','--disable-features=IsolateOrigins,site-per-process']});
+const page=await browser.newPage();
+page.on('console',m=>{if(m.type()==='error')console.log('BROWSER_ERROR',m.text())});
+await page.goto('http://127.0.0.1:4173/marine-corrosion/?v=3.4.0-current',{waitUntil:'domcontentloaded',timeout:60000});
+const out=await page.evaluate(async p=>{
+  localStorage.setItem('marineV340Settings',JSON.stringify({sd:{method:'auto_model'},surface:{}}));
+  const [{RunCoordinator},{resolveGis}]=await Promise.all([import('./run-controller.js?current='+Date.now()),import('./gis-browser-v328.js?current='+Date.now())]);
+  const c=new RunCoordinator({resolveGis});
+  const input={capturedAt:new Date().toISOString(),cfg:{latitude:p.lat,longitude:p.lon,height:p.height,mode:'current',exposureZone:'atmospheric',material:'carbon_steel',designLife:25,projectName:'V340 Current HN',minCoverage:.5},overrides:{},audit:[],calibrationModel:null};
+  const result=await c.run(input,()=>{}, {fresh:true});
+  const a=result.coastalAssessment,cams=result.inputData?.cams||{},fluxFields=['ssDry1','ssDry2','ssDry3','ssSed1','ssSed2','ssSed3','ssWetConv1','ssWetConv2','ssWetConv3','ssWetLs1','ssWetLs2','ssWetLs3'];
+  return {project:result.project,summary:{hours:result.summary.hours,coverage:result.summary.coveragePercent,camsHours:result.summary.camsHours,proxySaltHours:result.summary.proxySaltHours,pd:result.summary.meanSo2Dep,rh:result.summary.meanRh,t:result.summary.meanTemp},flux:{provenance:cams.autoSeaSaltFlux||null,finite:Object.fromEntries(fluxFields.map(k=>[k,(cams[k]||[]).filter(Number.isFinite).length]))},assessment:a,run:result.run};
+},p);
+fs.writeFileSync('/tmp/v340-current.json',JSON.stringify(out,null,2));
+console.log(JSON.stringify(out,null,2));
+await browser.close();
+const finiteCounts=Object.values(out.flux?.finite||{});
+if(!out.assessment?.ready)process.exitCode=2;
+if(!Number.isFinite(out.assessment?.sd?.camsBulkFluxSd)||out.assessment.sd.camsBulkFluxSd<0)process.exitCode=3;
+if((out.assessment?.sd?.camsFluxCoveragePercent||0)<35)process.exitCode=4;
+if(finiteCounts.length!==12||finiteCounts.some(n=>n<80))process.exitCode=5;
+if(!(out.assessment?.recommended?.rate>=out.assessment?.engineering?.rate))process.exitCode=6;
+if(out.assessment?.surfaceEnhanced?.rawRate<out.assessment?.engineering?.rate&&out.assessment?.surfaceEnhanced?.downgradeBlocked!==true)process.exitCode=7;
+if(!out.flux?.provenance||!/FORECAST/i.test(out.flux.provenance.productType||out.flux.provenance.type||''))process.exitCode=8;
