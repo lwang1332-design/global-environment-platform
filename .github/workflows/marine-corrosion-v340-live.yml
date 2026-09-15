@@ -1,5 +1,6 @@
 name: Marine Corrosion V3.4.0 Live Validation
 
+# Release gate: four fixed Historical points must pass before Current E2E.
 on:
   workflow_dispatch:
   push:
