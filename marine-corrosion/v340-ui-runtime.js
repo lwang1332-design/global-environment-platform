@@ -1,0 +1,38 @@
+import './v333-ui-runtime.js';
+import {APP_VERSION,STANDARD_BASELINE} from './input-policy-v340.js';
+import {readV340Settings,saveV340Settings} from './run-controller-v340.js';
+
+const $=s=>document.querySelector(s),$$=s=>[...document.querySelectorAll(s)];
+const fmt=(v,d=2)=>Number.isFinite(Number(v))?Number(v).toFixed(d):'—';
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+let last=null;
+function patchVersion(){document.title=document.title.replace(/V3\.3\.3|V3\.3\.2|V3\.3\.1|V3\.2\.8/g,`V${APP_VERSION}`);$$('.brand-title').forEach(el=>el.textContent=el.textContent.replace(/V3\.3\.3|V3\.3\.2|V3\.3\.1|V3\.2\.8/g,`V${APP_VERSION}`));const n=$('#globalNotice');if(n){n.dataset.v340='1';n.textContent='V3.4.0 沿海腐蚀工程评估终版：ISO 9223 Formal + ISO 9225 Sd追溯 + 虚拟湿烛Model-equivalent Sd + 金属表面湿润物理增强；Formal与Engineering严格分轨。'}}
+function inject(){if($('#v340CoastalPanel'))return;const page=$('#page-risk')||$('#page-validation');if(!page)return;const s=readV340Settings(),panel=document.createElement('section');panel.id='v340CoastalPanel';panel.className='panel';panel.innerHTML=`
+<div class="panel-head"><div><h2>V3.4.0 沿海腐蚀等级 · 最终评估</h2><p>一个结果页同时给出 Formal ISO、Model-equivalent Sd 和 Surface-Wetness Enhanced 工程等级。</p></div><span class="tag calc">FINAL</span></div>
+<div id="v340Status" class="notice info">完成一次Atmospheric计算后生成最终沿海腐蚀等级。</div>
+<div id="v340Cards" class="stat-grid"></div>
+<h3>ISO 9225 Sd 追溯方式</h3>
+<div class="form-grid">
+<label>方法<select id="v340SdMethod"><option value="auto_model">自动：虚拟湿烛 Model-equivalent</option><option value="wet_candle_direct">现场 ISO 9225 Wet Candle 实测</option><option value="standard_converted">ISO 9225 方法等效换算值</option></select></label>
+<label>测量高度 m<input id="v340SdHeight" type="number" min="0.1" max="300" step="0.1" placeholder="可选"/></label>
+<label>采样周期 d<input id="v340SdDays" type="number" min="1" max="366" step="1" placeholder="可选"/></label>
+<label>来源/报告编号<input id="v340SdSource" type="text" maxlength="180" placeholder="如 Wet candle station A / lab report"/></label>
+</div>
+<p class="muted">Direct/Converted 数值继续填写上方现有“ISO 9225湿烛等效 Sd”输入框；这里用于声明其计量来源。若选择Auto，平台自行计算虚拟湿烛Sd，但不会冒充Formal ISO。</p>
+<details><summary>金属表面湿润物理参数</summary><div class="form-grid">
+<label>金属有效厚度 mm<input id="v340Thickness" type="number" min="0.2" max="100" step="0.1"/></label>
+<label>太阳吸收率<input id="v340Abs" type="number" min="0.05" max="0.98" step="0.01"/></label>
+<label>长波发射率<input id="v340Emis" type="number" min="0.05" max="0.99" step="0.01"/></label>
+<label>海盐DRH %<input id="v340Drh" type="number" min="30" max="95" step="1"/></label>
+<label>海盐ERH %<input id="v340Erh" type="number" min="20" max="90" step="1"/></label>
+</div><p class="muted">默认参数按材料给定；DRH/ERH采用潮解/结晶滞回。改变参数后重新计算。</p></details>
+<h3>三轨结果</h3><div id="v340Tracks" class="source-table"></div>
+<h3>表面湿润诊断</h3><div id="v340Wetness" class="source-table"></div>
+<h3>结果边界与证据</h3><div id="v340Warnings" class="source-table"></div>
+<div class="button-row"><button id="v340Export" type="button" class="secondary">导出最终评估 JSON</button></div>`;page.prepend(panel);
+  const set=(id,v)=>{const e=$(id);if(e&&v!==undefined&&v!==null)e.value=String(v)};set('#v340SdMethod',s.sd?.method||'auto_model');set('#v340SdHeight',s.sd?.measurementHeightM);set('#v340SdDays',s.sd?.periodDays);set('#v340SdSource',s.sd?.source||'');set('#v340Thickness',s.surface?.thicknessMm);set('#v340Abs',s.surface?.absorptivity);set('#v340Emis',s.surface?.emissivity);set('#v340Drh',s.surface?.drh);set('#v340Erh',s.surface?.erh);
+  const save=()=>{const n=v=>{const x=$(v)?.value;return x===''?null:Number(x)},settings={sd:{method:$('#v340SdMethod')?.value||'auto_model',measurementHeightM:n('#v340SdHeight'),periodDays:n('#v340SdDays'),source:$('#v340SdSource')?.value||''},surface:{thicknessMm:n('#v340Thickness'),absorptivity:n('#v340Abs'),emissivity:n('#v340Emis'),drh:n('#v340Drh'),erh:n('#v340Erh')}};saveV340Settings(settings)};['#v340SdMethod','#v340SdHeight','#v340SdDays','#v340SdSource','#v340Thickness','#v340Abs','#v340Emis','#v340Drh','#v340Erh'].forEach(id=>$(id)?.addEventListener('change',save));$('#v340Export').onclick=()=>{if(!last)return;const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(last,null,2)],{type:'application/json'}));a.download='marine-corrosion-v340-final-assessment.json';a.click();setTimeout(()=>URL.revokeObjectURL(a.href),1000)};
+}
+function render(a){if(!a)return;last=a;const rec=a.recommended,formal=a.formal,eng=a.engineering,surf=a.surfaceEnhanced,wet=a.wetness,sd=a.sd;$('#v340Status').innerHTML=`推荐等级：<b>${esc(rec.corrosionClass)}</b> · ${esc(rec.label)} · 可信度 ${esc(a.confidence)}。${rec.formalIso?'满足Formal ISO门槛。':'Model-equivalent Sd + 表面湿润增强，属于工程评估。'}`;$('#v340Cards').innerHTML=[['推荐腐蚀等级',rec.corrosionClass,rec.formalIso?'ISO FORMAL':'ENGINEERING'],['推荐首年腐蚀',fmt(rec.rate),'μm/a'],['ISO Formal',formal.ready?formal.corrosionClass:'—',formal.ready?fmt(formal.rate)+' μm/a':'未满足门槛'],['Model-eq Sd',fmt(eng.sd),'mg/(m²·d)'],['表面RH',fmt(surf.meanSurfaceRh,1),'%'],['空气RH',fmt(a.rh,1),'%'],['实际湿润',fmt(wet.wetHours,0),'h/y'],['可信度',a.confidence,a.basis]].map(x=>`<div class="stat-card"><span>${esc(x[0])}</span><b>${esc(x[1])}</b><em>${esc(x[2])}</em></div>`).join('');$('#v340Tracks').innerHTML=`<table class="table"><thead><tr><th>轨道</th><th>Sd</th><th>RH/T</th><th>腐蚀率</th><th>等级</th><th>身份</th></tr></thead><tbody><tr><td>ISO 9223 Formal</td><td>${formal.ready?fmt(formal.sd):'—'}</td><td>${fmt(a.rh,1)}% / ${fmt(a.t,1)}℃</td><td>${fmt(formal.rate)}</td><td>${esc(formal.corrosionClass)}</td><td>${formal.ready?'FORMAL':'MISSING'}</td></tr><tr><td>ISO-based Engineering</td><td>${fmt(eng.sd)}</td><td>${fmt(a.rh,1)}% / ${fmt(a.t,1)}℃</td><td>${fmt(eng.rate)}</td><td>${esc(eng.corrosionClass)}</td><td>MODEL-EQUIVALENT</td></tr><tr><td>Surface-Wetness Enhanced</td><td>${fmt(eng.sd)}</td><td>${fmt(surf.meanSurfaceRh,1)}% / ${fmt(surf.meanSurfaceTemp,1)}℃</td><td>${fmt(surf.rate)}</td><td>${esc(surf.corrosionClass)}</td><td>ENGINEERING FINAL</td></tr></tbody></table>`;$('#v340Wetness').innerHTML=`<table class="table"><tbody><tr><th>空气RH</th><td>${fmt(a.rh,1)}%</td><th>表面RH</th><td>${fmt(wet.meanSurfaceRh,1)}%</td></tr><tr><th>空气T</th><td>${fmt(a.t,1)}℃</td><th>表面T</th><td>${fmt(wet.meanSurfaceTemp,1)}℃</td></tr><tr><th>电解质湿润</th><td>${fmt(wet.wetHours,0)} h</td><th>凝露</th><td>${fmt(wet.condHours,0)} h</td></tr><tr><th>盐水膜/潮解</th><td>${fmt(wet.brineHours,0)} h</td><th>最长连续湿润</th><td>${fmt(wet.longestWetHours,0)} h</td></tr><tr><th>潮解水膜均值</th><td>${fmt(wet.meanHygroscopicFilmUm,3)} μm</td><th>表面增强变化</th><td>${fmt(surf.wetnessDeltaPercent,1)}%</td></tr></tbody></table>`;$('#v340Warnings').innerHTML=`<div class="notice ${a.confidence==='A'||a.confidence==='B'?'ok':'warn'}">Sd方法：${esc(sd.method)}；追溯：${esc(sd.traceability)}；标准：${esc(sd.standard||STANDARD_BASELINE.iso9225)}。</div>${a.warnings.map(x=>`<p>• ${esc(x)}</p>`).join('')}`;if($('#isoClass'))$('#isoClass').textContent=rec.corrosionClass;if($('#isoLabel'))$('#isoLabel').textContent=rec.formalIso?'ISO 9223 FORMAL':'COASTAL ENGINEERING';if($('#clClass'))$('#clClass').textContent=eng.chlorideClass||'—';if($('#confidence'))$('#confidence').textContent=`${a.confidence} · ${rec.formalIso?'Formal':'Engineering'}`;}
+function init(){patchVersion();inject();window.addEventListener('marine:v340',e=>render(e.detail?.assessment));window.addEventListener('marine:v340:error',e=>{const s=$('#v340Status');if(s)s.textContent='V3.4.0最终评估失败：'+(e.detail?.error||'unknown')});}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>setTimeout(init,0),{once:true});else setTimeout(init,0);
