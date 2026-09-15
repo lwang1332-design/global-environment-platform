@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import { chromium } from 'playwright';
 const id=process.env.POINT_ID||'VN';
-const points={VN:{id:'VN',lat:10.9,lon:106.6,height:2,observed:46.4},HN:{id:'HN',lat:18.300797,lon:109.26452,height:5,observed:86.8},FJ:{id:'FJ',lat:25.42234,lon:119.489225,height:5,observed:100.2}};
+const points={VN:{id:'VN',lat:10.9,lon:106.6,height:2,observed:46.4},HN:{id:'HN',lat:18.300797,lon:109.26452,height:5,observed:86.8},FJ:{id:'FJ',lat:25.42234,lon:119.489225,height:5,observed:100.2},FJ100:{id:'FJ100',lat:25.42234,lon:119.489225,height:100,observed:49.7}};
 const p=points[id];if(!p)throw new Error('Unknown point '+id);
 const browser=await chromium.launch({headless:true,args:['--disable-web-security','--disable-features=IsolateOrigins,site-per-process']});
 const page=await browser.newPage();
@@ -14,10 +14,12 @@ const out=await page.evaluate(async p=>{
   const input={capturedAt:new Date().toISOString(),cfg:{latitude:p.lat,longitude:p.lon,height:p.height,mode:'historical',exposureZone:'atmospheric',material:'carbon_steel',designLife:25,projectName:'V340 live '+p.id,requestedYears:[2025],minCoverage:.95},overrides:{},audit:[],calibrationModel:null};
   const result=await c.run(input,()=>{}, {fresh:true});
   const a=result.coastalAssessment;
-  return {project:result.project,summary:{airSalt:result.summary.airSaltMean,engineeringCl:result.summary.clDepMean,pd:result.summary.meanSo2Dep,rh:result.summary.meanRh,t:result.summary.meanTemp,camsHours:result.summary.camsHours,proxySaltHours:result.summary.proxySaltHours,coverage:result.summary.coveragePercent},assessment:a,run:result.run};
+  return {project:result.project,summary:{airSalt:result.summary.airSaltMean,engineeringCl:result.summary.clDepMean,pd:result.summary.meanSo2Dep,rh:result.summary.meanRh,t:result.summary.meanTemp,camsHours:result.summary.camsHours,proxySaltHours:result.summary.proxySaltHours,coverage:result.summary.coveragePercent},services:result.services||null,assessment:a,run:result.run};
 },p);
 out.reference=p.observed;out.referenceRatio=out.assessment?.recommended?.rate?out.assessment.recommended.rate/p.observed:null;
 fs.writeFileSync(`/tmp/v340-live-${id}.json`,JSON.stringify(out,null,2));
 console.log(JSON.stringify(out,null,2));
 await browser.close();
 if(!out.assessment?.ready)process.exitCode=2;
+if((out.summary?.camsHours||0)<8000)process.exitCode=3;
+if((out.summary?.proxySaltHours||0)>760)process.exitCode=4;
