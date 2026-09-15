@@ -33,12 +33,13 @@ jobs:
           node --check marine-corrosion/input-policy-v340.js
           node --check marine-corrosion/tests/v340-final.test.mjs
           python3 -m py_compile marine-corrosion/direct-backend/api/salt.py
+          python3 -m py_compile marine-corrosion/direct-backend/api/salt_flux.py
       - name: Run all JavaScript tests
         run: node --test marine-corrosion/tests/*.test.mjs
       - name: Run sea-salt backend contract tests
         run: |
           python3 -m pip install -q pytest
-          pytest -q marine-corrosion/tests/test_salt_backend.py
+          pytest -q marine-corrosion/tests/test_salt_backend.py marine-corrosion/tests/test_salt_flux_backend.py
 
   browser:
     runs-on: ubuntu-latest
@@ -68,11 +69,12 @@ jobs:
           const errors=[];page.on('pageerror',e=>errors.push(e.message));
           await page.goto('http://127.0.0.1:4173/marine-corrosion/?v=3.4.0-ci',{waitUntil:'domcontentloaded',timeout:60000});
           await page.waitForSelector('#v340CoastalPanel',{state:'attached',timeout:30000});
-          const ui=await page.evaluate(()=>({title:document.title,brand:document.querySelector('.brand-title')?.textContent||'',head:document.querySelector('#v340CoastalPanel h2')?.textContent||'',methods:[...document.querySelectorAll('#v340SdMethod option')].map(x=>x.value),notice:document.querySelector('#globalNotice')?.textContent||'',overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}));
+          const ui=await page.evaluate(()=>({title:document.title,brand:document.querySelector('.brand-title')?.textContent||'',head:document.querySelector('#v340CoastalPanel h2')?.textContent||'',methods:[...document.querySelectorAll('#v340SdMethod option')].map(x=>x.value),notice:document.querySelector('#globalNotice')?.textContent||'',panel:document.querySelector('#v340CoastalPanel')?.textContent||'',overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}));
           console.log(ui);
           if(!ui.title.includes('V3.4.0')||!ui.brand.includes('V3.4.0')||!ui.head.includes('V3.4.0'))throw new Error('V3.4.0 branding missing');
           for(const x of ['auto_model','wet_candle_direct','standard_converted'])if(!ui.methods.includes(x))throw new Error('missing Sd method '+x);
-          if(!/Formal/.test(ui.notice)||!/表面湿润/.test(ui.notice))throw new Error('final guardrail notice missing');
+          if(!/Formal/.test(ui.notice)||!/CAMS真实海盐/.test(ui.notice)||!/不得降低|禁止.*降级/.test(ui.notice))throw new Error('final guardrail notice missing');
+          if(!/Recommended Envelope/.test(ui.panel)||!/CAMS通量/.test(ui.panel))throw new Error('final envelope/flux UI missing');
           if(ui.overflow>2||errors.length)throw new Error('browser regression: '+errors.join(' | '));
           const policy=await page.evaluate(async()=>{const p=await import('./input-policy-v340.js?ci='+Date.now());return {app:p.APP_VERSION,science:p.SCIENCE_MODEL_VERSION,data:p.DATA_LAYER_VERSION,diag:p.DIAGNOSTIC_LAYER_VERSION,coastal:p.COASTAL_ASSESSMENT_VERSION}});
           if(policy.app!=='3.4.0'||policy.science!=='3.3.0'||policy.data!=='3.4.0'||policy.diag!=='3.3.3'||policy.coastal!=='3.4.0')throw new Error('version boundary failed');
