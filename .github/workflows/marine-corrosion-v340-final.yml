@@ -1,0 +1,75 @@
+name: Marine Corrosion V3.4.0 Final
+
+on:
+  push:
+    branches:
+      - v3.4.0-coastal-corrosion-final
+    paths:
+      - 'marine-corrosion/**'
+      - '.github/workflows/marine-corrosion-v340-final.yml'
+  pull_request:
+    paths:
+      - 'marine-corrosion/**'
+      - '.github/workflows/marine-corrosion-v340-final.yml'
+  workflow_dispatch:
+
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Syntax check V3.4.0 modules
+        run: |
+          node --check marine-corrosion/iso-sd-v340.js
+          node --check marine-corrosion/surface-wetness-v340.js
+          node --check marine-corrosion/coastal-corrosion-v340.js
+          node --check marine-corrosion/run-controller-v340.js
+          node --check marine-corrosion/v340-ui-runtime.js
+          node --check marine-corrosion/input-policy-v340.js
+          node --check marine-corrosion/tests/v340-final.test.mjs
+      - name: Run all JavaScript tests
+        run: node --test marine-corrosion/tests/*.test.mjs
+
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Start local app
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/marine-v340-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/marine-corrosion/ >/dev/null && exit 0; sleep 1; done
+          cat /tmp/marine-v340-http.log
+          exit 1
+      - name: Verify final UI and standard guardrails
+        run: |
+          cat > /tmp/v340-browser.mjs <<'JS'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:1440,height:1100}});
+          const errors=[];page.on('pageerror',e=>errors.push(e.message));
+          await page.goto('http://127.0.0.1:4173/marine-corrosion/?v=3.4.0-ci',{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForSelector('#v340CoastalPanel',{state:'attached',timeout:30000});
+          const ui=await page.evaluate(()=>({title:document.title,brand:document.querySelector('.brand-title')?.textContent||'',head:document.querySelector('#v340CoastalPanel h2')?.textContent||'',methods:[...document.querySelectorAll('#v340SdMethod option')].map(x=>x.value),notice:document.querySelector('#globalNotice')?.textContent||'',overflow:document.documentElement.scrollWidth-document.documentElement.clientWidth}));
+          console.log(ui);
+          if(!ui.title.includes('V3.4.0')||!ui.brand.includes('V3.4.0')||!ui.head.includes('V3.4.0'))throw new Error('V3.4.0 branding missing');
+          for(const x of ['auto_model','wet_candle_direct','standard_converted'])if(!ui.methods.includes(x))throw new Error('missing Sd method '+x);
+          if(!/Formal/.test(ui.notice)||!/表面湿润/.test(ui.notice))throw new Error('final guardrail notice missing');
+          if(ui.overflow>2||errors.length)throw new Error('browser regression: '+errors.join(' | '));
+          const policy=await page.evaluate(async()=>{const p=await import('./input-policy-v340.js?ci='+Date.now());return {app:p.APP_VERSION,science:p.SCIENCE_MODEL_VERSION,data:p.DATA_LAYER_VERSION,diag:p.DIAGNOSTIC_LAYER_VERSION,coastal:p.COASTAL_ASSESSMENT_VERSION}});
+          if(policy.app!=='3.4.0'||policy.science!=='3.3.0'||policy.data!=='3.3.2'||policy.diag!=='3.3.3'||policy.coastal!=='3.4.0')throw new Error('version boundary failed');
+          await browser.close();
+          JS
+          node /tmp/v340-browser.mjs
