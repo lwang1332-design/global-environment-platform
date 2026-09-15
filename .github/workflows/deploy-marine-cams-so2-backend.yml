@@ -1,7 +1,14 @@
-name: Deploy Marine CAMS SO2 Backend
+name: Deploy Marine CAMS Backend
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - v3.4.0-coastal-corrosion-final
+    paths:
+      - 'marine-corrosion/direct-backend/api/salt.py'
+      - 'marine-corrosion/direct-backend/vercel.json'
+      - '.github/workflows/deploy-marine-cams-so2-backend.yml'
 
 permissions:
   contents: read
@@ -9,7 +16,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     env:
       PROJECT_NAME: global-marine-corrosion-direct-v332
       TEAM_SLUG: lwang1332-4885
@@ -17,7 +24,6 @@ jobs:
       CAMS_ADS_API_KEY: ${{ secrets.CAMS_ADS_API_KEY }}
     steps:
       - uses: actions/checkout@v4
-
       - name: Check required secrets without printing values
         shell: bash
         run: |
@@ -25,25 +31,17 @@ jobs:
           if [ -z "$VERCEL_TOKEN" ]; then echo '::error::Missing GitHub Secret VERCEL_TOKEN'; missing=1; fi
           if [ -z "$CAMS_ADS_API_KEY" ]; then echo '::error::Missing GitHub Secret CAMS_ADS_API_KEY'; missing=1; fi
           exit "$missing"
-
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-
-      - name: Link or create Vercel backend project
+      - name: Link production backend project
         working-directory: marine-corrosion/direct-backend
-        run: |
-          npx --yes vercel@latest link --yes --project "$PROJECT_NAME" --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN"
-
-      - name: Deploy production backend with server-only CAMS token
+        run: npx --yes vercel@latest link --yes --project "$PROJECT_NAME" --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN"
+      - name: Deploy production backend
         working-directory: marine-corrosion/direct-backend
         shell: bash
-        run: |
-          npx --yes vercel@latest deploy --prod --yes --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN" --env CAMS_ADS_API_KEY="$CAMS_ADS_API_KEY"
-
-      - name: Verify CAMS EAC4 and Forecast end-to-end
-        env:
-          PUBLIC_URL: https://global-marine-corrosion-direct-v332.vercel.app
+        run: npx --yes vercel@latest deploy --prod --yes --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN" --env CAMS_ADS_API_KEY="$CAMS_ADS_API_KEY"
+      - name: Verify CAMS sea-salt EAC4 and Forecast end-to-end
         shell: bash
         run: |
           python3 - <<'PY'
@@ -51,107 +49,47 @@ jobs:
           from urllib.error import HTTPError
           from urllib.parse import quote
           from urllib.request import Request, urlopen
-
-          BASE = "https://global-marine-corrosion-direct-v332.vercel.app/api/so2"
-
-          def request_json(method, url, payload=None, timeout=300):
-              data = None if payload is None else json.dumps(payload).encode("utf-8")
-              req = Request(url, data=data, method=method, headers={"Content-Type": "application/json"})
+          BASE='https://global-marine-corrosion-direct-v332.vercel.app/api/salt'
+          def request_json(method,url,payload=None,timeout=300):
+              data=None if payload is None else json.dumps(payload).encode()
+              req=Request(url,data=data,method=method,headers={'Content-Type':'application/json'})
               try:
-                  with urlopen(req, timeout=timeout) as r:
-                      return r.status, json.loads(r.read().decode("utf-8"))
+                  with urlopen(req,timeout=timeout) as r:return r.status,json.loads(r.read().decode())
               except HTTPError as e:
-                  body = e.read().decode("utf-8", "replace")
-                  try:
-                      parsed = json.loads(body)
-                  except Exception:
-                      parsed = {"raw": body[:1000]}
-                  raise RuntimeError(f"HTTP {e.code}: {parsed}") from None
-
-          def submit_and_wait(label, payload, expected_dataset, expected_level, max_wait=720):
-              code, body = request_json("POST", BASE, payload, timeout=60)
-              if code != 202:
-                  raise RuntimeError(f"{label} submit expected 202, got {code}: {body}")
-              if body.get("configured") is not True:
-                  raise RuntimeError(f"{label} backend not configured: {body}")
-              if body.get("dataset") != expected_dataset or str(body.get("modelLevel")) != expected_level:
-                  raise RuntimeError(f"{label} submit metadata mismatch: {body}")
-              job = body.get("jobId")
-              if not isinstance(job, str) or len(job) < 8:
-                  raise RuntimeError(f"{label} missing job id")
-              print(f"{label}: submitted, upstream status={body.get('status')}")
-
-              deadline = time.time() + max_wait
-              polls = 0
-              while time.time() < deadline:
-                  polls += 1
-                  wait_s = max(2, min(15, int(body.get("retryAfterSeconds") or 5)))
-                  time.sleep(wait_s)
-                  code, body = request_json("GET", BASE + "?job=" + quote(job, safe=""), timeout=300)
-                  if code == 202:
-                      if isinstance(body.get("jobId"), str) and len(body["jobId"]) >= 8:
-                          job = body["jobId"]
-                      if polls % 6 == 0:
-                          print(f"{label}: polling, status={body.get('status')}, polls={polls}")
+                  body=e.read().decode('utf-8','replace')
+                  try:parsed=json.loads(body)
+                  except Exception:parsed={'raw':body[:1000]}
+                  raise RuntimeError(f'HTTP {e.code}: {parsed}') from None
+          def wait(label,payload,dataset,level,min_samples,max_wait=720):
+              code,body=request_json('POST',BASE,payload,60)
+              if code!=202 or body.get('configured') is not True:raise RuntimeError(f'{label} submit failed: {code} {body}')
+              if body.get('dataset')!=dataset or str(body.get('modelLevel'))!=level:raise RuntimeError(f'{label} metadata mismatch {body}')
+              job=body.get('jobId');deadline=time.time()+max_wait;polls=0
+              while time.time()<deadline:
+                  polls+=1;time.sleep(max(2,min(15,int(body.get('retryAfterSeconds') or 5))))
+                  code,body=request_json('GET',BASE+'?job='+quote(job,safe=''),None,300)
+                  if code==202:
+                      job=body.get('jobId') or job
+                      if polls%6==0:print(label,'poll',polls,body.get('status'))
                       continue
-                  if code != 200:
-                      raise RuntimeError(f"{label} poll expected 200/202, got {code}: {body}")
-
-                  times = body.get("time")
-                  vals = body.get("so2")
-                  if body.get("configured") is not True:
-                      raise RuntimeError(f"{label} completed response not configured")
-                  if body.get("dataset") != expected_dataset or str(body.get("modelLevel")) != expected_level:
-                      raise RuntimeError(f"{label} completed metadata mismatch: {body}")
-                  if body.get("units", {}).get("so2") != "kg/kg":
-                      raise RuntimeError(f"{label} unit mismatch: {body.get('units')}")
-                  if not isinstance(times, list) or not isinstance(vals, list) or not times or len(times) != len(vals):
-                      raise RuntimeError(f"{label} invalid time/value arrays")
-                  finite = [float(v) for v in vals if isinstance(v, (int, float)) and math.isfinite(float(v)) and float(v) >= 0]
-                  if not finite:
-                      raise RuntimeError(f"{label} has no finite non-negative SO2 values")
-                  coverage = body.get("coverage")
-                  if not isinstance(coverage, (int, float)) or coverage <= 0:
-                      raise RuntimeError(f"{label} invalid coverage: {coverage}")
-                  print(json.dumps({
-                      "label": label,
-                      "source": body.get("source"),
-                      "dataset": body.get("dataset"),
-                      "modelLevel": body.get("modelLevel"),
-                      "samples": len(vals),
-                      "finiteSamples": len(finite),
-                      "coverage": coverage,
-                      "grid": body.get("grid"),
-                      "cycle": body.get("cycle"),
-                      "units": body.get("units"),
-                  }, ensure_ascii=False))
+                  if code!=200:raise RuntimeError(f'{label} poll {code}: {body}')
+                  times=body.get('time')
+                  if not isinstance(times,list) or len(times)<min_samples:raise RuntimeError(f'{label} invalid time axis')
+                  for k in ('ss1','ss2','ss3'):
+                      vals=body.get(k);finite=[float(v) for v in vals or [] if isinstance(v,(int,float)) and math.isfinite(float(v)) and float(v)>=0]
+                      if not isinstance(vals,list) or len(vals)!=len(times) or not finite:raise RuntimeError(f'{label} invalid {k}')
+                      if body.get('units',{}).get(k)!='kg/kg':raise RuntimeError(f'{label} unit mismatch for {k}')
+                  if body.get('referenceRhPercent')!=80:raise RuntimeError(f'{label} RH basis missing')
+                  print(json.dumps({'label':label,'dataset':body.get('dataset'),'modelLevel':body.get('modelLevel'),'samples':len(times),'coverage':body.get('coverage'),'grid':body.get('grid'),'cycle':body.get('cycle'),'referenceRhPercent':body.get('referenceRhPercent')},ensure_ascii=False))
                   return body
-              raise RuntimeError(f"{label} timed out after {max_wait}s")
-
-          historical = submit_and_wait(
-              "EAC4",
-              {"lat": 10.9, "lon": 106.6, "mode": "historical", "year": 2025},
-              "cams-global-reanalysis-eac4-monthly",
-              "60",
-          )
-          if len(historical["time"]) < 12:
-              raise RuntimeError(f"EAC4 expected at least 12 monthly samples, got {len(historical['time'])}")
-
-          forecast = submit_and_wait(
-              "Forecast",
-              {"lat": 10.9, "lon": 106.6, "mode": "current"},
-              "cams-global-atmospheric-composition-forecasts",
-              "137",
-          )
-          if len(forecast["time"]) < 20:
-              raise RuntimeError(f"Forecast expected at least 20 samples, got {len(forecast['time'])}")
-
-          print("CAMS SO2 V3.3.2 LIVE E2E PASS")
+              raise RuntimeError(f'{label} timeout')
+          h=wait('SeaSalt EAC4',{'lat':10.9,'lon':106.6,'mode':'historical','year':2025},'cams-global-reanalysis-eac4-monthly','60',12)
+          f=wait('SeaSalt Forecast',{'lat':10.9,'lon':106.6,'mode':'current'},'cams-global-atmospheric-composition-forecasts','137',20)
+          print('CAMS SEA SALT V3.4.0 LIVE E2E PASS')
           PY
-
-      - name: Verify expected production alias
+      - name: Smoke-check SO2 route remains alive
         shell: bash
         run: |
-          url="https://${PROJECT_NAME}.vercel.app/api/so2"
-          echo "Expected stable endpoint: $url"
-          curl -sS -o /tmp/health.json -w 'GET status: %{http_code}\n' "$url" || true
+          code=$(curl -sS -o /tmp/so2-smoke.json -w '%{http_code}' https://global-marine-corrosion-direct-v332.vercel.app/api/so2 || true)
+          test "$code" = "400" || test "$code" = "200" || { cat /tmp/so2-smoke.json; exit 1; }
+          echo "SO2 route alive: HTTP $code"
