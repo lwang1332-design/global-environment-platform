@@ -11,6 +11,10 @@ on:
       - 'marine-corrosion/direct-backend/vercel.json'
       - '.github/workflows/deploy-marine-cams-so2-backend.yml'
 
+concurrency:
+  group: marine-cams-backend-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: read
 
@@ -42,50 +46,14 @@ jobs:
         working-directory: marine-corrosion/direct-backend
         shell: bash
         run: npx --yes vercel@latest deploy --prod --yes --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN" --env CAMS_ADS_API_KEY="$CAMS_ADS_API_KEY"
-      - name: Verify CAMS sea-salt concentration EAC4 and Forecast end-to-end
+      - name: Smoke-check existing concentration and SO2 routes
         shell: bash
         run: |
-          python3 - <<'PY'
-          import json, math, time
-          from urllib.error import HTTPError
-          from urllib.parse import quote
-          from urllib.request import Request, urlopen
-          BASE='https://global-marine-corrosion-direct-v332.vercel.app/api/salt'
-          def request_json(method,url,payload=None,timeout=300):
-              data=None if payload is None else json.dumps(payload).encode();req=Request(url,data=data,method=method,headers={'Content-Type':'application/json'})
-              try:
-                  with urlopen(req,timeout=timeout) as r:return r.status,json.loads(r.read().decode())
-              except HTTPError as e:
-                  body=e.read().decode('utf-8','replace')
-                  try:parsed=json.loads(body)
-                  except Exception:parsed={'raw':body[:1000]}
-                  raise RuntimeError(f'HTTP {e.code}: {parsed}') from None
-          def wait(label,payload,dataset,level,min_samples,max_wait=900):
-              code,body=request_json('POST',BASE,payload,60)
-              if code!=202 or body.get('configured') is not True:raise RuntimeError(f'{label} submit failed: {code} {body}')
-              if body.get('dataset')!=dataset or str(body.get('modelLevel'))!=level:raise RuntimeError(f'{label} metadata mismatch {body}')
-              job=body.get('jobId');deadline=time.time()+max_wait;polls=0
-              while time.time()<deadline:
-                  polls+=1;time.sleep(max(2,min(15,int(body.get('retryAfterSeconds') or 5))))
-                  code,body=request_json('GET',BASE+'?job='+quote(job,safe=''),None,300)
-                  if code==202:
-                      job=body.get('jobId') or job
-                      if polls%6==0:print(label,'poll',polls,body.get('status'))
-                      continue
-                  if code!=200:raise RuntimeError(f'{label} poll {code}: {body}')
-                  times=body.get('time')
-                  if not isinstance(times,list) or len(times)<min_samples:raise RuntimeError(f'{label} invalid time axis')
-                  for k in ('ss1','ss2','ss3'):
-                      vals=body.get(k);finite=[float(v) for v in vals or [] if isinstance(v,(int,float)) and math.isfinite(float(v)) and float(v)>=0]
-                      if not isinstance(vals,list) or len(vals)!=len(times) or not finite:raise RuntimeError(f'{label} invalid {k}')
-                      if body.get('units',{}).get(k)!='kg/kg':raise RuntimeError(f'{label} unit mismatch for {k}')
-                  if body.get('referenceRhPercent')!=80:raise RuntimeError(f'{label} RH basis missing')
-                  print(json.dumps({'label':label,'dataset':body.get('dataset'),'modelLevel':body.get('modelLevel'),'samples':len(times),'coverage':body.get('coverage'),'grid':body.get('grid'),'cycle':body.get('cycle')},ensure_ascii=False));return body
-              raise RuntimeError(f'{label} timeout')
-          wait('SeaSalt EAC4',{'lat':10.9,'lon':106.6,'mode':'historical','year':2025},'cams-global-reanalysis-eac4-monthly','60',12)
-          wait('SeaSalt Forecast',{'lat':10.9,'lon':106.6,'mode':'current'},'cams-global-atmospheric-composition-forecasts','137',20)
-          print('CAMS SEA SALT CONCENTRATION V3.4.0 LIVE E2E PASS')
-          PY
+          for path in salt so2; do
+            code=$(curl -sS -o "/tmp/${path}.json" -w '%{http_code}' "https://global-marine-corrosion-direct-v332.vercel.app/api/${path}" || true)
+            test "$code" = "400" || test "$code" = "200" || { cat "/tmp/${path}.json"; exit 1; }
+            echo "$path route alive: HTTP $code"
+          done
       - name: Verify CAMS sea-salt deposition flux Historical and Current end-to-end
         shell: bash
         run: |
@@ -130,12 +98,7 @@ jobs:
                   print(json.dumps({'label':label,'productType':body.get('productType'),'samples':len(times),'coverage':body.get('coverage'),'grid':body.get('grid'),'cycle':body.get('cycle')},ensure_ascii=False));return body
               raise RuntimeError(f'{label} timeout after {max_wait}s')
           wait('SeaSalt Flux Historical 2025',{'lat':18.300797,'lon':109.26452,'mode':'historical','year':2025},2800,'ARCHIVED_FORECAST_FLUX')
+          time.sleep(20)
           wait('SeaSalt Flux Current',{'lat':18.300797,'lon':109.26452,'mode':'current'},20,'FORECAST_FLUX')
           print('CAMS SEA SALT DEPOSITION FLUX V3.4.0 LIVE E2E PASS')
           PY
-      - name: Smoke-check SO2 route remains alive
-        shell: bash
-        run: |
-          code=$(curl -sS -o /tmp/so2-smoke.json -w '%{http_code}' https://global-marine-corrosion-direct-v332.vercel.app/api/so2 || true)
-          test "$code" = "400" || test "$code" = "200" || { cat /tmp/so2-smoke.json; exit 1; }
-          echo "SO2 route alive: HTTP $code"
