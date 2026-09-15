@@ -1,0 +1,45 @@
+name: Marine Corrosion V3.4.0 Live Validation
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [v3.4.0-coastal-corrosion-final]
+    paths:
+      - 'marine-corrosion/tests/v340-live-e2e.mjs'
+      - '.github/workflows/marine-corrosion-v340-live.yml'
+
+jobs:
+  live:
+    strategy:
+      fail-fast: false
+      matrix:
+        point: [VN, HN, FJ]
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install chromium >/dev/null
+      - name: Start app
+        run: |
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/v340-live-http.log 2>&1 &
+          for i in $(seq 1 30); do curl -fsS http://127.0.0.1:4173/marine-corrosion/ >/dev/null && exit 0; sleep 1; done
+          exit 1
+      - name: Run live final assessment
+        env:
+          POINT_ID: ${{ matrix.point }}
+        run: node marine-corrosion/tests/v340-live-e2e.mjs
+      - name: Upload result
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v340-live-${{ matrix.point }}
+          path: /tmp/v340-live-${{ matrix.point }}.json
+          retention-days: 14
+          if-no-files-found: warn
