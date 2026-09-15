@@ -7,7 +7,7 @@
 'use strict';
 const q=(s,r=document)=>r?.querySelector?.(s)||null;
 const qa=(s,r=document)=>r?[...r.querySelectorAll(s)]:[];
-const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot',"'":'&#39;'}[c]));
 const finite=v=>Number.isFinite(Number(v));
 
 function globals(){
@@ -111,7 +111,23 @@ function observe(){
  const decision=q('#aiSummary');if(decision&&!decision.dataset.scientificObserved){decision.dataset.scientificObserved='1';let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(renderDecisionCore,0)}).observe(decision,{childList:true,subtree:true,characterData:true})}
  const admin=q('#adminPage');if(admin&&!admin.dataset.scientificObserved){admin.dataset.scientificObserved='1';let timer;new MutationObserver(()=>{clearTimeout(timer);timer=setTimeout(addAdminHelp,0)}).observe(admin,{childList:true,subtree:true})}
 }
+function loadFeatureScript(src,key,ready){
+ if(ready())return Promise.resolve();
+ return new Promise((resolve,reject)=>{
+   const old=document.querySelector(`script[data-ge-feature="${key}"]`);
+   if(old){old.addEventListener('load',resolve,{once:true});old.addEventListener('error',reject,{once:true});return}
+   const s=document.createElement('script');s.src=src;s.async=false;s.dataset.geFeature=key;s.onload=resolve;s.onerror=()=>reject(new Error(`加载失败：${src}`));document.head.appendChild(s);
+ });
+}
+async function loadTrendFeature(){
+ try{
+  await loadFeatureScript('./assets/trend-analysis.js?v=20260915-trend1','trend-analysis',()=>!!window.GETrendAnalysis);
+  await loadFeatureScript('./assets/trend-nullfix.js?v=20260915-trend1','trend-nullfix',()=>window.GETrendAnalysis?.dataQualityGuard==='null-excluded');
+  await loadFeatureScript('./assets/trend-modal.js?v=20260915-trend1','trend-modal',()=>!!window.GETrendModal);
+  window.GETrendModal?.init?.();
+ }catch(e){console.error('[GE Trend] feature load failed',e)}
+}
 window.CockpitScientific={refresh};
-function init(){refresh();observe();setTimeout(refresh,350);setTimeout(refresh,1200)}
+function init(){refresh();observe();loadTrendFeature();setTimeout(refresh,350);setTimeout(refresh,1200)}
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
