@@ -6,6 +6,11 @@ on:
     branches: [v3.4.0-coastal-corrosion-final]
     paths:
       - 'marine-corrosion/tests/v340-live-e2e.mjs'
+      - 'marine-corrosion/sources-v340.js'
+      - 'marine-corrosion/run-controller-v340.js'
+      - 'marine-corrosion/coastal-corrosion-v340.js'
+      - 'marine-corrosion/iso-sd-v340.js'
+      - 'marine-corrosion/surface-wetness-v340.js'
       - '.github/workflows/marine-corrosion-v340-live.yml'
 
 jobs:
@@ -13,7 +18,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        point: [VN, HN, FJ]
+        point: [VN, HN, FJ, FJ100]
     runs-on: ubuntu-latest
     timeout-minutes: 25
     steps:
