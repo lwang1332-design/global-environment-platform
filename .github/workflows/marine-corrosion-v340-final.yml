@@ -74,7 +74,7 @@ jobs:
           if(!ui.title.includes('V3.4.0')||!ui.brand.includes('V3.4.0')||!ui.head.includes('V3.4.0'))throw new Error('V3.4.0 branding missing');
           for(const x of ['auto_model','wet_candle_direct','standard_converted'])if(!ui.methods.includes(x))throw new Error('missing Sd method '+x);
           if(!/Formal/.test(ui.notice)||!/CAMS真实海盐/.test(ui.notice)||!/不得降低|禁止.*降级/.test(ui.notice))throw new Error('final guardrail notice missing');
-          if(!/Recommended Envelope/.test(ui.panel)||!/CAMS通量/.test(ui.panel))throw new Error('final envelope/flux UI missing');
+          if(!/保守包络/.test(ui.panel)||!/CAMS沉降通量/.test(ui.panel)||!/Surface-Wetness仅允许增加风险/.test(ui.panel))throw new Error('final envelope/flux static UI missing');
           if(ui.overflow>2||errors.length)throw new Error('browser regression: '+errors.join(' | '));
           const policy=await page.evaluate(async()=>{const p=await import('./input-policy-v340.js?ci='+Date.now());return {app:p.APP_VERSION,science:p.SCIENCE_MODEL_VERSION,data:p.DATA_LAYER_VERSION,diag:p.DIAGNOSTIC_LAYER_VERSION,coastal:p.COASTAL_ASSESSMENT_VERSION}});
           if(policy.app!=='3.4.0'||policy.science!=='3.3.0'||policy.data!=='3.4.0'||policy.diag!=='3.3.3'||policy.coastal!=='3.4.0')throw new Error('version boundary failed');
