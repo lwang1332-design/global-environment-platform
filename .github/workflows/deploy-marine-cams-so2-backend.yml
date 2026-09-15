@@ -21,7 +21,7 @@ permissions:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    timeout-minutes: 45
+    timeout-minutes: 60
     env:
       PROJECT_NAME: global-marine-corrosion-direct-v332
       TEAM_SLUG: lwang1332-4885
@@ -46,15 +46,15 @@ jobs:
         working-directory: marine-corrosion/direct-backend
         shell: bash
         run: npx --yes vercel@latest deploy --prod --yes --scope "$TEAM_SLUG" --token "$VERCEL_TOKEN" --env CAMS_ADS_API_KEY="$CAMS_ADS_API_KEY"
-      - name: Smoke-check existing concentration and SO2 routes
+      - name: Smoke-check concentration, deposition flux and SO2 routes
         shell: bash
         run: |
-          for path in salt so2; do
+          for path in salt salt_flux so2; do
             code=$(curl -sS -o "/tmp/${path}.json" -w '%{http_code}' "https://global-marine-corrosion-direct-v332.vercel.app/api/${path}" || true)
             test "$code" = "400" || test "$code" = "200" || { cat "/tmp/${path}.json"; exit 1; }
             echo "$path route alive: HTTP $code"
           done
-      - name: Verify CAMS sea-salt deposition flux Historical and Current end-to-end
+      - name: Verify CAMS sea-salt deposition flux quarterly Historical and Current end-to-end
         shell: bash
         run: |
           python3 - <<'PY'
@@ -73,11 +73,12 @@ jobs:
                   try:parsed=json.loads(body)
                   except Exception:parsed={'raw':body[:1200]}
                   raise RuntimeError(f'HTTP {e.code}: {parsed}') from None
-          def wait(label,payload,min_samples,expected_product,max_wait=1200):
+          def wait(label,payload,min_samples,expected_product,max_wait=900):
               code,body=request_json('POST',BASE,payload,60)
               if code!=202 or body.get('configured') is not True:raise RuntimeError(f'{label} submit failed: {code} {body}')
               if body.get('dataset')!='cams-global-atmospheric-composition-forecasts':raise RuntimeError(f'{label} dataset mismatch {body}')
               if body.get('productType')!=expected_product:raise RuntimeError(f'{label} product mismatch {body}')
+              if payload.get('chunk') and body.get('chunk')!=payload['chunk']:raise RuntimeError(f'{label} chunk mismatch {body}')
               job=body.get('jobId');deadline=time.time()+max_wait;polls=0
               while time.time()<deadline:
                   polls+=1;time.sleep(max(3,min(15,int(body.get('retryAfterSeconds') or 5))))
@@ -89,16 +90,21 @@ jobs:
                   if code!=200:raise RuntimeError(f'{label} poll {code}: {body}')
                   times=body.get('time')
                   if not isinstance(times,list) or len(times)<min_samples:raise RuntimeError(f'{label} invalid time axis: {len(times) if isinstance(times,list) else None}')
+                  if payload.get('chunk') and body.get('chunk')!=payload['chunk']:raise RuntimeError(f'{label} completed chunk mismatch {body.get("chunk")}')
                   for k in FIELDS:
                       vals=body.get(k)
                       if not isinstance(vals,list) or len(vals)!=len(times):raise RuntimeError(f'{label} invalid {k} array')
                       finite=[float(v) for v in vals if isinstance(v,(int,float)) and math.isfinite(float(v)) and float(v)>=0]
                       if len(finite)<max(1,int(.9*len(times))):raise RuntimeError(f'{label} insufficient finite {k}: {len(finite)}/{len(times)}')
                       if body.get('units',{}).get(k)!='kg/(m²·s)':raise RuntimeError(f'{label} unit mismatch {k}: {body.get("units",{}).get(k)}')
-                  print(json.dumps({'label':label,'productType':body.get('productType'),'samples':len(times),'coverage':body.get('coverage'),'grid':body.get('grid'),'cycle':body.get('cycle')},ensure_ascii=False));return body
+                  print(json.dumps({'label':label,'productType':body.get('productType'),'chunk':body.get('chunk'),'chunkRange':body.get('chunkRange'),'samples':len(times),'coverage':body.get('coverage'),'grid':body.get('grid'),'cycle':body.get('cycle')},ensure_ascii=False));return body
               raise RuntimeError(f'{label} timeout after {max_wait}s')
-          wait('SeaSalt Flux Historical 2025',{'lat':18.300797,'lon':109.26452,'mode':'historical','year':2025},2800,'ARCHIVED_FORECAST_FLUX')
-          time.sleep(20)
-          wait('SeaSalt Flux Current',{'lat':18.300797,'lon':109.26452,'mode':'current'},20,'FORECAST_FLUX')
-          print('CAMS SEA SALT DEPOSITION FLUX V3.4.0 LIVE E2E PASS')
+          total=0
+          for chunk in (1,2,3,4):
+              body=wait(f'SeaSalt Flux Historical 2025 Q{chunk}',{'lat':18.300797,'lon':109.26452,'mode':'historical','year':2025,'chunk':chunk},650,'ARCHIVED_FORECAST_FLUX')
+              total += len(body['time'])
+          if total < 2800: raise RuntimeError(f'Historical four-quarter aggregate too short: {total}')
+          time.sleep(10)
+          wait('SeaSalt Flux Current',{'lat':18.300797,'lon':109.26452,'mode':'current'},20,'FORECAST_FLUX',600)
+          print(f'CAMS SEA SALT DEPOSITION FLUX V3.4.0 LIVE E2E PASS; historicalSamples={total}')
           PY
