@@ -27,12 +27,18 @@ jobs:
           node --check marine-corrosion/iso-sd-v340.js
           node --check marine-corrosion/surface-wetness-v340.js
           node --check marine-corrosion/coastal-corrosion-v340.js
+          node --check marine-corrosion/sources-v340.js
           node --check marine-corrosion/run-controller-v340.js
           node --check marine-corrosion/v340-ui-runtime.js
           node --check marine-corrosion/input-policy-v340.js
           node --check marine-corrosion/tests/v340-final.test.mjs
+          python3 -m py_compile marine-corrosion/direct-backend/api/salt.py
       - name: Run all JavaScript tests
         run: node --test marine-corrosion/tests/*.test.mjs
+      - name: Run sea-salt backend contract tests
+        run: |
+          python3 -m pip install -q pytest
+          pytest -q marine-corrosion/tests/test_salt_backend.py
 
   browser:
     runs-on: ubuntu-latest
@@ -69,7 +75,7 @@ jobs:
           if(!/Formal/.test(ui.notice)||!/表面湿润/.test(ui.notice))throw new Error('final guardrail notice missing');
           if(ui.overflow>2||errors.length)throw new Error('browser regression: '+errors.join(' | '));
           const policy=await page.evaluate(async()=>{const p=await import('./input-policy-v340.js?ci='+Date.now());return {app:p.APP_VERSION,science:p.SCIENCE_MODEL_VERSION,data:p.DATA_LAYER_VERSION,diag:p.DIAGNOSTIC_LAYER_VERSION,coastal:p.COASTAL_ASSESSMENT_VERSION}});
-          if(policy.app!=='3.4.0'||policy.science!=='3.3.0'||policy.data!=='3.3.2'||policy.diag!=='3.3.3'||policy.coastal!=='3.4.0')throw new Error('version boundary failed');
+          if(policy.app!=='3.4.0'||policy.science!=='3.3.0'||policy.data!=='3.4.0'||policy.diag!=='3.3.3'||policy.coastal!=='3.4.0')throw new Error('version boundary failed');
           await browser.close();
           JS
           node v340-browser.mjs
