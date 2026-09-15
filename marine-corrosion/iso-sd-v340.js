@@ -5,6 +5,7 @@ export const ISO_SD_STANDARD='ISO 9225:2012';
 export const WET_CANDLE={diameterM:0.025,exposedAreaM2:0.01,exposedLengthM:0.12,orientationFactor:1/Math.PI,rainProtected:true};
 const RHO_P=2160, MU=1.81e-5;
 const finite=v=>Number.isFinite(Number(v))?Number(v):null;
+const FLUX_GROUPS={dry:['ssDry1','ssDry2','ssDry3'],sed:['ssSed1','ssSed2','ssSed3'],wetConv:['ssWetConv1','ssWetConv2','ssWetConv3'],wetLs:['ssWetLs1','ssWetLs2','ssWetLs3']};
 
 export function normalizeSdSettings(raw={}){
   const method=['auto_model','wet_candle_direct','standard_converted'].includes(raw.method)?raw.method:'auto_model';
@@ -17,6 +18,29 @@ function splitSpray(row,cfg){
   const l35=Math.max(.1,finite(cfg.localSprayScale35Km)??12),l75=Math.max(.1,finite(cfg.localSprayScale75Km)??6);
   const a=.68*Math.exp(-d/l35),b=.32*Math.exp(-d/l75),sum=a+b;
   return sum>0?[total*a/sum,total*b/sum]:[total*.68,total*.32];
+}
+
+export function camsBulkDrySaltFluxMgM2Day(result,index){
+  const cams=result?.inputData?.cams||{},cfg=result?.inputSnapshot?.cfg||{},factor=Math.max(1,finite(cfg.camsDryMassFactor)??4.3);
+  const sums={};
+  for(const [group,keys] of Object.entries(FLUX_GROUPS)){
+    const vals=keys.map(k=>finite(cams?.[k]?.[index]));
+    if(vals.some(v=>v===null))return null;
+    sums[group]=vals.reduce((s,v)=>s+v,0)*86400*1e6/factor;
+  }
+  return {...sums,total:sums.dry+sums.sed+sums.wetConv+sums.wetLs,unit:'mg/(m²·d) dry sea salt',massConversionFactor:factor};
+}
+
+export function camsFluxEquivalentSd(result){
+  const rows=result?.hourly||[],cfg=result?.inputSnapshot?.cfg||{},chlorideFraction=finite(cfg.chlorideFraction)??.55;
+  let weighted=0,hours=0,validHours=0,dry=0,sed=0,wet=0;
+  for(let i=0;i<rows.length;i++){
+    const r=rows[i];if(!r?.valid||!Number(r.dt))continue;validHours+=Number(r.dt);
+    const f=camsBulkDrySaltFluxMgM2Day(result,i);if(!f)continue;
+    const dt=Number(r.dt),cl=f.total*chlorideFraction;weighted+=cl*dt;hours+=dt;dry+=f.dry*chlorideFraction*dt;sed+=f.sed*chlorideFraction*dt;wet+=(f.wetConv+f.wetLs)*chlorideFraction*dt;
+  }
+  const coverage=validHours?hours/validHours:0;
+  return {ready:hours>0,sd:hours?weighted/hours:null,coveragePercent:100*coverage,dryCl:hours?dry/hours:null,sedimentationCl:hours?sed/hours:null,wetCl:hours?wet/hours:null,source:result?.inputData?.cams?.autoSeaSaltFlux?.source||null,productType:result?.inputData?.cams?.autoSeaSaltFlux?.productType||null,note:'CAMS dry + sedimentation + convective wet + large-scale wet sea-salt flux converted to dry sea salt (/4.3) then Cl⁻ fraction; this is an engineering deposition envelope, not an ISO 9225 field measurement.'};
 }
 
 export function virtualWetCandleSd(result,options={}){
@@ -42,9 +66,11 @@ export function virtualWetCandleSd(result,options={}){
     }
     perHour.push({dt:Number(r.dt),sd:saltFlux*chlorideFraction,direct:directBins});
   }
-  const h=perHour.reduce((s,r)=>s+r.dt,0),sd=h?perHour.reduce((s,r)=>s+r.sd*r.dt,0)/h:null,directH=perHour.filter(r=>r.direct).reduce((s,r)=>s+r.dt,0);
-  const directShare=h?directH/h:0;
-  return {ready:Number.isFinite(sd),sd,method:'MODEL_WET_CANDLE',standard:ISO_SD_STANDARD,formalIso:false,traceability:'MODEL_EQUIVALENT',confidence:directShare>.9?'C':'D',coveragePercent:100,directSeaSaltSharePercent:directShare*100,collector:{...WET_CANDLE,diameterM:L,orientationFactor:orientation},note:'虚拟湿烛以标准湿式竖直圆柱的几何响应为目标；不使用腐蚀实测反推倍率，不能冒充现场ISO 9225实测。'};
+  const h=perHour.reduce((s,r)=>s+r.dt,0),collectorSd=h?perHour.reduce((s,r)=>s+r.sd*r.dt,0)/h:null,directH=perHour.filter(r=>r.direct).reduce((s,r)=>s+r.dt,0);
+  const directShare=h?directH/h:0,bulk=camsFluxEquivalentSd(result),mode=result?.project?.mode||result?.summary?.mode||'historical';
+  const fluxUsable=bulk.ready&&(mode==='current'||bulk.coveragePercent>=90),sd=fluxUsable?Math.max(collectorSd??0,bulk.sd??0):collectorSd;
+  const driver=fluxUsable&&Number.isFinite(bulk.sd)&&bulk.sd>(collectorSd??-Infinity)?'CAMS_BULK_FLUX':'VIRTUAL_WET_CANDLE';
+  return {ready:Number.isFinite(sd),sd,method:fluxUsable?'MODEL_WET_CANDLE_CAMS_FLUX_ENVELOPE':'MODEL_WET_CANDLE',standard:ISO_SD_STANDARD,formalIso:false,traceability:fluxUsable?'MODEL_EQUIVALENT+CAMS_FLUX':'MODEL_EQUIVALENT',confidence:directShare>.9&&(!bulk.ready||bulk.coveragePercent>=90)?'C':'D',coveragePercent:100,directSeaSaltSharePercent:directShare*100,collectorModelSd:collectorSd,camsBulkFluxSd:bulk.sd,camsFluxCoveragePercent:bulk.coveragePercent,camsFluxComponents:{dryCl:bulk.dryCl,sedimentationCl:bulk.sedimentationCl,wetCl:bulk.wetCl},envelopeDriver:driver,collector:{...WET_CANDLE,diameterM:L,orientationFactor:orientation},fluxEvidence:bulk,note:'Model-equivalent Sd uses a conservative envelope: virtual wet-candle aerosol capture versus CAMS direct dry+sedimentation+wet deposition Cl⁻ flux. It never uses corrosion observations to tune a multiplier and cannot be presented as an ISO 9225 field measurement.'};
 }
 
 export function establishIsoSd(result,rawSettings={}){
