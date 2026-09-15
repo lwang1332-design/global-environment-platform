@@ -14,7 +14,6 @@ ADS_KEY=os.environ.get("CAMS_ADS_API_KEY")
 JOB_RE=re.compile(r"^[A-Za-z0-9_-]{8,4096}$")
 REQUEST_ID_RE=re.compile(r"^[A-Za-z0-9-]{8,200}$")
 DATASET="cams-global-atmospheric-composition-forecasts"
-# CAMS operational sea-salt deposition fluxes, kg m-2 s-1.
 DRY=[
     "dry_deposition_of_sea_salt_aerosol_0.03-0.5um",
     "dry_deposition_of_sea_salt_aerosol_0.5-5um",
@@ -48,6 +47,7 @@ FIELD_VARIABLES={
     "ssWetConv1":WET_CONV[0],"ssWetConv2":WET_CONV[1],"ssWetConv3":WET_CONV[2],
     "ssWetLs1":WET_LS[0],"ssWetLs2":WET_LS[1],"ssWetLs3":WET_LS[2],
 }
+QUARTERS={1:("01-01","03-31"),2:("04-01","06-30"),3:("07-01","09-30"),4:("10-01","12-31")}
 
 
 def _num(v):
@@ -55,25 +55,24 @@ def _num(v):
         x=float(v);return x if x==x and abs(x)!=float("inf") else None
     except Exception:return None
 
-def _area(lat,lon,half=.8):
-    return [min(90.,lat+half),max(-180.,lon-half),max(-90.,lat-half),min(180.,lon+half)]
-
+def _area(lat,lon,half=.8):return [min(90.,lat+half),max(-180.,lon-half),max(-90.,lat-half),min(180.,lon+half)]
 def _latest_cycle(now=None):
     now=now or datetime.now(timezone.utc);safe=now-timedelta(hours=8);hour=12 if safe.hour>=12 else 0
     return safe.replace(hour=hour,minute=0,second=0,microsecond=0)
 
-def build_historical_request(year,lat,lon):
-    if year<2019:
-        raise ValueError("CAMS archived sea-salt deposition flux full-year mode requires year >= 2019")
+def build_historical_request(year,lat,lon,chunk=1):
+    if year<2019:raise ValueError("CAMS archived sea-salt deposition flux requires year >= 2019")
+    if chunk not in QUARTERS:raise ValueError("Historical CAMS flux chunk must be 1..4")
+    start,end=QUARTERS[chunk]
     return {"dataset":DATASET,"request":{
         "variable":VARIABLES,
-        "date":[f"{year}-01-01/{year}-12-31"],
+        "date":[f"{year}-{start}/{year}-{end}"],
         "time":["00:00"],
         "type":["forecast"],
         "leadtime_hour":[str(h) for h in range(0,24,3)],
         "data_format":"netcdf_zip",
         "area":_area(lat,lon),
-    },"resolution":"~0.4° / 3 h archived operational deposition flux","history_basis":"ARCHIVED_FORECAST_FLUX"}
+    },"resolution":"~0.4° / 3 h archived operational deposition flux","history_basis":"ARCHIVED_FORECAST_FLUX","chunk":chunk,"chunk_range":f"{year}-{start}/{year}-{end}"}
 
 def build_current_request(lat,lon,cycle=None):
     cycle=cycle or _latest_cycle()
@@ -99,14 +98,16 @@ def _decode_job(token):
     if not isinstance(p,dict) or not REQUEST_ID_RE.match(str(p.get("requestId",""))):raise ValueError("invalid request id")
     lat,lon=_num(p.get("lat")),_num(p.get("lon"))
     if lat is None or lon is None or abs(lat)>90 or abs(lon)>180 or p.get("mode") not in {"historical","current"}:raise ValueError("invalid job metadata")
+    if p.get("mode")=="historical" and int(p.get("chunk",0)) not in QUARTERS:raise ValueError("invalid historical chunk")
     return p
 
-def _submit(lat,lon,mode,year=None,cycle=None,back=0):
-    spec=build_historical_request(year,lat,lon) if mode=="historical" else build_current_request(lat,lon,cycle or (_latest_cycle()-timedelta(hours=12*back)))
+def _submit(lat,lon,mode,year=None,chunk=None,cycle=None,back=0):
+    spec=build_historical_request(year,lat,lon,int(chunk or 1)) if mode=="historical" else build_current_request(lat,lon,cycle or (_latest_cycle()-timedelta(hours=12*back)))
     remote=_client().submit(spec["dataset"],spec["request"]);rid=str(remote.request_id)
     if not REQUEST_ID_RE.match(rid):raise RuntimeError("ADS did not return a valid request id")
     meta={"requestId":rid,"lat":lat,"lon":lon,"mode":mode,"year":year,"dataset":spec["dataset"],"resolution":spec["resolution"],"historyBasis":spec["history_basis"],"back":back}
-    if mode=="current":meta["cycle"]=spec["cycle"].isoformat().replace("+00:00","Z")
+    if mode=="historical":meta.update({"chunk":spec["chunk"],"chunkRange":spec["chunk_range"]})
+    else:meta["cycle"]=spec["cycle"].isoformat().replace("+00:00","Z")
     return _encode_job(meta),str(remote.status or "accepted"),meta
 
 def _datasets(path):
@@ -133,28 +134,24 @@ def _nearest(ds,lat,lon):
 def _identify(ds,outkey):
     short=SHORTS[outkey];target=FIELD_VARIABLES[outkey].replace("_"," ").lower()
     for key in ds.data_vars:
-        attrs=ds[key].attrs or {};name=key.lower();texts=[str(attrs.get(k,"")) for k in ("long_name","standard_name","short_name","GRIB_shortName")]
-        text=" ".join(texts).replace("_"," ").lower()
+        attrs=ds[key].attrs or {};name=key.lower();texts=[str(attrs.get(k,"")) for k in ("long_name","standard_name","short_name","GRIB_shortName")];text=" ".join(texts).replace("_"," ").lower()
         if name==short or str(attrs.get("GRIB_shortName","")).lower()==short or target in text:return key
     return None
 
-def _time(ds,count,mode,year=None,cycle=None):
+def _timestamps(ds,count,mode,cycle=None):
     import numpy as np, pandas as pd
     if "valid_time" in ds.coords:
-        v=np.asarray(ds["valid_time"].values).reshape(-1)
-        if len(v)==count:return [pd.Timestamp(x).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00","Z") for x in v]
+        v=np.asarray(ds["valid_time"].values)
+        if v.size==count:return [pd.Timestamp(x).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00","Z") for x in v.reshape(-1)]
     if "forecast_reference_time" in ds.coords and "forecast_period" in ds.coords:
-        base=np.asarray(ds["forecast_reference_time"].values).reshape(-1);period=np.asarray(ds["forecast_period"].values)
-        if period.size==count:
-            if base.size==1:
-                b=pd.Timestamp(base[0]);return [(b+pd.to_timedelta(x)).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00","Z") for x in period.reshape(-1)]
-            # Multi-cycle archive: construct 2-D valid times when dimensions are compatible.
-            if period.ndim==1 and base.size*period.size==count:
-                out=[]
-                for b in base:
-                    bb=pd.Timestamp(b)
-                    out.extend([(bb+pd.to_timedelta(x)).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00","Z") for x in period])
-                return out
+        base=np.asarray(ds["forecast_reference_time"].values).reshape(-1);period=np.asarray(ds["forecast_period"].values).reshape(-1)
+        if base.size==1 and period.size==count:
+            b=pd.Timestamp(base[0]);return [(b+pd.to_timedelta(x)).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00","Z") for x in period]
+        if base.size*period.size==count:
+            out=[]
+            for b in base:
+                bb=pd.Timestamp(b);out.extend([(bb+pd.to_timedelta(x)).to_pydatetime().replace(tzinfo=timezone.utc).isoformat().replace("+00:00","Z") for x in period])
+            return out
     for name in ("time","forecast_reference_time"):
         if name in ds.coords:
             v=np.asarray(ds[name].values).reshape(-1)
@@ -162,7 +159,7 @@ def _time(ds,count,mode,year=None,cycle=None):
     if mode=="current" and cycle:return [(cycle+timedelta(hours=3*i)).isoformat().replace("+00:00","Z") for i in range(count)]
     return []
 
-def _extract(path,lat,lon,mode,year=None,cycle=None):
+def _extract(path,lat,lon,mode,cycle=None):
     import numpy as np
     datasets=_datasets(path);series={};units={};grid=None;times=None
     try:
@@ -172,14 +169,13 @@ def _extract(path,lat,lon,mode,year=None,cycle=None):
                 pt,g=_nearest(ds,lat,lon);key=_identify(pt,outkey)
                 if key:found=(pt,key,g);break
             if not found:raise RuntimeError(f"Unable to identify CAMS deposition variable {outkey}")
-            pt,key,g=found;arr=np.asarray(pt[key].values,dtype=float).reshape(-1)
-            vals=[]
+            pt,key,g=found;arr=np.asarray(pt[key].values,dtype=float).reshape(-1);vals=[]
             for x in arr:
                 if not np.isfinite(x):vals.append(None)
                 elif x>=0:vals.append(float(x))
                 elif x>-1e-20:vals.append(0.0)
                 else:vals.append(None)
-            tt=_time(pt,len(vals),mode,year=year,cycle=cycle)
+            tt=_timestamps(pt,len(vals),mode,cycle=cycle)
             if len(tt)!=len(vals):raise RuntimeError(f"CAMS {outkey} time/value mismatch {len(tt)} vs {len(vals)}")
             if times is None:times=tt
             elif times!=tt:raise RuntimeError("CAMS deposition variables have inconsistent time axes")
@@ -203,8 +199,11 @@ def _result(meta):
     with tempfile.NamedTemporaryFile(suffix=".zip",delete=False) as f:target=f.name
     try:
         remote.download(target);cycle=datetime.fromisoformat(meta["cycle"].replace("Z","+00:00")) if meta.get("cycle") else None
-        time,series,upunits,grid=_extract(target,meta["lat"],meta["lon"],meta["mode"],year=meta.get("year"),cycle=cycle);n=max(1,len(time));coverage={k:sum(v is not None for v in vals)/n for k,vals in series.items()}
-        return "complete",{"version":"3.4.0","configured":True,"source":"CAMS archived operational sea-salt deposition flux" if meta["mode"]=="historical" else "CAMS Global atmospheric composition forecast sea-salt deposition flux","dataset":meta["dataset"],"productType":meta["historyBasis"],"resolution":meta["resolution"],**({"cycle":meta["cycle"]} if meta.get("cycle") else {}),"time":time,**series,"units":{k:"kg/(m²·s)" for k in series}|{"upstream":upunits},"grid":grid,"coverage":coverage,"referenceRhPercent":80,"massBasis":"CAMS sea-salt prognostic mass basis; platform converts deposition mass /4.3 to dry sea salt before chloride fraction","retrievedAt":datetime.now(timezone.utc).isoformat().replace("+00:00","Z")}
+        time,series,upunits,grid=_extract(target,meta["lat"],meta["lon"],meta["mode"],cycle=cycle);n=max(1,len(time));coverage={k:sum(v is not None for v in vals)/n for k,vals in series.items()}
+        body={"version":"3.4.0","configured":True,"source":"CAMS archived operational sea-salt deposition flux" if meta["mode"]=="historical" else "CAMS Global atmospheric composition forecast sea-salt deposition flux","dataset":meta["dataset"],"productType":meta["historyBasis"],"resolution":meta["resolution"],"time":time,**series,"units":{k:"kg/(m²·s)" for k in series}|{"upstream":upunits},"grid":grid,"coverage":coverage,"referenceRhPercent":80,"massBasis":"CAMS sea-salt prognostic mass basis; platform converts deposition mass /4.3 to dry sea salt before chloride fraction","retrievedAt":datetime.now(timezone.utc).isoformat().replace("+00:00","Z")}
+        if meta.get("cycle"):body["cycle"]=meta["cycle"]
+        if meta["mode"]=="historical":body.update({"chunk":meta["chunk"],"chunkRange":meta["chunkRange"]})
+        return "complete",body
     finally:
         try:os.remove(target)
         except OSError:pass
@@ -233,10 +232,13 @@ class handler(BaseHTTPRequestHandler):
                     if state=="pending":data["jobId"]=p["job"]
                     return self._json(202,{"version":"3.4.0","configured":True,**data})
                 cache="public, s-maxage=21600, stale-while-revalidate=86400" if meta["mode"]=="current" else "public, s-maxage=2592000, stale-while-revalidate=604800";return self._json(200,data,cache)
-            lat,lon=_num(p.get("lat")),_num(p.get("lon"));mode=str(p.get("mode","")).lower();year=int(p.get("year")) if p.get("year") not in (None,"") else None
+            lat,lon=_num(p.get("lat")),_num(p.get("lon"));mode=str(p.get("mode","")).lower();year=int(p.get("year")) if p.get("year") not in (None,"") else None;chunk=int(p.get("chunk",1) or 1)
             if lat is None or lon is None or abs(lat)>90 or abs(lon)>180 or mode not in {"historical","current"}:return self._json(400,{"error":{"code":"INPUT","message":"Invalid lat/lon/mode"}})
-            if mode=="historical" and (year is None or year<2019 or year>2025):return self._json(400,{"error":{"code":"INPUT","message":"Historical CAMS archived sea-salt flux requires full year 2019-2025"}})
-            job,status,meta=_submit(lat,lon,mode,year=year);return self._json(202,{"version":"3.4.0","configured":True,"status":status,"jobId":job,"dataset":meta["dataset"],"productType":meta["historyBasis"],"resolution":meta["resolution"],"retryAfterSeconds":5,**({"cycle":meta["cycle"]} if meta.get("cycle") else {})})
+            if mode=="historical" and (year is None or year<2019 or year>2025 or chunk not in QUARTERS):return self._json(400,{"error":{"code":"INPUT","message":"Historical CAMS archived sea-salt flux requires year 2019-2025 and chunk 1-4"}})
+            job,status,meta=_submit(lat,lon,mode,year=year,chunk=chunk);body={"version":"3.4.0","configured":True,"status":status,"jobId":job,"dataset":meta["dataset"],"productType":meta["historyBasis"],"resolution":meta["resolution"],"retryAfterSeconds":5}
+            if mode=="historical":body.update({"chunk":meta["chunk"],"chunkRange":meta["chunkRange"]})
+            elif meta.get("cycle"):body["cycle"]=meta["cycle"]
+            return self._json(202,body)
         except Exception as e:return self._json(502,{"version":"3.4.0","configured":True,"error":{"code":"UPSTREAM","message":str(e)[:900]}})
     def do_GET(self):self._handle()
     def do_POST(self):self._handle()
