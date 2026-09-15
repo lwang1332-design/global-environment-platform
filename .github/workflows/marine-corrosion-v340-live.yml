@@ -14,14 +14,19 @@ on:
       - 'marine-corrosion/surface-wetness-v340.js'
       - '.github/workflows/marine-corrosion-v340-live.yml'
 
+concurrency:
+  group: marine-v340-live-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   historical:
     strategy:
       fail-fast: false
+      max-parallel: 1
       matrix:
         point: [VN, HN, FJ, FJ100]
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -51,8 +56,9 @@ jobs:
           if-no-files-found: warn
 
   current:
+    needs: historical
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 35
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
