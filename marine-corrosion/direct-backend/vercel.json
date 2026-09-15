@@ -1,1 +1,1 @@
-{"version":2,"fluid":true,"functions":{"api/direct.js":{"maxDuration":60},"api/so2.py":{"maxDuration":300},"api/salt.py":{"maxDuration":300}}}
+{"version":2,"fluid":true,"functions":{"api/direct.js":{"maxDuration":60},"api/so2.py":{"maxDuration":300},"api/salt.py":{"maxDuration":300},"api/salt_flux.py":{"maxDuration":300}}}
