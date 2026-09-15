@@ -1,18 +1,11 @@
-/* Data-quality guard for trend analysis: Open-Meteo null values must never become numeric zero. */
+/* Trend V2 data-quality guard.
+ * V2 already excludes null/blank/non-finite source values in cleanPairs().
+ * Keep this file as an explicit runtime assertion so legacy loaders remain compatible.
+ */
 (()=>{
 'use strict';
-const core=window.GETrendAnalysis;if(!core)return;
-const observed=v=>v!==null&&v!==''&&Number.isFinite(Number(v));
-const pair=(times,values,transform)=>{const out=[],n=Math.min(Array.isArray(times)?times.length:0,Array.isArray(values)?values.length:0);for(let i=0;i<n;i++){if(!observed(values[i]))continue;const d=new Date(times[i]);if(!Number.isFinite(d.getTime()))continue;const v=transform?transform(Number(values[i]),i):Number(values[i]);if(!observed(v))continue;out.push({time:d.toISOString(),ts:d.getTime(),value:Number(v)})}const m=new Map();out.forEach(x=>m.set(x.ts,x));return[...m.values()].sort((a,b)=>a.ts-b.ts)};
-const globals=()=>{let c=null,p={};try{c=cache}catch{}try{p=params||{}}catch{}return{c,p}};
-const dailyEnergy=(t,v)=>core.aggregate(pair(t,v,x=>x/1000),'day','sum');
-const dailyBio=h=>{const t=h.time||[],T=h.temperature_2m||[],RH=h.relative_humidity_2m||[],pts=[],n=Math.min(t.length,T.length,RH.length);for(let i=0;i<n;i++){if(!observed(T[i])||!observed(RH[i]))continue;const d=new Date(t[i]);if(!Number.isFinite(d.getTime()))continue;pts.push({time:d.toISOString(),ts:d.getTime(),value:Number(T[i])>20&&Number(RH[i])>80?1:0})}return core.aggregate(pts,'day','sum')};
-function safePoints(moduleName){const{c,p}=globals(),h=c?.w?.j?.hourly||{},d=c?.w?.j?.daily||{},aq=c?.aq?.j?.hourly||{},ht=h.time||[],dt=d.time||[],at=aq.time||[];switch(moduleName){case'温度':return pair(ht,h.temperature_2m);case'湿度':return pair(ht,h.relative_humidity_2m);case'降雨':return pair(dt,d.precipitation_sum);case'PM10 / 颗粒物':return pair(at,aq.pm10);case'风速':return pair(ht,h.wind_speed_10m);case'盐雾':{const vd=observed(p.saltVd)?Number(p.saltVd):NaN,fc=observed(p.saltClFrac)?Number(p.saltClFrac):NaN,k=vd*86400/1000*fc;return Number.isFinite(k)?pair(at,aq.sea_salt_aerosol,x=>x*k):[]}case'海拔':return pair(ht,h.surface_pressure,x=>x/10);case'SO₂ / 腐蚀气体':return pair(at,aq.sulphur_dioxide);case'冰雪冻雨':return pair(dt,d.snowfall_sum);case'太阳辐照':return dailyEnergy(ht,h.shortwave_radiation);case'生物环境':return dailyBio(h);default:return[]}}
-const regression=pts=>{if(pts.length<2)return null;const year=365.2425*864e5,t0=pts[0].ts,x=pts.map(p=>(p.ts-t0)/year),y=pts.map(p=>p.value),xm=x.reduce((a,b)=>a+b,0)/x.length,ym=y.reduce((a,b)=>a+b,0)/y.length;let n=0,d=0;for(let i=0;i<x.length;i++){n+=(x[i]-xm)*(y[i]-ym);d+=(x[i]-xm)**2}if(!d)return null;const slope=n/d;return{slope,intercept:ym-slope*xm,t0}}
-const granularity=(pts,years)=>{if(!pts.length)return'day';const span=(pts.at(-1).ts-pts[0].ts)/(365.2425*864e5);if(span>=3.5||(years>=5&&span>=2))return'month';if(span>=1.4||(years>=3&&span>=1))return'week';return'day'};
-const originalConfig=core.configFor.bind(core),originalConclusion=core.conclusion.bind(core);
-core.configFor=moduleName=>{const cfg=originalConfig(moduleName);return{...cfg,points:safePoints(moduleName)}};
-core.prepare=moduleName=>{const cfg=core.configFor(moduleName),points=cfg.points||[],gran=granularity(points,cfg.years),display=core.aggregate(points,gran,cfg.aggregation||'mean'),smoothA=core.moving(display,gran==='month'?3:gran==='week'?4:7),smoothB=core.moving(display,gran==='month'?12:gran==='week'?13:30),analysis=core.analyzeEnvironmentalTrend(points,{unit:cfg.unit,years:cfg.years}),reg=regression(display),trendLine=display.map(p=>{if(!reg)return{...p,value:NaN};const x=(p.ts-display[0].ts)/(365.2425*864e5);return{...p,value:reg.intercept+reg.slope*x}});return{...cfg,granularity:gran,display,smoothA,smoothB,trendLine,analysis,coverage:points.length?{start:points[0].time,end:points.at(-1).time,count:points.length}:null,smoothLabels:gran==='month'?['3月均','12月均']:gran==='week'?['4周均','13周均']:['7日均','30日均']}};
-core.conclusion=originalConclusion;
+const core=window.GETrendAnalysis;
+if(!core){console.error('[GE Trend] analysis core unavailable before null guard');return}
 core.dataQualityGuard='null-excluded';
+core.nullPolicy={null:'excluded',blank:'excluded',nan:'excluded',infinity:'excluded',zero:'preserved when actually observed'};
 })();
