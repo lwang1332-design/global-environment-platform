@@ -1,0 +1,23 @@
+import fs from 'node:fs';
+import { chromium } from 'playwright';
+const id=process.env.POINT_ID||'VN';
+const points={VN:{id:'VN',lat:10.9,lon:106.6,height:2,observed:46.4},HN:{id:'HN',lat:18.300797,lon:109.26452,height:5,observed:86.8},FJ:{id:'FJ',lat:25.42234,lon:119.489225,height:5,observed:100.2}};
+const p=points[id];if(!p)throw new Error('Unknown point '+id);
+const browser=await chromium.launch({headless:true,args:['--disable-web-security','--disable-features=IsolateOrigins,site-per-process']});
+const page=await browser.newPage();
+page.on('console',m=>{if(m.type()==='error')console.log('BROWSER_ERROR',m.text())});
+await page.goto('http://127.0.0.1:4173/marine-corrosion/?v=3.4.0-live',{waitUntil:'domcontentloaded',timeout:60000});
+const out=await page.evaluate(async p=>{
+  localStorage.setItem('marineV340Settings',JSON.stringify({sd:{method:'auto_model'},surface:{}}));
+  const [{RunCoordinator},{resolveGis}]=await Promise.all([import('./run-controller.js?live='+Date.now()),import('./gis-browser-v328.js?live='+Date.now())]);
+  const c=new RunCoordinator({resolveGis});
+  const input={capturedAt:new Date().toISOString(),cfg:{latitude:p.lat,longitude:p.lon,height:p.height,mode:'historical',exposureZone:'atmospheric',material:'carbon_steel',designLife:25,projectName:'V340 live '+p.id,requestedYears:[2025],minCoverage:.95},overrides:{},audit:[],calibrationModel:null};
+  const result=await c.run(input,()=>{}, {fresh:true});
+  const a=result.coastalAssessment;
+  return {project:result.project,summary:{airSalt:result.summary.airSaltMean,engineeringCl:result.summary.clDepMean,pd:result.summary.meanSo2Dep,rh:result.summary.meanRh,t:result.summary.meanTemp,camsHours:result.summary.camsHours,proxySaltHours:result.summary.proxySaltHours,coverage:result.summary.coveragePercent},assessment:a,run:result.run};
+},p);
+out.reference=p.observed;out.referenceRatio=out.assessment?.recommended?.rate?out.assessment.recommended.rate/p.observed:null;
+fs.writeFileSync(`/tmp/v340-live-${id}.json`,JSON.stringify(out,null,2));
+console.log(JSON.stringify(out,null,2));
+await browser.close();
+if(!out.assessment?.ready)process.exitCode=2;
