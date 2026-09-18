@@ -209,7 +209,7 @@ function enhance(i){
 function prepareIndicator(module,key){const base=externalOverride(module,key,originalPrepare(module,key));return enhance(base||supplemental(module,key))}
 function prepareModule(module){
  const def=A.moduleCatalog().find(x=>x.module===module);if(!def)return null;
- const indicators=[...(def.indicators||[]).map(x=>prepareIndicator(module,x.key)),...((supplementalKeys[module]||[]).map(k=>prepareIndicator(module,k))].filter(Boolean),available=indicators.filter(i=>i.trendAvailable);
+ const indicators=[...(def.indicators||[]).map(x=>prepareIndicator(module,x.key)),...(supplementalKeys[module]||[]).map(k=>prepareIndicator(module,k))].filter(Boolean),available=indicators.filter(i=>i.trendAvailable);
  const defaults=(def.indicators||[]).filter(i=>i.defaultSelected).slice(0,3).map(i=>module+'::'+i.key);
  return{module,requestedYears:selectedYears(),indicators,defaultSelected:defaults.length?defaults:available.slice(0,3).map(i=>i.id)};
 }
