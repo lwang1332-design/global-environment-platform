@@ -10,6 +10,7 @@ on:
       - 'assets/cockpit-v291.js'
       - 'assets/data-sources-v33.js'
       - 'assets/analysis-v32.js'
+      - 'assets/risk-v33.js'
       - 'assets/platform-v33.js'
       - 'assets/trend-modal-v33.js'
       - 'assets/v291-admin-gate.js'
@@ -34,6 +35,7 @@ jobs:
           node --check assets/cockpit-v291.js
           node --check assets/data-sources-v33.js
           node --check assets/analysis-v32.js
+          node --check assets/risk-v33.js
           node --check assets/platform-v33.js
           node --check assets/trend-modal-v33.js
           node --check assets/v291-admin-gate.js
