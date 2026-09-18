@@ -89,6 +89,7 @@ function bodyContent(){
  const inds=S.mode==='single'?[byId(S.focus)].filter(Boolean):selected();
  if(!inds.length)return '<div class="geV33Empty">请选择至少一个可用时序指标。</div>';
  const top=S.mode==='single'?singleTop(inds[0]):(S.notice?'<div class="geV33Notice">'+esc(S.notice)+'</div>':'');
+ if(S.mode==='single'&&!inds[0]?.trendAvailable)return top;
  return top+chartPanel(inds)+windowStats(inds)+(S.mode==='combo'?corrPanel(inds):'')+'<div class="geV33Notice"><b>统计口径：</b>曲线展示原始/工程计算时序；长期趋势采用月均去季节化异常序列进行Mann-Kendall和Sen slope辅助判定。缩放后的窗口统计不改变底层数据。</div>';
 }
 function render(){
