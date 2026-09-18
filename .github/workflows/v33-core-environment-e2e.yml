@@ -1,0 +1,201 @@
+name: V3.3 Core Environment E2E
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - 'index.html'
+      - 'VERSION.json'
+      - 'assets/cockpit-v291.js'
+      - 'assets/trend-analysis.js'
+      - 'assets/trend-compat-v31.js'
+      - 'assets/analysis-v32.js'
+      - 'assets/data-sources-v31.js'
+      - 'assets/data-sources-v33.js'
+      - 'assets/platform-v33.js'
+      - 'assets/trend-modal-v33.js'
+      - 'assets/report-v29.js'
+      - '.github/workflows/v33-core-environment-e2e.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  v33:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Static syntax and version checks
+        run: |
+          node --check assets/cockpit-v291.js
+          node --check assets/trend-analysis.js
+          node --check assets/trend-compat-v31.js
+          node --check assets/analysis-v32.js
+          node --check assets/data-sources-v31.js
+          node --check assets/data-sources-v33.js
+          node --check assets/platform-v33.js
+          node --check assets/trend-modal-v33.js
+          node --check assets/report-v29.js
+          grep -q 'V3.3.0' VERSION.json
+          grep -q 'cockpit-v291.js?v=20260918-v33' index.html
+          grep -q 'report-v29.js?v=20260918-v33' index.html
+          grep -q 'trend-modal-v33.js' assets/cockpit-v291.js
+          grep -q 'analysis-v32.js' assets/cockpit-v291.js
+          grep -q 'data-sources-v33.js' assets/cockpit-v291.js
+
+      - name: Install Playwright
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm i -D playwright@1.55.0 >/dev/null
+          npx playwright install --with-deps chromium >/dev/null
+
+      - name: Start local static site
+        run: |
+          python3 -m http.server 8765 --bind 127.0.0.1 >/tmp/v33-http.log 2>&1 &
+          for i in $(seq 1 20); do
+            curl -fsS http://127.0.0.1:8765/assets/trend-modal-v33.js >/dev/null && exit 0
+            sleep 1
+          done
+          cat /tmp/v33-http.log || true
+          exit 1
+
+      - name: Registry and engineering analysis browser acceptance
+        run: |
+          cat > v33-check.mjs <<'EOF'
+          import { chromium } from 'playwright';
+          const browser=await chromium.launch({headless:true});
+          const page=await browser.newPage({viewport:{width:1600,height:1000});
+          const errors=[];
+          page.on('pageerror',e=>errors.push('pageerror:'+e.message));
+          page.on('console',m=>{
+            const t=m.text();
+            if(m.type()==='error'&&!/Failed to fetch|ERR_FAILED|404 \(File not found\)|429/i.test(t))errors.push('console:'+t);
+          });
+          await page.route('**/archive-api.open-meteo.com/**',r=>r.abort());
+          await page.route('**/historical-forecast-api.open-meteo.com/**',r=>r.abort());
+          await page.route('**/air-quality-api.open-meteo.com/**',r=>r.abort());
+          await page.route('**/marine-api.open-meteo.com/**',r=>r.abort());
+          await page.route('**/power.larc.nasa.gov/**',r=>r.abort());
+          await page.route('**/pae-paha.pacioos.hawaii.edu/**',r=>r.abort());
+          await page.goto('http://127.0.0.1:8765/?v=v33-e2e-'+Date.now(),{waitUntil:'domcontentloaded',timeout:60000});
+          await page.waitForFunction(()=>window.GETrendAnalysis?.scienceV32==='3.2.0'&&window.GEPlatformV33?.installed&&window.GETrendModal?.version?.startsWith('3.3'),{timeout:30000});
+          await page.waitForSelector('#cockpitKpiGrid',{timeout:20000});
+          await page.waitForTimeout(800);
+
+          const base=await page.evaluate(()=>({
+            title:document.title,
+            version:document.querySelector('.ver')?.textContent||'',
+            cards:document.querySelectorAll('#cockpitKpiGrid .cockpitKpi').length,
+            science:window.GETrendAnalysis?.scienceV32,
+            modal:window.GETrendModal?.version,
+            platform:window.GEPlatformV33?.version,
+            api:{
+              range:typeof window.GETrendAnalysis?.rangeStats,
+              corr:typeof window.GETrendAnalysis?.correlation,
+              lag:typeof window.GETrendAnalysis?.lagCorrelation,
+              csv:typeof window.GETrendAnalysis?.exportCsv,
+              norm:typeof window.GETrendAnalysis?.normalizeSeries,
+              gap:typeof window.GETrendAnalysis?.designEval
+            }
+          }));
+          console.log('BASE',base);
+          if(!base.title.includes('V3.3')||!base.version.includes('V3.3')||base.cards!==12||base.science!=='3.2.0'||!base.modal.startsWith('3.3')||!Object.values(base.api).every(x=>x==='function'))throw new Error('V3.3 bootstrap failed '+JSON.stringify(base));
+
+          await page.evaluate(()=>{
+            const A=window.GETrendAnalysis,mods=['温度','湿度','降雨','PM10 / 颗粒物','风速','盐雾','海拔','SO₂ / 腐蚀气体','冰雪冻雨','太阳辐照','生物环境','雷电'];
+            const t0=Date.UTC(2026,0,1);
+            const raw=(base,amp=1)=>Array.from({length:240},(_,i)=>({ts:t0+i*3600000,time:new Date(t0+i*3600000).toISOString(),value:base+amp*Math.sin(i/9)+i*.005}));
+            const mk=(module,key,name,unit,base,design=null,opts={})=>{
+              const r=opts.static?[]:raw(base,opts.amp??1);
+              const summary=opts.static?base:r.reduce((s,p)=>s+p.value,0)/r.length;
+              return {module,key,id:module+'::'+key,name,unit,summaryUnit:unit,source:opts.source||'E2E fixture',sourceVariable:key,dataClass:opts.static?'GIS/静态环境数据':'真实数据',originalDataClass:opts.static?'GIS/静态数据':'再分析数据',dataCode:opts.static?'GIS':'REA',accessStatus:opts.na?'B 可直接接入':'A 已接入',confidence:'A',confidenceMeta:{grade:opts.na?'N/A':'A',score:opts.na?0:94},design,raw:r,series:r,trendAvailable:!opts.static&&!opts.na,summaryValue:opts.na?null:summary,staticValue:opts.static?base:null,coverage:r.length?{start:r[0].time,end:r.at(-1).time,count:r.length,resolution:'1 h'}:null,coverageMeta:{requestedStart:'2026-01-01',requestedEnd:'2026-12-31',actualStart:r[0]?.time.slice(0,10)||null,actualEnd:r.at(-1)?.time.slice(0,10)||null,periodCoveragePercent:r.length?100:0,dataCompletenessPercent:r.length?100:0},analysis:{valid:!!r.length,current:r.at(-1)?.value,mean:summary,min:r.length?Math.min(...r.map(p=>p.value)):null,max:r.length?Math.max(...r.map(p=>p.value)):null,p95:r.length?A.percentile(r.map(p=>p.value),.95):null,p99:r.length?A.percentile(r.map(p=>p.value),.99):null},trendStats:{analysis:{valid:true,trendDirection:'无显著趋势',slopePerYear:.1,pValue:.2,significant:false}},exceedance:{count:1,totalHours:4,longestHours:4,maxGap:2,p95Gap:1.8},formula:'fixture formula',method:'fixture method',note:opts.na?'公开数据可接，当前未接时序':'fixture',axisGroup:unit};
+            };
+            const map={
+              '温度':[mk('温度','temp_mean','年平均温度','℃',20,{upper:22})],
+              '湿度':[mk('湿度','rh_mean','年平均相对湿度','%',72,{upper:95})],
+              '降雨':[mk('降雨','rain_hour_p99','小时降雨P99','mm/h',5,{upper:50})],
+              'PM10 / 颗粒物':[mk('PM10 / 颗粒物','pm10_p95','PM10 P95','μg/m³',60,{upper:150})],
+              '风速':[mk('风速','gust_p99','阵风P99','m/s',14,{upper:55})],
+              '盐雾':[mk('盐雾','cl_dep_rate','Cl⁻沉积速率','mg/(m²·d)',12,{upper:10}),mk('盐雾','tow','TOW润湿时间状态','0/1',.4,null,{amp:.3})],
+              '海拔':[mk('海拔','altitude','海拔高度','m',47,null,{static:true})],
+              'SO₂ / 腐蚀气体':[mk('SO₂ / 腐蚀气体','so2_p95','SO₂ P95','μg/m³',30,{upper:100})],
+              '冰雪冻雨':[mk('冰雪冻雨','ice_thickness','覆冰厚度P99','mm',0,null,{na:true})],
+              '太阳辐照':[mk('太阳辐照','solar_irradiance','短波辐照度','W/m²',300)],
+              '生物环境':[mk('生物环境','mold_hours','霉菌生长气候潜势','0/1',.2)],
+              '雷电':[mk('雷电','lightning_density','长期雷电闪频密度','次/km²·y',0,null,{na:true})]
+            };
+            const modules=mods.map(m=>({module:m,requestedYears:1,indicators:map[m],defaultSelected:map[m].filter(x=>x.trendAvailable).slice(0,3).map(x=>x.id)}));
+            const all=()=>modules.flatMap(m=>m.indicators);
+            A.prepareAll=()=>modules;
+            A.prepareModule=m=>modules.find(x=>x.module===m);
+            A.prepareIndicator=(m,k)=>all().find(x=>x.module===m&&x.key===k)||null;
+            A.prepareIndicatorByName=(m,n)=>all().find(x=>x.module===m&&x.name===n)||null;
+            A.rangeStats=(i,start,end)=>{const r=(i.raw||[]).filter(p=>p.ts>=start&&p.ts<=end),v=r.map(p=>p.value);return{count:v.length,mean:v.reduce((a,b)=>a+b,0)/(v.length||1),p95:v.length?A.percentile(v,.95):null,max:v.length?Math.max(...v):null,events:i.exceedance||{}}};
+            A.normalizeSeries=(points)=>{const v=points.map(p=>p.value),lo=Math.min(...v),hi=Math.max(...v);return points.map(p=>({...p,value:hi===lo?.5:(p.value-lo)/(hi-lo)}))};
+            A.correlation=()=>({r:.81,count:200});
+            A.lagCorrelation=()=>({best:{lagHours:24,r:.86,count:180},rows:[]});
+            A.exportCsv=(inds,start,end)=>'timestamp,'+inds.map(i=>i.name).join(',')+'\n2026-01-01T00:00:00.000Z,1,2,3';
+            A.designEval=(v,d)=>({pass:Number(v)<=Number(d?.upper),gap:Number(v)-Number(d?.upper),margin:Number(d?.upper)-Number(v)});
+            window.GEPlatformV33.refresh();
+            window.GETrendModal.init();
+          });
+          await page.waitForTimeout(250);
+
+          const registry=await page.evaluate(()=>({
+            cards:document.querySelectorAll('#cockpitKpiGrid .cockpitKpi').length,
+            registryCards:document.querySelectorAll('#cockpitKpiGrid [data-ge-registry="1"]').length,
+            codes:[...document.querySelectorAll('.cockpitKpiMeta')].map(x=>x.textContent),
+            lightning:[...document.querySelectorAll('.cockpitKpi')].find(x=>x.querySelector('.cockpitKpiTop span')?.textContent==='雷电')?.querySelector('.cockpitKpiValue')?.textContent
+          }));
+          console.log('REGISTRY',registry);
+          if(registry.cards!==12||registry.registryCards!==12||registry.lightning!=='--'||!registry.codes.some(x=>x.includes('可信')))throw new Error('Registry rendering failed '+JSON.stringify(registry));
+
+          const salt=page.locator('.cockpitKpi').filter({has:page.locator('.cockpitKpiTop span',{hasText:'盐雾'})}).first();
+          await salt.locator('.cockpitKpiValue').click();
+          await page.waitForSelector('#geMetricDetailHost.geV33Show',{timeout:3000});
+          const detail=await page.locator('#geV33Detail').innerText();
+          console.log('DETAIL',detail);
+          for(const required of ['请求周期覆盖率','数据完整率','数据类型','可信度','设计能力','Design Gap'])if(!detail.includes(required))throw new Error('Detail missing '+required);
+
+          await page.getByRole('button',{name:'查看趋势'}).click();
+          await page.waitForSelector('#geTrendHost.geV33Show',{timeout:3000});
+          const modalText=await page.locator('#geTrendHost').innerText();
+          for(const required of ['绝对值','归一化','导出当前窗口CSV','当前窗口工程统计','月均去季节化'])if(!modalText.includes(required))throw new Error('Trend workspace missing '+required);
+
+          await page.getByRole('button',{name:'组合时序'}).click();
+          await page.locator('[data-id="温度::temp_mean"]').click();
+          await page.locator('[data-id="湿度::rh_mean"]').click();
+          const legend=await page.locator('.geV33Legend button').allTextContents();
+          console.log('LEGEND',legend);
+          if(!legend.some(x=>x.includes('Cl⁻'))||!legend.some(x=>x.includes('年平均温度'))||!legend.some(x=>x.includes('年平均相对湿度')))throw new Error('Cross-module combo failed '+legend.join('|'));
+          if(await page.locator('.geV33Axis').count()<3)throw new Error('Y1/Y2/Y3 selectors missing');
+
+          await page.getByRole('button',{name:'归一化'}).click();
+          if(!(await page.locator('.geV33PanelHead').first().innerText()).includes('归一化'))throw new Error('Normalized mode failed');
+
+          const firstLegend=page.locator('.geV33Legend button').first();
+          await firstLegend.click();if(!await firstLegend.evaluate(e=>e.classList.contains('off')))throw new Error('Legend hide failed');
+          await firstLegend.click();if(await firstLegend.evaluate(e=>e.classList.contains('off')))throw new Error('Legend restore failed');
+
+          const stats=await page.locator('#geTrendHost').innerText();
+          if(!stats.includes('关联 / 滞后相关')||!stats.includes('累计超限h')||!stats.includes('最长h'))throw new Error('Engineering stats missing');
+
+          const dl=page.waitForEvent('download');
+          await page.getByRole('button',{name:'导出当前窗口CSV'}).click();
+          await dl;
+
+          await page.keyboard.down('Shift');
+          const svg=page.locator('#geV33Svg');const box=await svg.boundingBox();
+          if(box){await page.mouse.move(box.x+250,box.y+150);await page.mouse.down();await page.mouse.move(box.x+700,box.y+150,{steps:4});await page.mouse.up();}
+          await page.keyboard.up('Shift');
+          await page.waitForTimeout(100);
+          if(errors.length)throw new Error('Browser errors '+JSON.stringify(errors));
+          await browser.close();
+          console.log('V3.3 core environment E2E PASS');
+          EOF
+          node v33-check.mjs
