@@ -19,7 +19,7 @@ jobs:
             HTML_URL="https://lwang1332-design.github.io/global-environment-platform/?wait=${GITHUB_SHA}-${i}-$(date +%s)"
             if curl -fsSL --retry 2 --max-time 20 "$CSS_URL" -o /tmp/remote.css && \
                [ "$(sha256sum /tmp/remote.css | awk '{print $1}')" = "$LOCAL_CSS_SHA" ] && \
-               curl -fsSL --retry 2 --max-time 20 "$HTML_URL" | grep -q "report-v29.js?v=20260901-r2"; then
+               curl -fsSL --retry 2 --max-time 20 "$HTML_URL" | grep -q "report-v29.js?v=20260918-v33"; then
               echo "Current cockpit assets are live on GitHub Pages"
               exit 0
             fi
