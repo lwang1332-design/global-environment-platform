@@ -160,8 +160,8 @@ function externalOverride(module,key,base){
    return{...base,module,key,id:module+'::'+key,name:'暴晒最高地表温度P99',unit:'℃',summaryUnit:'℃',dataClass:'模式数据',originalDataClass:'模式数据',source:'NASA POWER Earth Skin Temperature (TS)',sourceVariable:'TS',raw,series:raw,trendAvailable:true,summaryValue:summary,staticValue:null,coverage:{start:raw[0].time,end:raw.at(-1).time,count:raw.length,resolution:'1 d'},accessStatus:'A 已接入',formula:'P99(TS_daily)',note:'NASA POWER日尺度地表/skin temperature；不再用空气温度替代。'};
  }
  if(module==='太阳辐照'&&key==='uv_b_dose'&&v33.uvb?.ok&&v33.uvb.series?.length){
-   const raw=v33.uvb.series.map(p=>({...p,value:Number(p.value)*86400})),summary=raw.reduce((s,p)=>s+p.value,0);
-   return{...base,module,key,id:module+'::'+key,name:'UV-B紫外剂量',unit:'J/m²·d',summaryUnit:'J/m²/期',dataClass:'模式数据',originalDataClass:'模式数据',source:'NASA POWER ALLSKY_SFC_UVB',sourceVariable:'ALLSKY_SFC_UVB',raw,series:raw,trendAvailable:true,summaryValue:summary,staticValue:null,coverage:{start:raw[0].time,end:raw.at(-1).time,count:raw.length,resolution:'1 d'},accessStatus:'A 已接入',formula:'E_UVB,daily = ALLSKY_SFC_UVB × 86400',note:'POWER日平均UV-B辐照度换算为日剂量并累计。'};
+   const raw=v33.uvb.series.map(p=>({...p,value:Number(p.value)*1e6})),summary=raw.reduce((s,p)=>s+p.value,0);
+   return{...base,module,key,id:module+'::'+key,name:'UV-B紫外剂量',unit:'J/m²·d',summaryUnit:'J/m²/期',dataClass:'模式数据',originalDataClass:'模式数据',source:'NASA POWER ALLSKY_SFC_UVB',sourceVariable:'ALLSKY_SFC_UVB',raw,series:raw,trendAvailable:true,summaryValue:summary,staticValue:null,coverage:{start:raw[0].time,end:raw.at(-1).time,count:raw.length,resolution:'1 d'},accessStatus:'A 已接入',formula:'E_UVB,daily = ALLSKY_SFC_UVB [MJ/m²/day] × 10^6',note:'NASA POWER返回ALLSKY_SFC_UVB单位为MJ/m²/day；转换为J/m²/day后累计，填充值-999不参与计算。'};
  }
  if(module==='盐雾'&&key==='coast_distance'&&v33.coast?.ok&&observed(v33.coast.value)){
    const val=Number(v33.coast.value);
