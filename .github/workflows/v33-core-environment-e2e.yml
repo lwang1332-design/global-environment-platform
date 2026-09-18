@@ -168,7 +168,9 @@ jobs:
           for(const required of ['绝对值','归一化','导出当前窗口CSV','当前窗口工程统计','月均去季节化'])if(!modalText.includes(required))throw new Error('Trend workspace missing '+required);
 
           await page.getByRole('button',{name:'组合时序'}).click();
+          await page.locator('.geV33Group').filter({hasText:'温度'}).locator('summary').click();
           await page.locator('[data-id="温度::temp_mean"]').click();
+          await page.locator('.geV33Group').filter({hasText:'湿度'}).locator('summary').click();
           await page.locator('[data-id="湿度::rh_mean"]').click();
           const legend=await page.locator('.geV33Legend button').allTextContents();
           console.log('LEGEND',legend);
