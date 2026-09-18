@@ -27,10 +27,10 @@ function capabilityRows(r){
  const b=r.base||{},c=r.condensation||{},s=r.salt||{},d=r.dust||{},checks=r.capabilityChecks||[];
  const heatLoss=parseFirstNumber(kvValue('altBox','对流散热修正'));
  const M={
-  '高温':[b.t99,'≤',params.capHigh,'℃'],'低温':[b.tmin,'≥',params.capLow,'℃'],'露点裕量':[c.minMargin,'≥',params.capDew,'K'],'凝露小时':[c.annualCondHours,'≤',params.capCondHours,'h/y'],
-  '盐沉积':[s.jcl,'≤',params.capCl,'mg/m²·d'],'PM10':[d.pm95,'≤',params.capPm,'μg/m³'],'沙蚀EI':[d.erosionIndex,'≤',params.capEi,'EI/y'],'散热衰减':[heatLoss,'≤',params.capHeatLoss,'%'],
-  '最大湿度':[b.rhMean,'≤',params.capRh,'%'],'日温差':[b.dayRange,'≤',params.capDayRange,'K'],'温变速率':[b.tempRate,'≤',params.capTempRate,'K/h'],'日降雨':[b.rainMax,'≤',params.capRainDay,'mm/d'],
-  '小时降雨':[b.rainP99h,'≤',params.capRainHour,'mm/h'],'阵风':[regValue('风速','gust_p99',NaN),'≤',params.capWind,'m/s'],'降雪':[b.snowMax,'≤',params.capSnow,'cm/d'],'海拔':[b.elev,'≤',params.capAltitude,'m'],'TOW':[s.towPct,'≤',params.capTow,'%']
+  '高温':[regValue('温度','temp_design_p99',b.t99),'≤',params.capHigh,'℃'],'低温':[regValue('温度','temp_low_p1',b.tmin),'≥',params.capLow,'℃'],'露点裕量':[regValue('湿度','surface_dew_margin',c.minMargin),'≥',params.capDew,'K'],'凝露小时':[regValue('湿度','cond_annual_hours',c.annualCondHours),'≤',params.capCondHours,'h/y'],
+  '盐沉积':[regValue('盐雾','cl_dep_rate',s.jcl),'≤',params.capCl,'mg/m²·d'],'PM10':[regValue('PM10 / 颗粒物','pm10_p95',d.pm95),'≤',params.capPm,'μg/m³'],'沙蚀EI':[d.erosionIndex,'≤',params.capEi,'EI/y'],'散热衰减':[regValue('海拔','heat_loss',heatLoss),'≤',params.capHeatLoss,'%'],
+  '最大湿度':[regValue('湿度','rh_max',NaN),'≤',params.capRh,'%'],'日温差':[regValue('温度','day_range_p95',b.dayRange),'≤',params.capDayRange,'K'],'温变速率':[regValue('温度','temp_rate_p95',b.tempRate),'≤',params.capTempRate,'K/h'],'日降雨':[regValue('降雨','rain_daily_max',b.rainMax),'≤',params.capRainDay,'mm/d'],
+  '小时降雨':[regValue('降雨','rain_hour_p99',b.rainP99h),'≤',params.capRainHour,'mm/h'],'阵风':[regValue('风速','gust_p99',NaN),'≤',params.capWind,'m/s'],'降雪':[regValue('冰雪冻雨','snow_daily_max',b.snowMax),'≤',params.capSnow,'cm/d'],'海拔':[regValue('海拔','altitude',b.elev),'≤',params.capAltitude,'m'],'SO2':[regValue('SO₂ / 腐蚀气体','so2_p95',NaN),'≤',params.capSo2,'μg/m³'],'NO2':[regValue('SO₂ / 腐蚀气体','no2_p95',NaN),'≤',params.capNo2,'μg/m³'],'TOW':[regValue('盐雾','tow',s.towPct),'≤',params.capTow,'%']
  };
  return checks.map(([name,valid,pass])=>{const x=M[name]||[NaN,'≤',NaN,''],[actual,op,limit,unit]=x;let gap='--';if(valid&&finite(actual)&&finite(limit)){const delta=op==='≤'?Number(limit)-Number(actual):Number(actual)-Number(limit);gap=pass?`余量 ${Math.abs(delta).toFixed(Math.abs(delta)>=100?0:Math.abs(delta)>=10?1:2)} ${unit}`:`Gap +${Math.abs(delta).toFixed(Math.abs(delta)>=100?0:Math.abs(delta)>=10?1:2)} ${unit}`}
   return{name,valid:!!valid,pass:!!pass,actual:finite(actual)?`${f(actual,Math.abs(Number(actual))>=100?0:Math.abs(Number(actual))>=10?1:2)} ${unit}`:'--',limit:finite(limit)?`${op} ${f(limit,Math.abs(Number(limit))>=100?0:Math.abs(Number(limit))>=10?1:2)} ${unit}`:'--',gap};
@@ -41,11 +41,11 @@ function modelRows(r){
  const cap=Object.fromEntries((r.capabilityChecks||[]).map(x=>[x[0],x]));
  const pass=(...names)=>names.every(n=>cap[n]?.[1]&&cap[n]?.[2]);
  return [
-  ['凝露',`${f(c.annualCondHours,0)} h/y`,'年凝露小时',`最低裕量 ${f(c.minMargin,2)} K；最长连续 ${f(c.maxRunHours,0)} h`,`裕量 ≥ ${f(params.capDew,1)} K；凝露 ≤ ${f(params.capCondHours,0)} h/y`,pass('露点裕量','凝露小时'),r.scores?.凝露||0],
+  ['凝露',`${f(regValue('湿度','cond_annual_hours',c.annualCondHours),0)} h/y`,'年凝露小时',`最低裕量 ${f(regValue('湿度','surface_dew_margin',c.minMargin),2)} K；最长连续 ${f(c.maxRunHours,0)} h`,`裕量 ≥ ${f(params.capDew,1)} K；凝露 ≤ ${f(params.capCondHours,0)} h/y`,pass('露点裕量','凝露小时'),r.scores?.凝露||0],
   ['盐雾 / 腐蚀',`${f(s.jcl,2)} mg/m²·d`,'Cl⁻沉积通量',`TOW ${f(s.towPct,1)}%；Sea Salt P95 ${f(s.sea95,2)} μg/m³`,`Cl⁻ ≤ ${f(params.capCl,1)} mg/m²·d`,pass('盐沉积'),r.scores?.盐雾||0],
   ['粉尘 / 积灰',`${f(d.pm95,1)} μg/m³`,'PM10 P95',`年进入 ${f(d.annualIn,1)} kg/y；Dust P95 ${f(d.dust95,1)} μg/m³`,`PM10 ≤ ${f(params.capPm,0)} μg/m³`,pass('PM10'),r.scores?.粉尘积灰||0],
   ['沙蚀',`${f(d.erosionIndex,2)} EI/y`,'年沙蚀指数',`Vimpact ${f(d.vimpact,1)} m/s；撞击质量 ${f(d.impactMass,2)} kg/y`,`EI ≤ ${f(params.capEi,2)} /y`,pass('沙蚀EI'),r.scores?.沙蚀||0],
-  ['高海拔 / 热管理',kvValue('altBox','对流散热修正'),'空气密度修正后散热衰减',`海拔 ${f(b.elev,0)} m；气压 ${finite(b.pressureMean)?f(b.pressureMean/10,1):'--'} kPa`,`衰减 ≤ ${f(params.capHeatLoss,0)}%；海拔 ≤ ${f(params.capAltitude,0)} m`,pass('散热衰减','海拔'),Math.max(r.scores?.高海拔||0,r.composite?.thermal||0)],
+  ['高海拔 / 热管理',`${f(regValue('海拔','heat_loss',heatLoss),1)} %`,'空气密度修正后散热衰减',`海拔 ${f(b.elev,0)} m；气压 ${finite(b.pressureMean)?f(b.pressureMean/10,1):'--'} kPa`,`衰减 ≤ ${f(params.capHeatLoss,0)}%；海拔 ≤ ${f(params.capAltitude,0)} m`,pass('散热衰减','海拔'),Math.max(r.scores?.高海拔||0,r.composite?.thermal||0)],
   ['雨水 / 极端风',`${f(regValue('降雨','rain_daily_max',b.rainMax),1)} mm/d · ${finite(regValue('风速','gust_p99',NaN))?f(regValue('风速','gust_p99',NaN),1):'--'} m/s`,'最大日雨 · P99阵风',`P99小时雨 ${f(regValue('降雨','rain_hour_p99',b.rainP99h),2)} mm/h；极端风 ${finite(regValue('风速','gust_p99',NaN))?(r.scores?.极端风||0)+'/100':'N/A'}`,`日雨 ≤ ${f(params.capRainDay,0)}；小时雨 ≤ ${f(params.capRainHour,0)}；阵风 ≤ ${f(params.capWind,0)}`,pass('日降雨','小时降雨','阵风'),Math.max(r.scores?.强降雨||0,finite(regValue('风速','gust_p99',NaN))?(r.scores?.极端风||0):0)]
  ]
 }
