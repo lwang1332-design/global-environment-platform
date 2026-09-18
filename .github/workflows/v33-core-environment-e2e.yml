@@ -69,7 +69,7 @@ jobs:
           cat > v33-check.mjs <<'EOF'
           import { chromium } from 'playwright';
           const browser=await chromium.launch({headless:true});
-          const page=await browser.newPage({viewport:{width:1600,height:1000});
+          const page=await browser.newPage({viewport:{width:1600,height:1000}});
           const errors=[];
           page.on('pageerror',e=>errors.push('pageerror:'+e.message));
           page.on('console',m=>{
@@ -136,7 +136,7 @@ jobs:
             A.prepareIndicator=(m,k)=>all().find(x=>x.module===m&&x.key===k)||null;
             A.prepareIndicatorByName=(m,n)=>all().find(x=>x.module===m&&x.name===n)||null;
             A.rangeStats=(i,start,end)=>{const r=(i.raw||[]).filter(p=>p.ts>=start&&p.ts<=end),v=r.map(p=>p.value);return{count:v.length,mean:v.reduce((a,b)=>a+b,0)/(v.length||1),p95:v.length?A.percentile(v,.95):null,max:v.length?Math.max(...v):null,events:i.exceedance||{}}};
-            A.normalizeSeries=(points)=>{const v=points.map(p=>p.value),lo=Math.min(...v),hi=Math.max(...v);return points.map(p=>({...p,value:hi===lo?.5:(p.value-lo)/(hi-lo)}))};
+            A.normalizeSeries=(points)=>{const v=points.map(p=>p.value),lo=Math.min(...v),hi=Math.max(...v);return points.map(p=>({...p,value:hi===lo?0.5:(p.value-lo)/(hi-lo)}))};
             A.correlation=()=>({r:.81,count:200});
             A.lagCorrelation=()=>({best:{lagHours:24,r:.86,count:180},rows:[]});
             A.exportCsv=(inds,start,end)=>'timestamp,'+inds.map(i=>i.name).join(',')+'\n2026-01-01T00:00:00.000Z,1,2,3';
