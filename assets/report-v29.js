@@ -1,4 +1,4 @@
-/* V2.9 Engineering Decision PDF template.
+/* V3.3 Engineering Decision PDF template.
  * Presentation/report organization only. Reads existing result/cache/params/V29JointResult.
  * Does not change APIs, formulas, scores, parameters, matrix calculations or PWA behavior.
  */
@@ -11,6 +11,8 @@ const f=(v,n=1)=>finite(v)?Number(v).toFixed(n):'--';
 const riskBand=v=>{v=Number(v)||0;return v>=80?['CRITICAL','critical']:v>=60?['HIGH','high']:v>=30?['MEDIUM','medium']:['LOW','low']};
 const cfgState=()=>window.V29Config?.state||{};
 const joint=()=>window.V29JointResult||window.V29Joint?.result||null;
+function reg(module,key){try{return window.GETrendAnalysis?.prepareIndicator?.(module,key)||null}catch{return null}}
+function regValue(module,key,fallback=NaN){const i=reg(module,key),v=i?.summaryValue??i?.staticValue;return finite(v)?Number(v):fallback}
 function sectionByTitle(doc,title){return qa('section.page',doc).find(s=>(q('h2',s)?.textContent||'').includes(title))||null}
 function sectionBody(sec,{removeFormula=false}={}){if(!sec)return'';const c=sec.cloneNode(true);q('h2',c)?.remove();if(removeFormula)qa('.formula',c).forEach(x=>x.remove());return c.innerHTML}
 function sourceName(){const s=cfgState();if(s.debugActive||Number(s.dirtyCount||0)>0)return'本机调试参数';return s.source==='cloud'?'云端正式参数':s.source==='local'?'本地最近有效参数':'系统默认参数'}
@@ -28,7 +30,7 @@ function capabilityRows(r){
   '高温':[b.t99,'≤',params.capHigh,'℃'],'低温':[b.tmin,'≥',params.capLow,'℃'],'露点裕量':[c.minMargin,'≥',params.capDew,'K'],'凝露小时':[c.annualCondHours,'≤',params.capCondHours,'h/y'],
   '盐沉积':[s.jcl,'≤',params.capCl,'mg/m²·d'],'PM10':[d.pm95,'≤',params.capPm,'μg/m³'],'沙蚀EI':[d.erosionIndex,'≤',params.capEi,'EI/y'],'散热衰减':[heatLoss,'≤',params.capHeatLoss,'%'],
   '最大湿度':[b.rhMean,'≤',params.capRh,'%'],'日温差':[b.dayRange,'≤',params.capDayRange,'K'],'温变速率':[b.tempRate,'≤',params.capTempRate,'K/h'],'日降雨':[b.rainMax,'≤',params.capRainDay,'mm/d'],
-  '小时降雨':[b.rainP99h,'≤',params.capRainHour,'mm/h'],'阵风':[b.gust99,'≤',params.capWind,'m/s'],'降雪':[b.snowMax,'≤',params.capSnow,'cm/d'],'海拔':[b.elev,'≤',params.capAltitude,'m'],'TOW':[s.towPct,'≤',params.capTow,'%']
+  '小时降雨':[b.rainP99h,'≤',params.capRainHour,'mm/h'],'阵风':[regValue('风速','gust_p99',NaN),'≤',params.capWind,'m/s'],'降雪':[b.snowMax,'≤',params.capSnow,'cm/d'],'海拔':[b.elev,'≤',params.capAltitude,'m'],'TOW':[s.towPct,'≤',params.capTow,'%']
  };
  return checks.map(([name,valid,pass])=>{const x=M[name]||[NaN,'≤',NaN,''],[actual,op,limit,unit]=x;let gap='--';if(valid&&finite(actual)&&finite(limit)){const delta=op==='≤'?Number(limit)-Number(actual):Number(actual)-Number(limit);gap=pass?`余量 ${Math.abs(delta).toFixed(Math.abs(delta)>=100?0:Math.abs(delta)>=10?1:2)} ${unit}`:`Gap +${Math.abs(delta).toFixed(Math.abs(delta)>=100?0:Math.abs(delta)>=10?1:2)} ${unit}`}
   return{name,valid:!!valid,pass:!!pass,actual:finite(actual)?`${f(actual,Math.abs(Number(actual))>=100?0:Math.abs(Number(actual))>=10?1:2)} ${unit}`:'--',limit:finite(limit)?`${op} ${f(limit,Math.abs(Number(limit))>=100?0:Math.abs(Number(limit))>=10?1:2)} ${unit}`:'--',gap};
@@ -44,7 +46,7 @@ function modelRows(r){
   ['粉尘 / 积灰',`${f(d.pm95,1)} μg/m³`,'PM10 P95',`年进入 ${f(d.annualIn,1)} kg/y；Dust P95 ${f(d.dust95,1)} μg/m³`,`PM10 ≤ ${f(params.capPm,0)} μg/m³`,pass('PM10'),r.scores?.粉尘积灰||0],
   ['沙蚀',`${f(d.erosionIndex,2)} EI/y`,'年沙蚀指数',`Vimpact ${f(d.vimpact,1)} m/s；撞击质量 ${f(d.impactMass,2)} kg/y`,`EI ≤ ${f(params.capEi,2)} /y`,pass('沙蚀EI'),r.scores?.沙蚀||0],
   ['高海拔 / 热管理',kvValue('altBox','对流散热修正'),'空气密度修正后散热衰减',`海拔 ${f(b.elev,0)} m；气压 ${finite(b.pressureMean)?f(b.pressureMean/10,1):'--'} kPa`,`衰减 ≤ ${f(params.capHeatLoss,0)}%；海拔 ≤ ${f(params.capAltitude,0)} m`,pass('散热衰减','海拔'),Math.max(r.scores?.高海拔||0,r.composite?.thermal||0)],
-  ['雨水 / 极端风',`${f(b.rainMax,1)} mm/d · ${f(b.gust99,1)} m/s`,'最大日雨 · P99阵风',`P99小时雨 ${f(b.rainP99h,2)} mm/h；极端风 ${r.scores?.极端风||0}/100`,`日雨 ≤ ${f(params.capRainDay,0)}；小时雨 ≤ ${f(params.capRainHour,0)}；阵风 ≤ ${f(params.capWind,0)}`,pass('日降雨','小时降雨','阵风'),Math.max(r.scores?.强降雨||0,r.scores?.极端风||0)]
+  ['雨水 / 极端风',`${f(regValue('降雨','rain_daily_max',b.rainMax),1)} mm/d · ${finite(regValue('风速','gust_p99',NaN))?f(regValue('风速','gust_p99',NaN),1):'--'} m/s`,'最大日雨 · P99阵风',`P99小时雨 ${f(regValue('降雨','rain_hour_p99',b.rainP99h),2)} mm/h；极端风 ${finite(regValue('风速','gust_p99',NaN))?(r.scores?.极端风||0)+'/100':'N/A'}`,`日雨 ≤ ${f(params.capRainDay,0)}；小时雨 ≤ ${f(params.capRainHour,0)}；阵风 ≤ ${f(params.capWind,0)}`,pass('日降雨','小时降雨','阵风'),Math.max(r.scores?.强降雨||0,finite(regValue('风速','gust_p99',NaN))?(r.scores?.极端风||0):0)]
  ]
 }
 function modelSummaryTable(r){return `<table class="modelSummary"><thead><tr><th>模型</th><th>核心结果</th><th>辅助工程量</th><th>设计限值</th><th>风险</th><th>判定</th></tr></thead><tbody>${modelRows(r).map(x=>{const b=riskBand(x[6]);return `<tr><td><b>${esc(x[0])}</b><small>${esc(x[2])}</small></td><td class="num">${esc(x[1])}</td><td>${esc(x[3])}</td><td>${esc(x[4])}</td><td><span class="tag ${b[1]}">${b[0]} · ${x[6]}</span></td><td><span class="judge ${x[5]?'pass':'fail'}">${x[5]?'满足':'不满足'}</span></td></tr>`}).join('')}</tbody></table>`}
@@ -79,15 +81,16 @@ function install(){
   const combo=topCombinations(r,5),decRows=decisionRows();
   const param=parameterRows();
   const summaryText=(q('#aiSummary')?.textContent||'').replace(/^AI工程结论\s*/,'').trim()||`${current?.name||'项目'}主要环境风险为${topEnv.slice(0,3).map(x=>x[0]).join('、')}，重点设备为${topEq.slice(0,3).map(x=>x[0]).join('、')}。`;
+  const mTmax=regValue('温度','temp_max',b.t99),mTmin=regValue('温度','temp_min',b.tmin),mDay=regValue('温度','day_range_p95',b.dayRange),mRh=regValue('湿度','rh_mean',b.rhMean),mRh90=regValue('湿度','rh90_ratio',b.rh90),mDew=regValue('湿度','surface_dew_margin',c.minMargin),mGust=regValue('风速','gust_p99',NaN),mWind=regValue('风速','wind_mean',b.windMean),mRain=regValue('降雨','rain_daily_max',b.rainMax),mRainH=regValue('降雨','rain_hour_p99',b.rainP99h),mAlt=regValue('海拔','altitude',b.elev),mPress=regValue('海拔','pressure_mean',finite(b.pressureMean)?b.pressureMean/10:NaN),mCl=regValue('盐雾','cl_dep_rate',s.jcl),mTow=regValue('盐雾','tow',s.towPct),mSea=regValue('盐雾','seasalt_p95',s.sea95),mPm=regValue('PM10 / 颗粒物','pm10_p95',d.pm95),mDustMass=regValue('PM10 / 颗粒物','dust_mass_year',d.annualIn),mSo2=regValue('SO₂ / 腐蚀气体','so2_p95',s.so295);
   const coreKpis=[
-   kpi('温度',`${f(b.t99,1)} ℃`,'P99高温',`最低 ${f(b.tmin,1)} ℃ · 日温差 ${f(b.dayRange,1)} K`),
-   kpi('湿度',`${f(b.rhMean,1)} %`,'平均RH',`RH>90% ${f(b.rh90,1)}% · 最低露点裕量 ${f(c.minMargin,2)} K`),
-   kpi('风速',`${f(b.gust99,1)} m/s`,'P99阵风 / Proxy',`平均风 ${f(b.windMean,1)} m/s`),
-   kpi('降雨',`${f(b.rainMax,1)} mm/d`,'最大日降雨',`P99小时 ${f(b.rainP99h,2)} mm/h`),
-   kpi('海拔',`${f(b.elev,0)} m`,'Elevation',`平均气压 ${finite(b.pressureMean)?f(b.pressureMean/10,1):'--'} kPa`),
-   kpi('盐雾',`${f(s.jcl,2)} mg/m²·d`,'Cl⁻沉积通量',`TOW ${f(s.towPct,1)}% · Sea Salt P95 ${f(s.sea95,2)} μg/m³`),
-   kpi('PM10',`${f(d.pm95,1)} μg/m³`,'PM10 P95',`年进入 ${f(d.annualIn,1)} kg/y`),
-   kpi('SO₂',`${f(s.so295,1)} μg/m³`,'SO₂ P95',`复合腐蚀 ${r.composite?.corrosion??'--'}/100`)
+   kpi('温度',`${f(mTmax,1)} ℃`,'极端最高温 / Registry',`最低 ${f(mTmin,1)} ℃ · 日温差P95 ${f(mDay,1)} K`),
+   kpi('湿度',`${f(mRh,1)} %`,'平均RH / Registry',`RH>90% ${f(mRh90,1)}% · 最低表面露点裕量 ${f(mDew,2)} K`),
+   kpi('风速',`${finite(mGust)?f(mGust,1):'--'} m/s`,'P99阵风 / 真实或历史档案',`平均风 ${f(mWind,1)} m/s`),
+   kpi('降雨',`${f(mRain,1)} mm/d`,'最大日降雨 / Registry',`P99小时 ${f(mRainH,2)} mm/h`),
+   kpi('海拔',`${f(mAlt,0)} m`,'Elevation / Registry',`平均气压 ${finite(mPress)?f(mPress,1):'--'} kPa`),
+   kpi('盐雾',`${f(mCl,2)} mg/m²·d`,'Cl⁻沉积通量 / Registry',`TOW ${f(mTow,1)}% · Sea Salt P95 ${f(mSea,2)} μg/m³`),
+   kpi('PM10',`${f(mPm,1)} μg/m³`,'PM10 P95 / Registry',`等效年化进入 ${f(mDustMass,1)} kg/y`),
+   kpi('SO₂',`${f(mSo2,1)} μg/m³`,'SO₂ P95 / Registry',`复合腐蚀 ${r.composite?.corrosion??'--'}/100`)
   ].join('');
   const formulas=[
    ['凝露','C_A = ρ·C_p·δ；h_c = 5.7 + 3.8V；C_A·dT_s/dt = q_conv + q_solar − q_rad；凝露：T_s − T_d ≤ ΔT_film','δ 金属厚度；ρ 密度；C_p 比热；V 风速；T_s 表面温度；T_d 露点温度'],
@@ -95,7 +98,7 @@ function install(){
    ['粉尘 / 积灰','Pen=(1−η_filter)(1−β)+β；M_raw=PM10_mean·Q·H_op/1e9；M_in=M_raw·Pen','η_filter 过滤效率；β 旁通率；Q 通风量；H_op 年运行小时'],
    ['沙蚀','V_tip=πD·rpm/60；V_axial=Q/3600/(πD²/4)；V_impact=√(V_tip²+V_axial²)；EI=K_mat·(M/M_ref)·(V/V_ref)^n·Angle·Size','D 直径；rpm 转速；M 撞击颗粒质量；n 速度指数；K_mat 材料修正系数'],
    ['高海拔 / 热管理','ρ_air=p/[287.05(T+273.15)]；ρ₀=101325/(287.05·288.15)；HeatLoss=(1−ρ_air/ρ₀)·100%','p 表面气压；T 环境温度；ρ_air 空气密度'],
-   ['雨水 / 极端风','RainScore=lin(Max日降雨,rainA,rainB)；无直接阵风时 V_gust=gustFactor·V_10m；WindScore=lin(P99阵风,windA,windB)','gustFactor 阵风估算系数；V_10m ERA5 10m风速'],
+   ['雨水 / 极端风','RainScore=lin(Max日降雨,rainA,rainB)；WindScore仅在真实/历史档案阵风时序可用时计算','V_gust 使用直接/历史档案 wind_gusts_10m；固定 gustFactor 仅保留底层兼容兜底，不作为正式阵风展示'],
    ['风温联合','I_i=1，当同一小时 T_i 满足温度条件且 V_i 满足风速条件；H_joint=ΣI_i·Δt；P_joint=H_joint/H_valid×100%，ERA5逐小时 Δt=1h','H_valid 为温度与风速共同有效小时数，不固定采用8760']
   ];
   const appendixB=[['B.1 凝露',oldCond],['B.2 盐雾 / 腐蚀',oldSalt],['B.3 粉尘 / 积灰与沙蚀',oldDust],['B.4 高海拔 / 热管理',oldAlt],['B.5 雨雪 / 极端风',oldExtreme]].map(([t,sec])=>`<div class="appendixSub"><h3>${t}</h3><div class="legacyBlock">${sectionBody(sec,{removeFormula:true})}</div></div>`).join('');
@@ -103,9 +106,9 @@ function install(){
   const matrixHTML=`<table class="matrix"><thead><tr><th>环境</th>${eqs.map(e=>`<th>${esc(e)}</th>`).join('')}</tr></thead><tbody>${Object.entries(r.matrix||{}).map(([env,row])=>`<tr><td>${esc(env)}</td>${eqs.map(eq=>{const v=row?.[eq]??0,b=riskBand(v);return `<td class="${b[1]}">${v}</td>`}).join('')}</tr>`).join('')}</tbody></table>`;
   const actionTable=decRows.length?decisionCards(decRows):sectionBody(oldAction);
   const configSource=sourceName();
-  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(current?.name||'项目')}｜环境适应性工程决策报告 V2.9</title><style>${reportCSS()}</style></head><body>
+  return `<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><title>${esc(current?.name||'项目')}｜环境适应性工程决策报告 V3.3</title><style>${reportCSS()}</style></head><body>
   <div class="footer"><span>${esc(current?.name||'Project')} · 全球风电机组环境适应性评估平台</span><span>${esc(configVersion())} · ${esc(generated)}</span></div>
-  <section class="cover"><div class="coverTop"><h1>全球风电机组环境适应性<br>工程决策报告</h1><div class="coverSub">Global Wind Turbine Environmental Adaptability Engineering Decision Report</div><div class="coverBadge ${draft?'draft':''}">${draft?'DRAFT · 本机调试参数':'V2.9 · 正式工程报告'}</div></div><div class="coverMeta"><div><span>项目名称</span><b>${esc(current?.name||'--')}</b></div><div><span>项目坐标</span><b>${finite(current?.lat)?Number(current.lat).toFixed(4):'--'}, ${finite(current?.lon)?Number(current.lon).toFixed(4):'--'}</b></div><div><span>项目海拔</span><b>${f(b.elev,0)} m</b></div><div><span>数据周期</span><b>${esc(cache?.w?.start||'--')} ~ ${esc(cache?.w?.end||'--')}</b></div><div><span>参数版本</span><b>${esc(configVersion())}</b></div><div><span>参数来源</span><b>${esc(configSource)}</b></div><div><span>报告版本</span><b>V2.9 工程决策报告版</b></div><div><span>生成时间</span><b>${esc(generated)}</b></div></div><div class="coverFoot"><b>真实环境数据 × 确定性物理模型 × 设备风险 × Design Gap × 工程决策</b><br>底层数值由现有平台数据和确定性公式计算；报告用于设计输入、风险预防和验证策划，不替代认证、现场专项试验或材料寿命认证。</div></section>
+  <section class="cover"><div class="coverTop"><h1>全球风电机组环境适应性<br>工程决策报告</h1><div class="coverSub">Global Wind Turbine Environmental Adaptability Engineering Decision Report</div><div class="coverBadge ${draft?'draft':''}">${draft?'DRAFT · 本机调试参数':'V3.3 · 正式工程报告'}</div></div><div class="coverMeta"><div><span>项目名称</span><b>${esc(current?.name||'--')}</b></div><div><span>项目坐标</span><b>${finite(current?.lat)?Number(current.lat).toFixed(4):'--'}, ${finite(current?.lon)?Number(current.lon).toFixed(4):'--'}</b></div><div><span>项目海拔</span><b>${f(b.elev,0)} m</b></div><div><span>数据周期</span><b>${esc(cache?.w?.start||'--')} ~ ${esc(cache?.w?.end||'--')}</b></div><div><span>参数版本</span><b>${esc(configVersion())}</b></div><div><span>参数来源</span><b>${esc(configSource)}</b></div><div><span>报告版本</span><b>V3.3 工程决策报告版</b></div><div><span>生成时间</span><b>${esc(generated)}</b></div></div><div class="coverFoot"><b>真实环境数据 × 确定性物理模型 × 设备风险 × Design Gap × 工程决策</b><br>底层数值由现有平台数据和确定性公式计算；报告用于设计输入、风险预防和验证策划，不替代认证、现场专项试验或材料寿命认证。</div></section>
   <section class="page first"><h2>Executive Summary｜项目综合结论</h2><div class="hero"><div class="heroScore"><div><span class="small">综合环境严酷度</span><strong>${r.severity}/100</strong></div><span class="tag ${sev[1]}">${sev[0]}</span></div><p class="lead">${esc(summaryText)}</p></div><div class="summaryGrid">${kpi('设计适配',`${adapt}%`,'能力覆盖率')}${kpi('Design Gap',String(failed.length),'不满足项')}${kpi('TOP环境',`${topEnv[0]?.[1]??'--'}/100`,topEnv[0]?.[0]||'--')}${kpi('TOP设备',`${topEq[0]?.[1]??'--'}/100`,topEq[0]?.[0]||'--')}${kpi('参数版本',esc(configVersion()),configSource)}</div><div class="two"><div><h3>TOP 3 环境风险</h3>${riskBars(Object.fromEntries(topEnv.slice(0,3)))}</div><div><h3>关键 Design Gap</h3>${failed.length?`<table><tr><th>能力项</th><th>项目值</th><th>设计限值</th><th>Gap</th></tr>${failed.slice(0,6).map(x=>`<tr class="gapFail"><td>${esc(x.name)}</td><td>${esc(x.actual)}</td><td>${esc(x.limit)}</td><td><b>${esc(x.gap)}</b></td></tr>`).join('')}</table>`:'<div class="note">当前有效设计能力判据未发现不满足项，仍需按项目验证计划完成边界验证。</div>'}</div></div><div class="chain"><div>Environment</div><div>Physics</div><div>Equipment</div><div>Engineering Decision</div></div></section>
   <section class="page"><h2>01 项目与计算依据</h2><table><tr><th>项目</th><th>坐标</th><th>海拔</th><th>数据周期</th><th>有效小时</th></tr><tr><td>${esc(current?.name||'--')}</td><td>${finite(current?.lat)?Number(current.lat).toFixed(4):'--'}, ${finite(current?.lon)?Number(current.lon).toFixed(4):'--'}</td><td>${f(b.elev,0)} m</td><td>${esc(cache?.w?.start||'--')} ~ ${esc(cache?.w?.end||'--')}</td><td>${validHours()} h</td></tr></table><h3>计算链路</h3><div class="chain"><div>ERA5 / CAMS / Marine</div><div>环境统计与物理模型</div><div>环境 × 设备风险</div><div>Design Gap / 决策</div></div><h3>评估与判定依据</h3><table><tr><th>层级</th><th>采用依据</th><th>工程输出</th></tr><tr><td>数据层</td><td>项目坐标、ERA5逐小时气象、CAMS大气组分、Marine与高程补充数据</td><td>数据周期、有效样本、来源状态</td></tr><tr><td>统计层</td><td>极值、均值、P1/P5/P95/P99、超阈小时及年化统计</td><td>环境设计边界与暴露时长</td></tr><tr><td>物理层</td><td>凝露、盐雾/腐蚀、粉尘/积灰、沙蚀、高海拔/热管理、雨水/极端风</td><td>可核查工程量、风险与模型判定</td></tr><tr><td>决策层</td><td>环境 × 设备风险矩阵与设计能力限值对照</td><td>Design Gap、工程措施与验证要求</td></tr></table><h3>数据源与获取状态</h3>${qualityTable||'<div class="note">数据状态以平台当前缓存和实时接口返回为准。</div>'}<div class="note">参数版本：<b>${esc(configVersion())}</b> · 来源：<b>${esc(configSource)}</b> · 参数更新时间：${esc(configUpdated())}${draft?'。本报告使用尚未正式发布的本机调试参数，报告状态为 DRAFT。':''}</div></section>
   <section class="page"><h2>02 核心环境数据</h2><div class="kpis">${coreKpis}</div><div class="note">核心环境数据用于快速识别项目环境边界；完整分位值、时序图和气象统计保留在本报告后续章节/附录中。阵风在无直接序列时为现有平台 Proxy 估算值。</div>${weatherSec?`<h3>关键气象统计与趋势</h3><div class="legacyBlock">${sectionBody(weatherSec)}</div>`:''}</section>
