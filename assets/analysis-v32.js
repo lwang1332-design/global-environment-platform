@@ -152,6 +152,32 @@ function exportCsv(indicators,start,end){
  rows.push([]);rows.push(['metadata']);inds.forEach(i=>rows.push([i.name,i.source,i.dataCode,i.accessStatus,'confidence '+(i.confidenceMeta?.grade||''),'formula '+(i.formula||''),'requested '+(i.coverageMeta?.requestedStart||'')+'~'+(i.coverageMeta?.requestedEnd||''),'actual '+(i.coverageMeta?.actualStart||'')+'~'+(i.coverageMeta?.actualEnd||'')]));
  return rows.map(r=>r.map(csvEscape).join(',')).join('\n');
 }
+
+function globalParams(){try{return window.params||params||{}}catch{return{}}}
+function globalCache(){try{return window.cache||cache||{}}catch{return{}}}
+function supplemental(module,key){
+ const p=globalParams(),cc=globalCache(),H=cc?.w?.j?.hourly||{},D=cc?.w?.j?.daily||{};
+ const mk=(name,unit,raw,summaryValue,opts={})=>({module,key,id:module+'::'+key,name,unit,summaryUnit:unit,dataClass:opts.dataClass||'统计派生值',originalDataClass:opts.originalDataClass||opts.dataClass||'统计派生值',source:opts.source||'统一Metric Registry派生',sourceVariable:opts.sourceVariable||'',raw,series:raw,trendAvailable:raw.length>0,summaryValue:observed(summaryValue)?Number(summaryValue):null,staticValue:null,coverage:raw.length?{start:raw[0].time,end:raw.at(-1).time,count:raw.length,resolution:opts.resolution||'按源数据'}:null,accessStatus:opts.accessStatus||'A 已接入',confidence:opts.confidence||'A',design:opts.design||null,formula:opts.formula||'',method:opts.method||'',note:opts.note||'',axisGroup:opts.axisGroup||unit});
+ if(module==='温度'&&key==='temp_design_p99'){
+   const raw=A.cleanPairs?.(D.time||[],D.temperature_2m_max||[])||[],v=raw.map(x=>x.value),summary=pct(v,.99);
+   return mk('设计高温P99','℃',raw,summary,{source:'ERA5逐日最高温',sourceVariable:'temperature_2m_max',resolution:'1 d',design:{upper:num(p.capHigh),label:'最高设计温度'},formula:'P99(Tmax_day)',method:'逐日最高温形成序列后取P99，与绝对最高温Max分开。'});
+ }
+ if(module==='温度'&&key==='temp_low_p1'){
+   const base=originalPrepare('温度','temp_min'),raw=base?.raw||base?.series||[],summary=pct(raw.map(x=>x.value),.01);
+   return mk('设计低温P1','℃',raw,summary,{source:'ERA5 2 m小时温度',sourceVariable:'temperature_2m',design:{lower:num(p.capLow),label:'最低设计温度'},formula:'P1(T_hour)',method:'低温设计统计值，与绝对最低温Min分开。'});
+ }
+ if(module==='湿度'&&key==='rh_max'){
+   const base=originalPrepare('湿度','rh_mean'),raw=base?.raw||base?.series||[],v=raw.map(x=>x.value),summary=v.length?Math.max(...v):NaN;
+   return mk('最大相对湿度','%',raw,summary,{source:'ERA5 2 m相对湿度',sourceVariable:'relative_humidity_2m',design:{upper:num(p.capRh),label:'最大RH能力'},formula:'max(RH_hour)',method:'设计能力校核使用最大RH，不再用平均RH代替。'});
+ }
+ if(module==='海拔'&&key==='heat_loss'){
+   const base=originalPrepare('海拔','air_density'),src=base?.raw||base?.series||[],rho0=101325/(287.05*288.15),raw=src.map(x=>({...x,value:Math.max(0,(1-Number(x.value)/rho0)*100)})),v=raw.map(x=>x.value),summary=v.length?Math.max(...v):NaN;
+   return mk('空气密度散热衰减','%',raw,summary,{dataClass:'工程模型值',source:'ERA5气压+温度 → 空气密度修正',sourceVariable:'surface_pressure + temperature_2m',design:{upper:num(p.capHeatLoss),label:'最大散热衰减能力'},formula:'HeatLoss=(1−ρ/ρ0)×100%',method:'V3.3统一采用线性空气密度修正作为平台基准；指数模型不再并行使用。',accessStatus:'C 可模型计算',confidence:'B'});
+ }
+ return null;
+}
+const supplementalKeys={'温度':['temp_design_p99','temp_low_p1'],'湿度':['rh_max'],'海拔':['heat_loss']};
+
 const originalPrepare=A.prepareIndicator.bind(A);
 function externalOverride(module,key,base){
  const v33=window.GEDataSourcesV33?.state||{};
@@ -175,10 +201,10 @@ function enhance(i){
  const de=designEval(summary,design),events=exceedanceEvents(i.raw||i.series||[],design),tm=trendMeta(i);
  return{...i,design,dataCode:code,coverageMeta:cov,confidenceMeta:conf,designEvaluation:de,exceedance:events,trendStats:tm};
 }
-function prepareIndicator(module,key){return enhance(externalOverride(module,key,originalPrepare(module,key)))}
+function prepareIndicator(module,key){const base=externalOverride(module,key,originalPrepare(module,key));return enhance(base||supplemental(module,key))}
 function prepareModule(module){
  const def=A.moduleCatalog().find(x=>x.module===module);if(!def)return null;
- const indicators=(def.indicators||[]).map(x=>prepareIndicator(module,x.key)).filter(Boolean),available=indicators.filter(i=>i.trendAvailable);
+ const indicators=[...(def.indicators||[]).map(x=>prepareIndicator(module,x.key)),...((supplementalKeys[module]||[]).map(k=>prepareIndicator(module,k))].filter(Boolean),available=indicators.filter(i=>i.trendAvailable);
  const defaults=(def.indicators||[]).filter(i=>i.defaultSelected).slice(0,3).map(i=>module+'::'+i.key);
  return{module,requestedYears:selectedYears(),indicators,defaultSelected:defaults.length?defaults:available.slice(0,3).map(i=>i.id)};
 }
