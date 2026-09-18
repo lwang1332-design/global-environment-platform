@@ -1,9 +1,24 @@
 {
-  "platform_version": "V2.9.0-local-v3",
-  "code_version": "local-deployment-v3",
-  "model_version": "inherit-v2.9-no-formula-change",
+  "platform_version": "V3.3.0",
+  "code_version": "core-environment-engineering-v3.3",
+  "model_version": "metric-registry-v3.2 + engineering-analysis-v3.3",
   "parameter_version": "runtime-cloud-or-local-snapshot",
-  "database_version": "1",
-  "build_date": "2026-09-01",
-  "deployment_mode": ["github-pages", "local-online", "local-offline-cache"]
+  "database_version": "2",
+  "build_date": "2026-09-18",
+  "deployment_mode": [
+    "github-pages",
+    "local-online",
+    "local-offline-cache"
+  ],
+  "core_features": [
+    "single metric registry",
+    "coverage + completeness",
+    "unified design gap",
+    "exceedance events",
+    "raw + normalized time series",
+    "correlation + lag correlation",
+    "CSV export",
+    "PacIOOS distance-to-coast",
+    "NASA POWER UV-B + skin temperature"
+  ]
 }
