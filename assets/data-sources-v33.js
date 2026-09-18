@@ -55,8 +55,8 @@ async function refresh(cur){
  const [coast,power]=await Promise.allSettled([fetchCoast(lat,lon),fetchPower(lat,lon)]);
  state.coast=coast.status==='fulfilled'?coast.value:{ok:false,error:String(coast.reason||'coast query failed'),source:'NASA OBPG / PacIOOS ERDDAP'};
  state.power=power.status==='fulfilled'?power.value:{ok:false,error:String(power.reason||'POWER query failed'),source:'NASA POWER'};
- state.uvb=state.power?.ok?{ok:true,start:state.power.start,end:state.power.end,series:state.power.uvb,source:state.power.source}:{ok:false,source:'NASA POWER'};
- state.skinTemperature=state.power?.ok?{ok:true,start:state.power.start,end:state.power.end,series:state.power.skinTemperature,source:state.power.source}:{ok:false,source:'NASA POWER'};
+ state.uvb=state.power?.ok&&state.power.uvb?.length?{ok:true,start:state.power.uvb[0].time.slice(0,10),end:state.power.uvb.at(-1).time.slice(0,10),series:state.power.uvb,source:state.power.source,unit:'MJ/m²/day'}:{ok:false,source:'NASA POWER',unit:'MJ/m²/day'};
+ state.skinTemperature=state.power?.ok&&state.power.skinTemperature?.length?{ok:true,start:state.power.skinTemperature[0].time.slice(0,10),end:state.power.skinTemperature.at(-1).time.slice(0,10),series:state.power.skinTemperature,source:state.power.source,unit:'℃'}:{ok:false,source:'NASA POWER'};
  state.landcover={ok:false,status:'B',source:'ESA WorldCover 10 m 2021',note:'全球公开COG已确认；浏览器端无稳定无鉴权点查询API，保留公开COG/未来后端采样接口，不伪造分类。'};
  state.lightning={ok:false,status:'B',source:'NASA LIS/OTD gridded climatology',note:'全球长期气候场已确认；当前没有稳定无鉴权点API，待后端/静态栅格采样。'};
  state.cyclone={ok:false,status:'B',source:'NOAA IBTrACS',note:'全球Best Track公开可接；不在浏览器端整库下载，待轻量后端按半径查询。'};
