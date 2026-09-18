@@ -166,6 +166,11 @@ function supplemental(module,key){
    const base=originalPrepare('温度','temp_min'),raw=base?.raw||base?.series||[],summary=pct(raw.map(x=>x.value),.01);
    return mk('设计低温P1','℃',raw,summary,{source:'ERA5 2 m小时温度',sourceVariable:'temperature_2m',design:{lower:num(p.capLow),label:'最低设计温度'},formula:'P1(T_hour)',method:'低温设计统计值，与绝对最低温Min分开。'});
  }
+ if(module==='湿度'&&key==='cond_annual_hours'){
+   const base=originalPrepare('湿度','cond_hours'),raw=base?.raw||base?.series||[],hours=raw.length?mean(raw.map(x=>Number(x.value)))*8760:NaN;
+   const out=mk('年凝露时间','0/1',raw,hours,{dataClass:'工程模型值',source:'ERA5+金属瞬态热模型',sourceVariable:'T/RH/Td/Wind/Radiation',design:{upper:num(p.capCondHours),label:'允许年凝露小时'},formula:'Hcond,annual = mean(Icond)×8760',method:'趋势展示逐时0/1凝露状态；卡片/能力校核使用年化凝露小时。',accessStatus:'C 可模型计算',confidence:'B'});
+   out.summaryUnit='h/y';return out;
+ }
  if(module==='湿度'&&key==='rh_max'){
    const base=originalPrepare('湿度','rh_mean'),raw=base?.raw||base?.series||[],v=raw.map(x=>x.value),summary=v.length?Math.max(...v):NaN;
    return mk('最大相对湿度','%',raw,summary,{source:'ERA5 2 m相对湿度',sourceVariable:'relative_humidity_2m',design:{upper:num(p.capRh),label:'最大RH能力'},formula:'max(RH_hour)',method:'设计能力校核使用最大RH，不再用平均RH代替。'});
@@ -176,7 +181,7 @@ function supplemental(module,key){
  }
  return null;
 }
-const supplementalKeys={'温度':['temp_design_p99','temp_low_p1'],'湿度':['rh_max'],'海拔':['heat_loss']};
+const supplementalKeys={'温度':['temp_design_p99','temp_low_p1'],'湿度':['rh_max','cond_annual_hours'],'海拔':['heat_loss']};
 
 const originalPrepare=A.prepareIndicator.bind(A);
 function externalOverride(module,key,base){
@@ -197,7 +202,7 @@ function externalOverride(module,key,base){
 }
 
 function enhance(i){
- if(!i)return null;const cov=coverageMeta(i),code=dataCode(i),conf=confidence(i,cov),design=normalizeDesign(i.design),summary=i.summaryValue??i.staticValue;
+ if(!i)return null;const pp=globalParams();if(i.key==='surface_dew_margin'&&!i.design)i={...i,design:{lower:num(pp.capDew),label:'最低露点裕量'}};if(i.key==='altitude'&&!i.design)i={...i,design:{upper:num(pp.capAltitude),label:'最大设计海拔'}};const cov=coverageMeta(i),code=dataCode(i),conf=confidence(i,cov),design=normalizeDesign(i.design),summary=i.summaryValue??i.staticValue;
  const de=designEval(summary,design),events=exceedanceEvents(i.raw||i.series||[],design),tm=trendMeta(i);
  return{...i,design,dataCode:code,coverageMeta:cov,confidenceMeta:conf,designEvaluation:de,exceedance:events,trendStats:tm};
 }
