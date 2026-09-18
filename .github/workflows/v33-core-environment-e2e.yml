@@ -10,6 +10,7 @@ on:
       - 'assets/trend-analysis.js'
       - 'assets/trend-compat-v31.js'
       - 'assets/analysis-v32.js'
+      - 'assets/risk-v33.js'
       - 'assets/data-sources-v31.js'
       - 'assets/data-sources-v33.js'
       - 'assets/platform-v33.js'
@@ -36,6 +37,7 @@ jobs:
           node --check assets/trend-analysis.js
           node --check assets/trend-compat-v31.js
           node --check assets/analysis-v32.js
+          node --check assets/risk-v33.js
           node --check assets/data-sources-v31.js
           node --check assets/data-sources-v33.js
           node --check assets/platform-v33.js
@@ -46,6 +48,7 @@ jobs:
           grep -q 'report-v29.js?v=20260918-v33' index.html
           grep -q 'trend-modal-v33.js' assets/cockpit-v291.js
           grep -q 'analysis-v32.js' assets/cockpit-v291.js
+          grep -q 'risk-v33.js' assets/cockpit-v291.js
           grep -q 'data-sources-v33.js' assets/cockpit-v291.js
 
       - name: Install Playwright
