@@ -153,12 +153,29 @@ function exportCsv(indicators,start,end){
  return rows.map(r=>r.map(csvEscape).join(',')).join('\n');
 }
 const originalPrepare=A.prepareIndicator.bind(A);
+function externalOverride(module,key,base){
+ const v33=window.GEDataSourcesV33?.state||{};
+ if(module==='温度'&&key==='surface_temp_p99'&&v33.skinTemperature?.ok&&v33.skinTemperature.series?.length){
+   const raw=v33.skinTemperature.series.slice(),vals=raw.map(p=>Number(p.value)).filter(finite),summary=pct(vals,.99);
+   return{...base,module,key,id:module+'::'+key,name:'暴晒最高地表温度P99',unit:'℃',summaryUnit:'℃',dataClass:'模式数据',originalDataClass:'模式数据',source:'NASA POWER Earth Skin Temperature (TS)',sourceVariable:'TS',raw,series:raw,trendAvailable:true,summaryValue:summary,staticValue:null,coverage:{start:raw[0].time,end:raw.at(-1).time,count:raw.length,resolution:'1 d'},accessStatus:'A 已接入',formula:'P99(TS_daily)',note:'NASA POWER日尺度地表/skin temperature；不再用空气温度替代。'};
+ }
+ if(module==='太阳辐照'&&key==='uv_b_dose'&&v33.uvb?.ok&&v33.uvb.series?.length){
+   const raw=v33.uvb.series.map(p=>({...p,value:Number(p.value)*86400})),summary=raw.reduce((s,p)=>s+p.value,0);
+   return{...base,module,key,id:module+'::'+key,name:'UV-B紫外剂量',unit:'J/m²·d',summaryUnit:'J/m²/期',dataClass:'模式数据',originalDataClass:'模式数据',source:'NASA POWER ALLSKY_SFC_UVB',sourceVariable:'ALLSKY_SFC_UVB',raw,series:raw,trendAvailable:true,summaryValue:summary,staticValue:null,coverage:{start:raw[0].time,end:raw.at(-1).time,count:raw.length,resolution:'1 d'},accessStatus:'A 已接入',formula:'E_UVB,daily = ALLSKY_SFC_UVB × 86400',note:'POWER日平均UV-B辐照度换算为日剂量并累计。'};
+ }
+ if(module==='盐雾'&&key==='coast_distance'&&v33.coast?.ok&&observed(v33.coast.value)){
+   const val=Number(v33.coast.value);
+   return{...base,module,key,id:module+'::'+key,name:'距海岸距离',unit:'km',summaryUnit:'km',dataClass:'GIS/静态数据',originalDataClass:'GIS/静态数据',source:v33.coast.source,sourceVariable:'dist',raw:[],series:[],trendAvailable:false,summaryValue:val,staticValue:val,coverage:null,accessStatus:'A 已接入',formula:'nearest-coast distance grid lookup',note:'0.04°全球距岸栅格点查询；作为环境元数据，不作为盐雾经验衰减公式。'};
+ }
+ return base;
+}
+
 function enhance(i){
  if(!i)return null;const cov=coverageMeta(i),code=dataCode(i),conf=confidence(i,cov),design=normalizeDesign(i.design),summary=i.summaryValue??i.staticValue;
  const de=designEval(summary,design),events=exceedanceEvents(i.raw||i.series||[],design),tm=trendMeta(i);
  return{...i,design,dataCode:code,coverageMeta:cov,confidenceMeta:conf,designEvaluation:de,exceedance:events,trendStats:tm};
 }
-function prepareIndicator(module,key){return enhance(originalPrepare(module,key))}
+function prepareIndicator(module,key){return enhance(externalOverride(module,key,originalPrepare(module,key)))}
 function prepareModule(module){
  const def=A.moduleCatalog().find(x=>x.module===module);if(!def)return null;
  const indicators=(def.indicators||[]).map(x=>prepareIndicator(module,x.key)).filter(Boolean),available=indicators.filter(i=>i.trendAvailable);
