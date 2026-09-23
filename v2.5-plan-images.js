@@ -117,7 +117,7 @@
       .plan-head h4{margin:0!important;display:flex;align-items:baseline;gap:10px;min-width:0}
       .plan-level{font-size:18px;line-height:1.1;color:var(--nav);font-weight:800;letter-spacing:.15px}
       .plan-cn-title{font-size:13px;color:#475467;font-weight:700}
-      .plan-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:wrap}.plan-status{flex:0 0 auto}
+      .plan-head-actions{display:flex;align-items:center;justify-content:flex-end;gap:14px;flex-wrap:nowrap}.plan-status{flex:0 0 auto}
       .plan-status-badge{display:inline-flex;align-items:center;border-radius:99px;padding:5px 9px;font-size:10px;font-weight:800;white-space:nowrap}
       .plan-status-badge.recommended{background:#eaf2ff;color:var(--blue)}
       .plan-status-badge.current{background:#eef7f3;color:var(--green)}
@@ -154,7 +154,7 @@
         #plan .plan-grid{gap:14px}
         .plan-head{align-items:flex-start}
         .plan-head h4{flex-direction:column;gap:3px}
-        .plan-head-actions{align-items:flex-end;gap:8px}
+        .plan-head-actions{align-items:flex-end;gap:8px;flex-wrap:wrap}
         .plan-level{font-size:17px}
         .plan-cn-title{font-size:12px}
         .plan-main{grid-template-columns:1fr;min-height:0}
