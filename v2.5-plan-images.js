@@ -1,17 +1,18 @@
 // V2.7 plan images + plan metadata: Standard / Pro / Plus each has an independent image, caption, risk, positioning and cost change.
 (function installPlanImages(){
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
+  const PLAN_LABELS={Standard:'标准环境适应方案',Pro:'增强环境适应方案',Plus:'极端环境适应方案'};
 
   window.planImageFallback=function(img){
     const box=img?.closest?.('.plan-image-box');
     if(!box)return;
-    box.innerHTML='<div class="plan-image-placeholder"><b>暂无方案图</b><small>请在管理员中上传</small></div>';
+    box.innerHTML='<div class="plan-image-placeholder"><b>TECHNICAL SCHEME</b><small>技术方案图待配置</small></div>';
   };
 
   function mediaHtml(d,level){
     const url=d?.planImages?.[level]||'';
     const caption=d?.planImageCaptions?.[level]||'';
-    if(!url)return `<div class="plan-image-box"><div class="plan-image-placeholder"><b>暂无方案图</b><small>请在管理员中上传</small></div></div>${caption?`<div class="plan-image-caption">${esc(caption)}</div>`:''}`;
+    if(!url)return `<div class="plan-image-box"><div class="plan-image-placeholder"><b>TECHNICAL SCHEME</b><small>技术方案图待配置</small></div></div>${caption?`<div class="plan-image-caption">${esc(caption)}</div>`:''}`;
     return `<div class="plan-image-box"><img src="${esc(url)}" alt="${esc(caption||`${level} 方案图`)}" loading="lazy" onerror="planImageFallback(this)"></div>${caption?`<div class="plan-image-caption">${esc(caption)}</div>`:''}`;
   }
 
@@ -19,10 +20,17 @@
     const m=d?.planMeta?.[level]||{};
     const risk=m.mainRisk||'—',position=m.positioning||'—',cost=m.costChange||'—';
     return `<div class="plan-meta">
+      <div class="plan-subtitle">方案工程属性</div>
       <div class="plan-meta-row risk"><span>主要风险</span><b>${esc(risk)}</b></div>
       <div class="plan-meta-row positioning"><span>方案定位</span><b>${esc(position)}</b></div>
       <div class="plan-meta-row cost"><span>相对成本变化</span><b>${esc(cost)}</b></div>
     </div>`;
+  }
+
+  function statusHtml(name,recommended,selected){
+    if(recommended)return '<span class="plan-status-badge recommended">★ 推荐方案</span>';
+    if(selected)return '<span class="plan-status-badge current">✓ 当前选择</span>';
+    return '<span class="plan-status-badge optional">可选</span>';
   }
 
   renderPlans=function(){
@@ -30,15 +38,37 @@
     if(!planManual)selectedPlan=r.name;
     $('planBadge').textContent=`系统推荐：${r.name}`;
     const d=getScenario(selectedScene);
-    $('planGrid').innerHTML=['Standard','Pro','Plus'].map(name=>`<div class="plan ${selectedPlan===name?'selected':''}">
-      <span class="pill">${name===r.name?'系统推荐':'可选'}</span><h4>${name}</h4>
-      <div class="plan-main">
-        <div class="plan-copy"><ul>${(d?.plans?.[name]||[]).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>${metaHtml(d,name)}</div>
-        <div class="plan-media">${mediaHtml(d,name)}</div>
-      </div>
-      <div class="plan-footer"><span>作为场景主方案</span><input type="radio" name="plan" ${selectedPlan===name?'checked':''} onchange="selectedPlan='${name}';planManual=true;renderPlans();renderPackages();renderGap();renderResult()"></div>
-    </div>`).join('');
-    $('planReason').innerHTML=`推荐规则：项目环境最高需求 <b>${r.envCode}/3</b>，当前机组基础能力 <b>${r.machine}/3</b>，能力差 <b>${r.gap}</b> → 推荐 <b>${r.name}</b>。场景方案内容来自 <b>${esc(selectedScene)}</b> 技术货架。方案图、方案定位和相对成本变化不参与 Standard / Pro / Plus 推荐算法；“主要风险”用于 07 升级包推荐评价，但不反向改变 06 三档方案推荐结果。`;
+
+    $('planGrid').innerHTML=['Standard','Pro','Plus'].map(name=>{
+      const recommended=name===r.name;
+      const selected=selectedPlan===name;
+      const items=d?.plans?.[name]||[];
+      return `<div class="plan plan-row ${recommended?'recommended':''} ${selected?'selected':''}">
+        <div class="plan-head">
+          <h4><span class="plan-level">${name.toUpperCase()}</span><span class="plan-cn-title">${PLAN_LABELS[name]||''}</span></h4>
+          <div class="plan-status">${statusHtml(name,recommended,selected)}</div>
+        </div>
+        <div class="plan-main">
+          <div class="plan-copy">
+            <div class="plan-config">
+              <div class="plan-subtitle">核心技术配置</div>
+              <ul>${items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+            </div>
+            ${metaHtml(d,name)}
+            <div class="plan-footer">
+              <label class="plan-radio-label"><input type="radio" name="plan" ${selected?'checked':''} onchange="selectedPlan='${name}';planManual=true;renderPlans();renderPackages();renderGap();renderResult()"><span>${selected?'当前场景主方案':'作为场景主方案'}</span></label>
+            </div>
+          </div>
+          <div class="plan-media">${mediaHtml(d,name)}</div>
+        </div>
+      </div>`;
+    }).join('');
+
+    const selectionNote=planManual&&selectedPlan!==r.name
+      ? `当前人工选择 <b>${esc(selectedPlan)}</b>，系统推荐 <b>${r.name}</b> 保持不变；07 推荐升级包、08 Design Gap 和项目输出按当前人工选择方案继续计算。`
+      : `当前主方案与系统推荐一致，为 <b>${r.name}</b>。`;
+
+    $('planReason').innerHTML=`推荐规则：项目环境最高需求 <b>${r.envCode}/3</b>，当前机组基础能力 <b>${r.machine}/3</b>，能力差 <b>${r.gap}</b> → 系统推荐 <b>${r.name}</b>。场景方案内容来自 <b>${esc(selectedScene)}</b> 技术货架。方案图、方案定位和相对成本变化不参与 Standard / Pro / Plus 推荐算法；“主要风险”用于 07 升级包推荐评价，但不反向改变 06 三档方案推荐结果。<br><span class="plan-selection-note">${selectionNote}</span>`;
   };
 
   const previousSave=saveReportSnapshot;
@@ -47,12 +77,17 @@
     try{
       const snap=JSON.parse(localStorage.getItem(REPORT_KEY)||'null');
       const d=getScenario(selectedScene),m=d?.planMeta?.[selectedPlan]||{};
+      const r=recommendedPlan();
       if(snap&&snap.plan){
         snap.plan.imageUrl=d?.planImages?.[selectedPlan]||'';
         snap.plan.imageCaption=d?.planImageCaptions?.[selectedPlan]||'';
         snap.plan.mainRisk=m.mainRisk||'';
         snap.plan.positioning=m.positioning||'';
         snap.plan.costChange=m.costChange||'';
+        snap.plan.recommendedName=r.name;
+        snap.plan.selectedName=selectedPlan;
+        snap.plan.manualOverride=Boolean(planManual&&selectedPlan!==r.name);
+        snap.plan.recommendationBasis={envCode:r.envCode,machine:r.machine,gap:r.gap};
         localStorage.setItem(REPORT_KEY,JSON.stringify(snap));
       }
     }catch(e){console.warn('方案图/方案元数据报告快照写入失败',e)}
@@ -61,18 +96,65 @@
 
   if(!document.getElementById('planImageStyle')){
     const st=document.createElement('style');st.id='planImageStyle';st.textContent=`
-      .plan-main{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(105px,1fr);gap:9px;align-items:start}
-      .plan-copy{min-width:0}.plan-copy ul{min-height:0!important;margin-top:5px}
-      .plan-media{min-width:0}.plan-image-box{aspect-ratio:4/3;border:1px solid var(--line);border-radius:8px;background:#f5f8fc;display:flex;align-items:center;justify-content:center;overflow:hidden}
+      #plan .plan-grid{display:grid;grid-template-columns:1fr;gap:18px}
+      #plan .plan{padding:0;overflow:hidden;position:relative;background:#fff;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow);transform:none}
+      #plan .plan.recommended{border:2px solid var(--blue);background:#f8fbff;box-shadow:0 8px 22px rgba(21,87,214,.08)}
+      #plan .plan.recommended:before{content:"";position:absolute;left:0;top:0;bottom:0;width:4px;background:var(--blue)}
+      #plan .plan.selected:not(.recommended){box-shadow:inset 0 0 0 2px rgba(21,87,214,.18),var(--shadow)}
+      .plan-head{min-height:48px;padding:11px 14px 9px 16px;display:flex;align-items:center;justify-content:space-between;gap:12px;border-bottom:1px solid #edf0f4}
+      .plan-head h4{margin:0!important;display:flex;align-items:baseline;gap:10px;min-width:0}
+      .plan-level{font-size:18px;line-height:1.1;color:var(--nav);font-weight:800;letter-spacing:.15px}
+      .plan-cn-title{font-size:13px;color:#475467;font-weight:700}
+      .plan-status{flex:0 0 auto}
+      .plan-status-badge{display:inline-flex;align-items:center;border-radius:99px;padding:5px 9px;font-size:10px;font-weight:800;white-space:nowrap}
+      .plan-status-badge.recommended{background:#eaf2ff;color:var(--blue)}
+      .plan-status-badge.current{background:#eef7f3;color:var(--green)}
+      .plan-status-badge.optional{background:#f2f4f7;color:#667085}
+      .plan-main{display:grid;grid-template-columns:minmax(0,2fr) minmax(260px,1fr);gap:0;align-items:stretch;min-height:270px}
+      .plan-copy{min-width:0;padding:13px 17px 12px 18px;display:flex;flex-direction:column}
+      .plan-subtitle{font-size:11px;color:var(--nav);font-weight:800;letter-spacing:.1px;margin-bottom:7px}
+      .plan-config{padding-bottom:11px}
+      .plan-copy ul{margin:0;padding-left:18px;min-height:0!important;font-size:11px;line-height:1.72;color:#475467;columns:2;column-gap:34px}
+      .plan-copy li{break-inside:avoid;margin:0 0 2px}
+      .plan-meta{border-top:1px solid #e6ebf1;padding-top:10px;display:grid;grid-template-columns:1fr;gap:7px}
+      .plan-meta .plan-subtitle{margin-bottom:1px}
+      .plan-meta-row{display:grid;grid-template-columns:92px minmax(0,1fr);gap:10px;align-items:start;font-size:10px;line-height:1.55}
+      .plan-meta-row span{color:var(--muted);font-weight:700}
+      .plan-meta-row b{font-weight:600;color:#344054;word-break:break-word}
+      .plan-meta-row.risk b{color:#9a5b08}
+      .plan-meta-row.cost b{display:inline-flex;justify-self:start;padding:3px 8px;border-radius:99px;background:#eef4ff;color:#1557d6;font-size:10px}
+      .plan-footer{margin-top:auto;padding-top:11px;border-top:1px solid #edf0f4}
+      .plan-radio-label{display:inline-flex;align-items:center;gap:7px;color:#475467;font-size:10px;font-weight:700;cursor:pointer}
+      .plan-radio-label input{width:auto;margin:0}
+      .plan-media{min-width:0;border-left:1px solid #edf0f4;padding:12px;display:flex;flex-direction:column;justify-content:center;background:#fbfcfe}
+      .plan-image-box{width:100%;aspect-ratio:4/3;border:1px solid var(--line);border-radius:9px;background:#f5f8fc;display:flex;align-items:center;justify-content:center;overflow:hidden}
       .plan-image-box img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
-      .plan-image-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:8px;min-height:100%}
-      .plan-image-placeholder b{font-size:10px;color:#65758a}.plan-image-placeholder small{font-size:8px;margin-top:3px;color:#98a2b3}
-      .plan-image-caption{font-size:8px;color:var(--muted);text-align:center;margin-top:4px;line-height:1.35}
-      .plan-meta{margin-top:9px;border-top:1px solid #edf0f4;padding-top:7px;display:grid;gap:6px}
-      .plan-meta-row{display:grid;grid-template-columns:74px minmax(0,1fr);gap:7px;align-items:start;font-size:9px;line-height:1.45}
-      .plan-meta-row span{color:var(--muted);font-weight:700}.plan-meta-row b{font-weight:600;color:#344054;word-break:break-word}
-      .plan-meta-row.risk b{color:#9a5b08}.plan-meta-row.cost b{display:inline-flex;justify-self:start;padding:3px 7px;border-radius:99px;background:#eef4ff;color:#1557d6;font-size:10px}
-      @media(max-width:720px){.plan-main{grid-template-columns:1fr}.plan-image-box{max-height:240px}.plan-media{margin-top:4px}.plan-meta-row{grid-template-columns:70px 1fr}}
+      .plan-image-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:16px;min-height:100%;letter-spacing:.3px}
+      .plan-image-placeholder b{font-size:11px;color:#65758a}
+      .plan-image-placeholder small{font-size:9px;margin-top:5px;color:#98a2b3}
+      .plan-image-caption{font-size:9px;color:var(--muted);text-align:center;margin-top:6px;line-height:1.4}
+      .plan-selection-note{display:inline-block;margin-top:4px;color:#475467}
+      @media(max-width:1080px){
+        .plan-main{grid-template-columns:minmax(0,3fr) minmax(250px,2fr)}
+        .plan-copy ul{columns:1}
+      }
+      @media(max-width:720px){
+        #plan .plan-grid{gap:14px}
+        .plan-head{align-items:flex-start}
+        .plan-head h4{flex-direction:column;gap:3px}
+        .plan-level{font-size:17px}
+        .plan-cn-title{font-size:12px}
+        .plan-main{grid-template-columns:1fr;min-height:0}
+        .plan-copy{padding:13px 14px}
+        .plan-media{border-left:0;border-top:1px solid #edf0f4;padding:12px}
+        .plan-image-box{max-height:300px}
+        .plan-meta-row{grid-template-columns:78px 1fr}
+      }
+      @media(max-width:480px){
+        .plan-head{padding:10px 12px}
+        .plan-copy{padding:12px}
+        .plan-status-badge{padding:4px 7px;font-size:9px}
+      }
     `;document.head.appendChild(st);
   }
 
