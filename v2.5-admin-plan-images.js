@@ -51,7 +51,7 @@
       <div class="admin-plan-actions"><button type="button" class="btn secondary" data-upload="${level}">${url?'更换图片':'上传图片'}</button><button type="button" class="btn secondary" data-clear="${level}" ${url?'':'disabled'}>移除图片</button></div>
       <div class="admin-upload-state" data-state="${level}">${url?'已配置方案图':'未配置方案图'}</div>
       <div class="admin-plan-meta">
-        <label>大部件差异化方案<textarea data-major-components="${level}" placeholder="每行一条，例如：齿轮箱冷却外置&#10;发电机冷却内置&#10;主变采用闭式液冷">${esc(m.majorComponentPlan||'')}</textarea></label>
+        <label>大部件差异化配置<textarea data-major-components="${level}" placeholder="每行一条，例如：齿轮箱冷却外置&#10;发电机冷却内置&#10;主变采用闭式液冷">${esc(m.majorComponentPlan||'')}</textarea></label>
         <label>主要风险<textarea data-main-risk="${level}" placeholder="填写采用该档方案后仍需关注的主要风险">${esc(m.mainRisk||'')}</textarea></label>
         <label>方案定位<textarea data-positioning="${level}" placeholder="填写该档方案适用项目、核心价值和定位">${esc(m.positioning||'')}</textarea></label>
         <label>相对成本变化<input data-cost-change="${level}" value="${esc(m.costChange||'')}" placeholder="例如：基准、15%～25%、35%～55%"><div class="cost-hint">表示相对于 Standard 基准方案的技术方案增量成本参考，不代表整机总BOM增幅。</div></label>
@@ -71,7 +71,7 @@
   function mutate(level,key,value){
     const name=document.getElementById('sceneSelect').value,scene=workingScenarios[name];ensureFields(scene);
     if(key==='caption')scene.planImageCaptions[level]=value;else scene.planMeta[level][key]=value;
-    const label=key==='majorComponentPlan'?'大部件差异化方案':key==='mainRisk'?'主要风险':key==='positioning'?'方案定位':key==='costChange'?'相对成本变化':'方案图注';
+    const label=key==='majorComponentPlan'?'大部件差异化配置':key==='mainRisk'?'主要风险':key==='positioning'?'方案定位':key==='costChange'?'相对成本变化':'方案图注';
     markDirty(`${name} · ${level} · ${label} 已修改，尚未发布。`);
   }
 
