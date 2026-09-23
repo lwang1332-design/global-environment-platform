@@ -21,7 +21,7 @@
     const raw=m.majorComponentPlan??'';
     const items=(Array.isArray(raw)?raw:String(raw).split(/\r?\n/)).map(x=>String(x).trim()).filter(Boolean);
     return `<div class="plan-major">
-      <div class="plan-subtitle">大部件差异化方案</div>
+      <div class="plan-subtitle">大部件差异化配置</div>
       ${items.length?`<ul class="plan-major-list">${items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>`:'<div class="plan-empty-line">待管理员配置</div>'}
     </div>`;
   }
@@ -52,7 +52,7 @@
     $('planGrid').innerHTML=['Standard','Pro','Plus'].map(name=>{
       const recommended=name===r.name;
       const selected=selectedPlan===name;
-      const items=d?.plans?.[name]||[];
+      const items=Array.isArray(d?.plans?.[name])?d.plans[name]:[];
       return `<div class="plan plan-row ${recommended?'recommended':''} ${selected?'selected':''}">
         <div class="plan-head">
           <h4><span class="plan-level">${name.toUpperCase()}</span><span class="plan-cn-title">${PLAN_LABELS[name]||''}</span></h4>
@@ -79,7 +79,7 @@
       ? `当前人工选择 <b>${esc(selectedPlan)}</b>，系统推荐 <b>${r.name}</b> 保持不变；07 推荐升级包、08 Design Gap 和项目输出按当前人工选择方案继续计算。`
       : `当前主方案与系统推荐一致，为 <b>${r.name}</b>。`;
 
-    $('planReason').innerHTML=`推荐规则：项目环境最高需求 <b>${r.envCode}/3</b>，当前机组基础能力 <b>${r.machine}/3</b>，能力差 <b>${r.gap}</b> → 系统推荐 <b>${r.name}</b>。场景方案内容来自 <b>${esc(selectedScene)}</b> 技术货架。方案图、大部件差异化方案、方案定位和相对成本变化不参与 Standard / Pro / Plus 推荐算法；“主要风险”用于 07 升级包推荐评价，但不反向改变 06 三档方案推荐结果。<br><span class="plan-selection-note">${selectionNote}</span>`;
+    $('planReason').innerHTML=`推荐规则：项目环境最高需求 <b>${r.envCode}/3</b>，当前机组基础能力 <b>${r.machine}/3</b>，能力差 <b>${r.gap}</b> → 系统推荐 <b>${r.name}</b>。场景方案内容来自 <b>${esc(selectedScene)}</b> 技术货架。方案图、大部件差异化配置、方案定位和相对成本变化不参与 Standard / Pro / Plus 推荐算法；“主要风险”用于 07 升级包推荐评价，但不反向改变 06 三档方案推荐结果。<br><span class="plan-selection-note">${selectionNote}</span>`;
   };
 
   const previousSave=saveReportSnapshot;
@@ -138,9 +138,10 @@
       .plan-meta-row.cost b{display:inline-flex;justify-self:start;padding:3px 8px;border-radius:99px;background:#eef4ff;color:#1557d6;font-size:10px}
       .plan-radio-label{display:inline-flex;align-items:center;gap:7px;color:#475467;font-size:10px;font-weight:700;cursor:pointer;white-space:nowrap}
       .plan-radio-label input{width:auto;margin:0}
-      .plan-media{min-width:0;border-left:1px solid #edf0f4;padding:12px;display:flex;flex-direction:column;justify-content:stretch;background:#fbfcfe}
-      .plan-image-box{width:100%;height:100%;min-height:316px;border:1px solid var(--line);border-radius:9px;background:#f5f8fc;display:flex;align-items:center;justify-content:center;overflow:hidden}
-      .plan-image-box img{width:100%;height:100%;object-fit:contain;display:block;background:#fff}
+      .plan-media{min-width:0;min-height:0;border-left:1px solid #edf0f4;padding:0;display:flex;position:relative;align-self:stretch;background:#fbfcfe;overflow:hidden}
+      .plan-image-box{width:100%;min-width:0;min-height:0;flex:1;align-self:stretch;border:0;border-radius:0;background:#f5f8fc;display:flex;align-items:center;justify-content:center;overflow:hidden}
+      .plan-image-box img{width:100%;height:100%;min-height:100%;object-fit:contain;display:block;background:#fff}
+      .plan-image-caption{position:absolute;left:10px;right:10px;bottom:8px;margin:0!important;padding:4px 7px;border-radius:6px;background:rgba(255,255,255,.88);backdrop-filter:blur(2px)}
       .plan-image-placeholder{display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;color:var(--muted);padding:16px;min-height:100%;letter-spacing:.3px}
       .plan-image-placeholder b{font-size:11px;color:#65758a}
       .plan-image-placeholder small{font-size:9px;margin-top:5px;color:#98a2b3}
@@ -159,8 +160,8 @@
         .plan-cn-title{font-size:12px}
         .plan-main{grid-template-columns:1fr;min-height:0}
         .plan-copy{padding:13px 14px}
-        .plan-media{border-left:0;border-top:1px solid #edf0f4;padding:12px}
-        .plan-image-box{height:auto;min-height:0;aspect-ratio:4/3;max-height:320px}
+        .plan-media{border-left:0;border-top:1px solid #edf0f4;padding:0;display:block}
+        .plan-image-box{height:auto;min-height:0;aspect-ratio:4/3;max-height:none}
         .plan-meta-row{grid-template-columns:78px 1fr}
       }
       @media(max-width:480px){
