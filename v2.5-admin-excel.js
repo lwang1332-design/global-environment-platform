@@ -105,7 +105,7 @@ function parseWorkbook(){
 
  const plans=[];const planSeen=new Set();
  for(const r of r06){if(!enabled(get(r,'启用')))continue;const scene=txt(get(r,'场景'));if(!sceneSet.has(scene)){errors.push(`06 第${r.__row}行：未知场景“${scene||'空'}”`);continue}if(planSeen.has(scene))errors.push(`06：场景“${scene}”出现多行`);planSeen.add(scene);
-   plans.push({scene,Standard:splitMulti(get(r,'Standard')),Pro:splitMulti(get(r,'Pro')),Plus:splitMulti(get(r,'Plus')),planMeta:{Standard:{majorComponentPlan:txt(get(r,'Standard_大部件差异化方案','Standard大部件差异化方案')),mainRisk:txt(get(r,'Standard_主要风险','Standard主要风险')),positioning:txt(get(r,'Standard_方案定位','Standard方案定位')),costChange:txt(get(r,'Standard_成本变化','Standard成本变化'))},Pro:{majorComponentPlan:txt(get(r,'Pro_大部件差异化方案','Pro大部件差异化方案')),mainRisk:txt(get(r,'Pro_主要风险','Pro主要风险')),positioning:txt(get(r,'Pro_方案定位','Pro方案定位')),costChange:txt(get(r,'Pro_成本变化','Pro成本变化'))},Plus:{majorComponentPlan:txt(get(r,'Plus_大部件差异化方案','Plus大部件差异化方案')),mainRisk:txt(get(r,'Plus_主要风险','Plus主要风险')),positioning:txt(get(r,'Plus_方案定位','Plus方案定位')),costChange:txt(get(r,'Plus_成本变化','Plus成本变化'))}},row:r.__row});
+   plans.push({scene,Standard:splitMulti(get(r,'Standard')),Pro:splitMulti(get(r,'Pro')),Plus:splitMulti(get(r,'Plus')),planMeta:{Standard:{majorComponentPlan:txt(get(r,'Standard_大部件差异化配置','Standard大部件差异化配置','Standard_大部件差异化配置','Standard大部件差异化方案')),mainRisk:txt(get(r,'Standard_主要风险','Standard主要风险')),positioning:txt(get(r,'Standard_方案定位','Standard方案定位')),costChange:txt(get(r,'Standard_成本变化','Standard成本变化'))},Pro:{majorComponentPlan:txt(get(r,'Pro_大部件差异化配置','Pro大部件差异化配置','Pro_大部件差异化配置','Pro大部件差异化方案')),mainRisk:txt(get(r,'Pro_主要风险','Pro主要风险')),positioning:txt(get(r,'Pro_方案定位','Pro方案定位')),costChange:txt(get(r,'Pro_成本变化','Pro成本变化'))},Plus:{majorComponentPlan:txt(get(r,'Plus_大部件差异化配置','Plus大部件差异化配置','Plus_大部件差异化配置','Plus大部件差异化方案')),mainRisk:txt(get(r,'Plus_主要风险','Plus主要风险')),positioning:txt(get(r,'Plus_方案定位','Plus方案定位')),costChange:txt(get(r,'Plus_成本变化','Plus成本变化'))}},row:r.__row});
  }
  for(const scene of scenes)if(!planSeen.has(scene))errors.push(`06：缺少场景“${scene}”的 Standard / Pro / Plus 方案行`);
 
@@ -152,7 +152,7 @@ function flattenCfg(cfg){
    for(const level of ['Standard','Pro','Plus']){
      ((d.plans||{})[level]||[]).forEach(x=>out.plan.set(`${scene}|${level}|${x}`,''));
      const m=d.planMeta?.[level]||{};
-     if(m.majorComponentPlan)out.plan.set(`${scene}|${level}|大部件差异化方案`,m.majorComponentPlan);
+     if(m.majorComponentPlan)out.plan.set(`${scene}|${level}|大部件差异化配置`,m.majorComponentPlan);
      if(m.mainRisk)out.plan.set(`${scene}|${level}|主要风险`,m.mainRisk);
      if(m.positioning)out.plan.set(`${scene}|${level}|方案定位`,m.positioning);
      if(m.costChange)out.plan.set(`${scene}|${level}|成本变化`,m.costChange);
@@ -186,7 +186,7 @@ function exportExcel(){
  try{ensureXlsx();const cfg=compose(),wb=XLSX.utils.book_new();const dRows=[],rRows=[],pRows=[];(Object.entries(cfg.scenarios||{})).forEach(([scene,d])=>{(d.demands||[]).forEach((x,i)=>dRows.push([`DMD`,scene,i+1,x[0],x[1],typeCn(x[2]),x[2],'是','']));for(const [type,arr] of Object.entries(d.reqs||{}))(arr||[]).forEach((x,i)=>rRows.push(['REQ',scene,typeCn(type),type,i+1,x,'是','']));pRows.push(['PLN',scene,(d.plans?.Standard||[]).join('\n'),(d.plans?.Pro||[]).join('\n'),(d.plans?.Plus||[]).join('\n'),d.planMeta?.Standard?.majorComponentPlan||'',d.planMeta?.Standard?.mainRisk||'',d.planMeta?.Standard?.positioning||'',d.planMeta?.Standard?.costChange||'',d.planMeta?.Pro?.majorComponentPlan||'',d.planMeta?.Pro?.mainRisk||'',d.planMeta?.Pro?.positioning||'',d.planMeta?.Pro?.costChange||'',d.planMeta?.Plus?.majorComponentPlan||'',d.planMeta?.Plus?.mainRisk||'',d.planMeta?.Plus?.positioning||'',d.planMeta?.Plus?.costChange||'','是',''])});const kRows=(cfg.packages||[]).map((p,i)=>['PKG',i+1,p[0],p[1],p[2],(p[3]||[]).map(typeCn).join('、'),(p[3]||[]).join(','),'是','']);
    XLSX.utils.book_append_sheet(wb,aoaSheet('04 客户核心诉求',['记录ID','场景','场景内序号','客户诉求标题','客户语言描述','类型中文','类型代码','启用','备注'],dRows),'04_客户诉求');
    XLSX.utils.book_append_sheet(wb,aoaSheet('05 产品设计需求',['记录ID','场景','类型中文','类型代码','类型内序号','设计需求 / 验证要求','启用','备注'],rRows),'05_设计需求');
-   XLSX.utils.book_append_sheet(wb,aoaSheet('06 场景方案',['记录ID','场景','Standard','Pro','Plus','Standard_大部件差异化方案','Standard_主要风险','Standard_方案定位','Standard_成本变化','Pro_大部件差异化方案','Pro_主要风险','Pro_方案定位','Pro_成本变化','Plus_大部件差异化方案','Plus_主要风险','Plus_方案定位','Plus_成本变化','启用','备注'],pRows),'06_场景方案');
+   XLSX.utils.book_append_sheet(wb,aoaSheet('06 场景方案',['记录ID','场景','Standard','Pro','Plus','Standard_大部件差异化配置','Standard_主要风险','Standard_方案定位','Standard_成本变化','Pro_大部件差异化配置','Pro_主要风险','Pro_方案定位','Pro_成本变化','Plus_大部件差异化配置','Plus_主要风险','Plus_方案定位','Plus_成本变化','启用','备注'],pRows),'06_场景方案');
    XLSX.utils.book_append_sheet(wb,aoaSheet('07 升级包',['记录ID','排序','升级包名称','适用风险 / 触发条件','具体措施','触发类型中文','触发类型代码','启用','备注'],kRows),'07_升级包');
    const dict=[['场景名称','', '类型代码','类型中文'],...scenarioNames().map((s,i)=>[s,'',Object.keys(TYPE_LABELS)[i]||'',Object.values(TYPE_LABELS)[i]||''])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dict),'99_字典');
    XLSX.writeFile(wb,`环境技术货架_04-07_${cloudRow?.version||'draft'}.xlsx`);
