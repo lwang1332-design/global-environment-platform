@@ -105,7 +105,7 @@ const root=document.getElementById('envGrid');if(!root)return;root.className='en
 const vals=merged(),groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
 root.innerHTML=groups.map(g=>{
  const p=g[0],active=g.filter(x=>x.record.value!==null).length;
- const cKey=mainLabels[p.group],risk=active&&Number.isFinite(env[cKey])?riskLevel(cKey):null;
+ const cKey=mainLabels[p.group],risk=p.record.value!==null&&typeof p.record.value==='number'&&Number.isFinite(env[cKey])?riskLevel(cKey):null;
  const status=risk===3?'高风险':risk===2?'中风险':risk===1?'低风险':'待评价';
  const row=x=>'<div class="ev3-item" title="'+escape([x.record.source,x.record.period,x.record.rule].filter(Boolean).join(' | '))+'"><span>'+escape(x.name)+'</span><b>'+escape(unitValue(x.record.value,x.unit))+'</b></div>';
  return '<article class="ev3-card"><div class="ev3-header"><b>'+escape(p.group)+'</b><span class="ev3-risk">'+status+'</span></div><div class="ev3-number">'+escape(unitValue(p.record.value,p.unit))+'</div><div class="ev3-caption">'+escape(p.name)+'</div><div class="ev3-details">'+g.slice(1).map(row).join('')+'</div><div class="ev3-foot">'+active+'/5 有数据 · '+escape(p.record.quality)+' · '+escape(p.record.source)+'</div></article>'
