@@ -2,6 +2,9 @@
 (function(){
 'use strict';
 const FIELDS=[["温度","极端高温","℃","t99","ERA5"],["温度","极端低温","℃","tmin","ERA5"],["温度","平均温度","℃"],["温度","日温差P95","K"],["温度","温变速率P95","K/h"],["湿度","RH均值","%","rhAvg","ERA5"],["湿度","RH>80%时长","h/y"],["湿度","凝露概率","%"],["湿度","凝露时长","h/y"],["湿度","最大连续凝露","h"],["风速","年平均风速","m/s"],["风速","风速P99","m/s"],["风速","年强阵风事件频次","次/y"],["风速","风速–降雨联合时长","h/y"],["风速","风速–沙尘联合时长","h/y"],["降雨","年降雨量","mm/y","rainYear","ERA5"],["降雨","强降雨最大日值","mm/d"],["降雨","P99小时降雨","mm/h"],["降雨","风驱雨联合指数P99","mm·m/(h·s)"],["降雨","最长连续降雨时长","h"],["盐雾","盐沉积","mg/(m²·d)"],["盐雾","盐气溶胶P95","μg/m³"],["盐雾","湿盐膜/TOW","%"],["盐雾","海盐腐蚀风险","分(0–100)"],["盐雾","环境腐蚀等级","类别（C2/C3/C4/C5/CX）"],["沙尘","PM10 P95","μg/m³"],["沙尘","PM2.5 P95","μg/m³"],["沙尘","矿物沙尘浓度P95（Dust）","μg/m³"],["沙尘","年均沙尘暴频次","次/y"],["沙尘","年沙尘暴持续时间","h/y"],["冰雪","最大积雪深度","cm"],["冰雪","降雪最大日值","cm/d"],["冰雪","年降雪小时数","h/y","snowHours","ERA5"],["冰雪","年冻融循环次数","次/y"],["冰雪","年积雪覆盖天数","d/y"],["海拔","海拔","m","alt","DEM"],["海拔","年平均大气压力","kPa"],["海拔","最低大气压力","kPa"],["海拔","年平均空气密度","kg/m³"],["海拔","最低空气密度","kg/m³"],["有害气体","SO₂浓度","μg/m³","so2","CAMS"],["有害气体","H₂S浓度","μg/m³"],["有害气体","Cl₂浓度","μg/m³"],["有害气体","NO₂浓度","μg/m³"],["有害气体","NH₃浓度","μg/m³"],["其它环境","周围植被类型","类别（可附占比%）"],["其它环境","太阳辐照","W/m²","rad95","ERA5"],["其它环境","台风","次/y"],["其它环境","雷电","次/(km²·y)"],["其它环境","生物","无量纲"]];
+const CATALOG_VERSION='3.2.0';
+const METRIC_CATALOG=Object.freeze(FIELDS.map((x,i)=>Object.freeze({id:'EA'+String(i+1).padStart(2,'0'),index:i+1,group:x[0],name:x[1],unit:x[2],legacyKey:x[3]||null,defaultSource:x[4]||'专项数据或模型',version:CATALOG_VERSION})));
+window.EA_METRIC_CATALOG=METRIC_CATALOG;
 const STORAGE='ea-health-v3-verified';
 const valid=x=>typeof x==='number'&&Number.isFinite(x);
 const q=(a,p)=>{const z=(a||[]).filter(valid).sort((x,y)=>x-y);if(!z.length)return null;const t=(z.length-1)*p,k=Math.floor(t);return z[k]+(z[Math.min(k+1,z.length-1)]-z[k])*(t-k)};
@@ -102,10 +105,10 @@ function stored(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||'{}');re
 function merged(){const overrides=stored(),out={};for(let i=1;i<=50;i++)out[i]=overrides[i]?{...overrides[i],quality:'人工验证'}:(records[i]||{value:null,source:'待接入',rule:'尚无可信来源',quality:'专项缺口'});return out}
 function draw(){
 const root=document.getElementById('envGrid');if(!root)return;root.className='env-health-v3';
-const vals=merged();window.envHealthV31={version:'3.1',createdAt:new Date().toISOString(),context:loc(),fields:FIELDS.map((d,i)=>({id:i+1,group:d[0],name:d[1],unit:d[2],...(vals[i+1]||{})}))};const groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
+const vals=merged();window.envHealthV31={version:CATALOG_VERSION,createdAt:new Date().toISOString(),context:loc(),fields:METRIC_CATALOG.map((d,i)=>({...d,...(vals[i+1]||{}),riskStatus:(vals[i+1]?.value===null||vals[i+1]?.value===undefined)?'UNKNOWN':'UNRATED'}))};const groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
 root.innerHTML=groups.map(g=>{
  const p=g[0],active=g.filter(x=>x.record.value!==null).length;
- const cKey=mainLabels[p.group],risk=p.record.value!==null&&typeof p.record.value==='number'&&Number.isFinite(env[cKey])?riskLevel(cKey):null;
+ const cKey=mainLabels[p.group],risk=p.record.value!==null&&typeof p.record.value==='number'&&Number.isFinite(env[cKey])&&!window.__envMissing?.has(cKey)?riskLevel(cKey):null;
  const status=risk===3?'高风险':risk===2?'中风险':risk===1?'低风险':'待评价';
  const row=x=>'<div class="ev3-item" title="'+escape([x.record.source,x.record.period,x.record.rule].filter(Boolean).join(' | '))+'"><span>'+escape(x.name)+'</span><b>'+escape(unitValue(x.record.value,x.unit))+'</b></div>';
  return '<article class="ev3-card"><div class="ev3-header"><b>'+escape(p.group)+'</b><span class="ev3-risk">'+status+'</span></div><div class="ev3-number">'+escape(unitValue(p.record.value,p.unit))+'</div><div class="ev3-caption">'+escape(p.name)+'</div><div class="ev3-details">'+g.slice(1).map(row).join('')+'</div><div class="ev3-foot">'+active+'/5 有数据 · '+escape(p.record.quality)+' · '+escape(p.record.source)+'</div></article>'
