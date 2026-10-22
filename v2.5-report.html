@@ -21,6 +21,13 @@ const diag=s.environmentDiagnostic,assurance=s.assurance||{};
 const extra=diag?'<div class="page"><div class="sec"><h2>附录B｜50项环境诊断溯源（V3.1）</h2><p>每项记录原始来源、统计期、评价说明；空值表示缺少可信数据，不视为零风险。</p>'+
 tbl(['编号','类别','参数','数据/单位','来源与统计期'],diag.fields.map(x=>[String(x.id).padStart(2,'0'),esc(x.group),esc(x.name),x.value===null||x.value===undefined?'待评价':esc(String(x.value)+' '+x.unit),esc((x.source||'—')+' · '+(x.period||'—'))]),['7%','16%','23%','24%','30%'])+
 '<h2>算法与能力验证说明</h2><p>'+esc(assurance.gapCaveat||'')+'</p><p>'+esc(assurance.statistics||'')+'</p><p>缺少输入：'+esc((assurance.missingLegacyFields||[]).join('、')||'无记录')+'</p></div></div>':'';
-document.getElementById('report').innerHTML=cover+page1+page2+page3+page4+extra;
+const integrity=s.integrity||{},trace=s.requirementTrace||[];
+const cross='<div class="page"><div class="sec"><h2>附录C｜环境风险、设计要求与工程验证追溯</h2>'+
+'<p>计算规则及数据源版本：'+esc(s.metricCatalogVersion||'待接入')+'；报告生成时间：'+esc(s.generatedAt||'—')+'</p>'+
+'<p>数据完整性：'+(integrity.unknown?'<strong style="color:#b91c1c">存在关键参数待评价</strong>':'已完成本次接口数据检查，仍需工程复核')+'</p>'+
+'<p>未获取关键指标：'+esc((integrity.missingNames||[]).join('、')||'无')+'</p>'+
+tbl(['设计要求ID','业务来源','环境/风险证据','设计要求','验证状态'],trace.map(x=>[esc(x.id),esc(x.source),esc(x.evidence),esc(x.requirement),esc(x.verificationStatus)+'｜'+esc(x.verification)]),['9%','22%','24%','29%','16%'])+
+'<div class="footer-note">说明：场景匹配概率不等于设计可靠度；未记录能力参数与试验批准的升级措施不应抵消剩余Design Gap。UNKNOWN和UNRATED不表示低风险。</div></div></div>';
+document.getElementById('report').innerHTML=cover+page1+page2+page3+page4+extra+cross;
 }
 </script></body></html>
