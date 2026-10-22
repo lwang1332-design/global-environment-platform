@@ -106,7 +106,7 @@ function stored(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||'{}');re
 function merged(){const overrides=stored(),out={};for(let i=1;i<=50;i++)out[i]=overrides[i]?{...overrides[i],quality:'人工验证'}:(records[i]||{value:null,source:'待接入',rule:'尚无可信来源',quality:'专项缺口'});return out}
 function draw(){
 const root=document.getElementById('envGrid');if(!root)return;root.className='env-health-v3';
-const vals=merged();window.envHealthV31={version:CATALOG_VERSION,createdAt:new Date().toISOString(),context:loc(),fields:METRIC_CATALOG.map((d,i)=>({...d,...(vals[i+1]||{}),riskStatus:(vals[i+1]?.value===null||vals[i+1]?.value===undefined)?'UNKNOWN':'UNRATED'}))};const groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
+const vals=merged();window.envHealthV31={version:CATALOG_VERSION,createdAt:new Date().toISOString(),context:loc(),fields:METRIC_CATALOG.map((d,i)=>({...d,...(vals[i+1]||{}),riskStatus:(vals[i+1]?.value===null||vals[i+1]?.value===undefined||window.__envMissing?.has(d.legacyKey))?'UNKNOWN':(d.legacyKey&&riskRules[d.legacyKey]?(riskLevel(d.legacyKey)===3?'HIGH':riskLevel(d.legacyKey)===2?'MEDIUM':'LOW'):'UNRATED'),riskRuleSource:d.legacyKey&&riskRules[d.legacyKey]?'管理员配置风险阈值':'无已验证风险阈值'}))};const groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
 root.innerHTML=groups.map(g=>{
  const p=g[0],active=g.filter(x=>x.record.value!==null).length;
  const cKey=mainLabels[p.group],risk=p.record.value!==null&&typeof p.record.value==='number'&&Number.isFinite(env[cKey])&&!window.__envMissing?.has(cKey)?riskLevel(cKey):null;
