@@ -18,11 +18,26 @@ const loc=()=>[document.getElementById('lat')?.value,document.getElementById('lo
 const add=(i,v,source,rule,quality='计算',period='项目统计期')=>{
   records[i]={value:valid(v)?v:(typeof v==='string'?v:null),source,rule,quality,period};
 };
+/* ERA5-Land supplementary series are optional; failure must not block primary ERA5. */
+const oldWeather=loadWeather;
+loadWeather=async function(lat,lon,years){
+ const base=await oldWeather(lat,lon,years);
+ try{
+  const u='https://archive-api.open-meteo.com/v1/archive?latitude='+encodeURIComponent(lat)+'&longitude='+encodeURIComponent(lon)+'&start_date='+base.start+'&end_date='+base.end+'&hourly=snow_depth,wind_gusts_10m&wind_speed_unit=ms&timezone=UTC&models=era5_land';
+  const response=await fetch(u);if(!response.ok)throw Error('HTTP '+response.status);
+  const data=await response.json();if(data.error)throw Error(data.reason||'ERA5-Land error');
+  const depth=data.hourly?.snow_depth||[],gust=data.hourly?.wind_gusts_10m||[];
+  if(depth.length===base.h.temperature_2m.length)base.h.snow_depth=depth;
+  if(gust.length===base.h.temperature_2m.length)base.h.wind_gusts_10m=gust;
+  base.secondaryStatus='ERA5-Land补充成功';
+ }catch(e){base.secondaryStatus='ERA5-Land补充失败：'+e.message;console.warn(base.secondaryStatus)}
+ return base;
+};
 const oldDerive=derive;
 derive=function(h,a,elev){
  oldDerive(h,a,elev);
  records={};lastContext=loc();
- const T=h.temperature_2m||[],RH=h.relative_humidity_2m||[],P=h.precipitation||[],W=h.wind_speed_10m||[],G=h.wind_gusts_10m||[],SF=h.snowfall||[],SD=h.snow_depth||[],WC=h.weather_code||[],BP=h.surface_pressure||[],RAD=h.shortwave_radiation||[],D=h.dew_point_2m||[];
+ const T=h.temperature_2m||[],RH=h.relative_humidity_2m||[],P=h.precipitation||[],RAIN=h.rain||[],W=h.wind_speed_10m||[],G=h.wind_gusts_10m||[],SF=h.snowfall||[],SD=h.snow_depth||[],WC=h.weather_code||[],BP=h.surface_pressure||[],RAD=h.shortwave_radiation||[],D=h.dew_point_2m||[];
  const n=T.length,period='ERA5选定统计期',aPeriod='CAMS最近90天';
  let diff=[];for(let i=1;i<n;i++)if(valid(T[i])&&valid(T[i-1]))diff.push(Math.abs(T[i]-T[i-1]));
  add(1,q(days(T,z=>max(z)),.99),'ERA5','逐日最高气温P99','再分析',period);
@@ -39,7 +54,7 @@ derive=function(h,a,elev){
  const joint=(pred)=>{let total=0,yes=0;for(let i=0;i<n;i++)if(valid(W[i])&&valid(P[i])){total++;if(pred(i))yes++}return ann(yes,total)};
  add(14,joint(i=>W[i]>=12&&P[i]>=0.1),'ERA5','同期风速≥12m/s且小时降水≥0.1mm；工程筛查口径','代理',period);
  add(15,null,'需同期风沙历史数据','CAMS近90天不与ERA5多年逐时强制拼接','专项缺口');
- add(16,ann(P.filter(valid).reduce((s,x)=>s+x,0),P.filter(valid).length),'ERA5','统计期逐小时降雨量折合年值','再分析',period);
+ add(16,ann(RAIN.filter(valid).reduce((s,x)=>s+x,0),RAIN.filter(valid).length),'ERA5','统计期逐小时降雨量折合年值','再分析',period);
  add(17,max(days(P,z=>z.reduce((s,x)=>s+x,0))),'ERA5','逐日降水量最大值','再分析',period);
  add(18,q(P,.99),'ERA5','全小时样本（含无雨小时）降雨量P99','再分析',period);
  const wr=[];for(let i=0;i<n;i++)if(valid(W[i])&&valid(P[i]))wr.push(W[i]*P[i]);
@@ -79,7 +94,7 @@ derive=function(h,a,elev){
  add(49,null,'需雷电密度数据','雷击密度需专业闪电定位资料','专项缺口');
  add(50,null,'需生物专项调查','需定义昆虫鸟类、藻菌或生物附着场景','专项缺口');
  // Legacy consumers remain on their existing keyed variables; only correct matching fields with equivalent semantics.
- if(valid(records[1].value))env.t99=records[1].value;
+ // Do not mutate legacy scenario engine inputs (03-10 remain on their original definitions).
 };
 const mainLabels={'温度':'t99','湿度':'rhAvg','风速':'wind95','降雨':'rainYear','盐雾':'salt','沙尘':'pm10','冰雪':'snowHours','海拔':'alt','有害气体':'so2','其它环境':'rad95'};
 const unitValue=(v,unit)=>v==null?'—':typeof v==='string'?v:((Math.abs(v)<1&&v!==0?v.toFixed(3):v.toFixed(1)).replace(/\.0$/,''))+' '+unit;
