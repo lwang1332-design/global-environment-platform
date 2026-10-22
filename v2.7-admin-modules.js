@@ -3,7 +3,7 @@
 const groups=['总体架构与热管理','环境隔离与防护','湿度与凝露控制','低温防护与防冰','腐蚀与材料防护','特殊环境专项防护','智能监测与环境控制'];
 const ids=['planStandard','planPro','planPlus'];
 const test=[/监测|预警|传感|智能|在线|远程|控制/,/防雨|防水|防尘|密封|过滤|百叶|排水|迷宫|IPX/,/凝露|露点|湿度|除湿|防潮|干燥/,/低温|防冰|结冰|伴热|防冻|融冰|预热|加热|保温/,/盐雾|腐蚀|防腐|涂层|耐蚀|不锈钢|C5|CX/,/沙尘|沙蚀|高海拔|低气压|紫外|台风|雷电|生物|防霉/];
-function classify(t){const m=t.match(/^\[(0[1-7])\]\s*/);if(m)return +m[1]-1;for(const j of [0,4,5,2,3,1])if(test[j].test(t))return [6,1,2,3,4,5][j];return 0}
+function classify(t){const m=t.match(/^\[(0[1-7])\]\s*/);if(m)return +m[1]-1;for(const j of [0,4,5,2,3,1])if(test[j].test(t))return [6,4,5,2,3,1][j];return 0}
 const host=document.getElementById('planStandard')?.closest('.card');if(!host)return;
 const panel=document.createElement('div');panel.id='adminSevenModules';panel.innerHTML='<h4 style="margin:12px 0 8px;color:#0b2548">核心技术配置 · 七模块编辑</h4><p class="note">选择方案后逐模块编辑，每行一条措施。自动与上方原方案文本同步；保存场景和云端发布方式不变。</p><div style="display:flex;gap:12px;align-items:center;margin:8px 0"><label>方案 <select id="moduleTier"><option value="planStandard">Standard</option><option value="planPro">Pro</option><option value="planPlus">Plus</option></select></label><span id="moduleCount" style="color:#667085;font-size:11px"></span></div><div id="moduleGrid" class="admin-module-grid"></div>';
 const toolbar=host.querySelector('.toolbar');host.insertBefore(panel,toolbar);
