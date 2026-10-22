@@ -112,11 +112,17 @@
 
   function planCapabilities(domain,need,current){
     if(domain.name==='维护性'){
-      return {Standard:current,Pro:need>=2?Math.min(3,current+1):current,Plus:3};
+      return {Standard:current,Pro:current,Plus:current};
     }
-    const standard=need>=2?Math.max(current,2):current;
-    const pro=need>=2?Math.max(current,3):current;
-    return {Standard:Math.min(3,standard),Pro:Math.min(3,pro),Plus:3};
+    // Unverified scheme names do not provide engineering capability by themselves.
+    const meta=getScenario(selectedScene)?.planMeta||{};
+    const ver=level=>{
+      const byDomain=meta[level]?.verifiedCapabilities;
+      const v=byDomain&&byDomain[domain.name];
+      return v&&v.approved===true&&Number.isFinite(Number(v.level))
+        ?Math.max(current,Math.min(3,Number(v.level))):current;
+    };
+    return {Standard:ver('Standard'),Pro:ver('Pro'),Plus:ver('Plus')};
   }
 
   // "场景包" is the capability contribution of the upgrade packages actually checked in 07.
@@ -128,7 +134,7 @@
       if(types.some(t=>domain.types.includes(t)))hit=true;
       if(domain.name==='维护性'&&/维护|过滤|寿命|少维护/.test(`${p[0]||''} ${p[1]||''} ${p[2]||''}`))hit=true;
     });
-    return hit?1:0;
+    return 0; // Selected upgrade packages need verified domain capability before reducing Gap.
   }
 
   gapRows=function(){
@@ -181,7 +187,7 @@
       let note=card.querySelector('.gap-core-explain');
       if(!note){note=document.createElement('div');note.className='gap-core-explain';card.appendChild(note)}
       const rec=typeof recommendedPlan==='function'?recommendedPlan().name:selectedPlan;
-      note.innerHTML=`<b>Design Gap 决策：</b>在当前已勾选场景包下，Standard 总缺口 <b>${tot.Standard}</b>，Pro 总缺口 <b>${tot.Pro}</b>，Plus 总缺口 <b>${tot.Plus}</b>。系统推荐 <b>${esc(rec)}</b>，当前选择 <b>${esc(selectedPlan)}</b>。对比矩阵直接回答“当前机组缺什么、Pro为什么合适、还需要哪些场景包补齐”。`;
+      note.innerHTML=`<b>Design Gap 决策：</b>在当前已勾选场景包下，Standard 总缺口 <b>${tot.Standard}</b>，Pro 总缺口 <b>${tot.Pro}</b>，Plus 总缺口 <b>${tot.Plus}</b>。系统推荐 <b>${esc(rec)}</b>，当前选择 <b>${esc(selectedPlan)}</b>。对比矩阵直接回答“当前机组缺什么、哪些能力已经验证，以及尚缺哪些证据”。`;
     }
     return rows;
   };
