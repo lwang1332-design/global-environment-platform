@@ -59,10 +59,22 @@ function derive(h,air,elev){
 
 function riskLevel(metric){const r=riskRules[metric];if(!r)return 1;const v=Number(env[metric]||0);if(r.direction==='low')return v<=Number(r.high)?3:v<=Number(r.medium)?2:1;return v>=Number(r.high)?3:v>=Number(r.medium)?2:1}
 function renderEnv(){
-  const defs=[['P99最高气温','t99','ERA5'],['极端最低气温','tmin','ERA5'],['年均相对湿度','rhAvg','ERA5'],['RH>90%','rh90','ERA5'],['年降水量','rainYear','ERA5'],['最大1h降水','rain1h','ERA5'],['海拔','alt','DEM'],['PM10均值','pm10','CAMS'],['Dust均值','dust','CAMS'],['Sea Salt Aerosol','salt','CAMS'],['SO₂均值','so2','CAMS'],['年降雪小时','snowHours','ERA5'],['P95风速','wind95','ERA5'],['P95太阳辐射','rad95','ERA5']];
-  $('envGrid').innerHTML=defs.map(d=>{const r=riskLevel(d[1]),cl=r===3?'r-high':r===2?'r-mid':'r-low',v=env[d[1]]||0,unit=riskRules[d[1]]?.unit||({rhAvg:'%',}[d[1]]||'');return `<div class="metric"><small>${d[0]}</small><b>${Math.round(v*10)/10} ${unit}</b><em class="${cl}">${r===3?'高':r===2?'中':'低'}风险 · ${d[2]}</em></div>`}).join('')
+  // 50项参数名称、一级分类及单位按《环境数据50项_修订版》维护；仅更换02模块展示。
+  const defs=[["温度","极端高温","℃","t99","ERA5"],["温度","极端低温","℃","tmin","ERA5"],["温度","平均温度","℃"],["温度","日温差P95","K"],["温度","温变速率P95","K/h"],["湿度","RH均值","%","rhAvg","ERA5"],["湿度","RH>80%时长","h/y"],["湿度","凝露概率","%"],["湿度","凝露时长","h/y"],["湿度","最大连续凝露","h"],["风速","年平均风速","m/s"],["风速","风速P99","m/s"],["风速","年强阵风事件频次","次/y"],["风速","风速–降雨联合时长","h/y"],["风速","风速–沙尘联合时长","h/y"],["降雨","年降雨量","mm/y","rainYear","ERA5"],["降雨","强降雨最大日值","mm/d"],["降雨","P99小时降雨","mm/h"],["降雨","风驱雨联合指数P99","mm·m/(h·s)"],["降雨","是否有冻雨（建议删除）","是/否/未知"],["盐雾","盐沉积","mg/(m²·d)"],["盐雾","盐气溶胶P95","μg/m³"],["盐雾","湿盐膜/TOW","%"],["盐雾","海盐腐蚀风险","分(0–100)"],["盐雾","环境腐蚀等级","类别（C2/C3/C4/C5/CX）"],["沙尘","PM10 P95","μg/m³"],["沙尘","PM2.5 P95","μg/m³"],["沙尘","矿物沙尘浓度P95（Dust）","μg/m³"],["沙尘","年均沙尘暴频次","次/y"],["沙尘","年沙尘暴持续时间","h/y"],["冰雪","最大积雪深度","cm"],["冰雪","降雪最大日值","cm/d"],["冰雪","年降雪小时数","h/y","snowHours","ERA5"],["冰雪","年冻融循环次数","次/y"],["冰雪","冻雨年发生频次","次/y"],["海拔","海拔","m","alt","DEM"],["海拔","年平均大气压力","kPa"],["海拔","最低大气压力","kPa"],["海拔","年平均空气密度","kg/m³"],["海拔","最低空气密度","kg/m³"],["有害气体","SO₂浓度","μg/m³","so2","CAMS"],["有害气体","H₂S浓度","μg/m³"],["有害气体","Cl₂浓度","μg/m³"],["有害气体","NO₂浓度","μg/m³"],["有害气体","NH₃浓度","μg/m³"],["其它环境","周围植被类型","类别（可附占比%）"],["其它环境","太阳辐照","W/m²","rad95","ERA5"],["其它环境","台风","次/y"],["其它环境","雷电","次/(km²·y)"],["其它环境","生物","无量纲"]];
+  let lastGroup='';
+  $('envGrid').innerHTML=defs.map((d,i)=>{
+    const [group,name,unit,key,source]=d;
+    let header='';
+    if(group!==lastGroup){lastGroup=group;header=`<div style="grid-column:1/-1;font-weight:700;color:#0b2548;border-bottom:1px solid #dde4ee;padding:9px 0 5px;margin-top:6px">${group}</div>`;}
+    const raw=key?env[key]:undefined;
+    const valid=raw!==null&&raw!==undefined&&raw!==''&&Number.isFinite(Number(raw));
+    const value=valid?(Math.round(Number(raw)*10)/10)+' '+unit:'暂无数据';
+    const r=valid&&key?riskLevel(key):null;
+    const cl=r===3?'r-high':r===2?'r-mid':'r-low';
+    const note=valid&&key?`${r===3?'高':r===2?'中':'低'}风险 · ${source||'数据源'}`:'未接入 / 待统计';
+    return header+`<div class="metric"><small>${String(i+1).padStart(2,'0')} · ${name}</small><b>${value}</b><em class="${valid?cl:''}">${note}</em></div>`;
+  }).join('');
 }
-
 function calcScene(name,items){const score=Math.round(weighted(items));const basis=[...items].sort((a,b)=>(b.v*b.w)-(a.v*a.w)).slice(0,3).map(x=>`${x.label} ${Math.round(x.v)}%`).join('；');return{name,score:clamp(score),basis}}
 function sceneScores(){
   const e=env,mt=$('machineType').value;
