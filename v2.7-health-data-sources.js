@@ -99,8 +99,11 @@ renderEnv=function(){
    }else missingN++;
   });
   const big=card.querySelector('.health-main'),sub=card.querySelector('.health-sub');
-  if(firstKnown){big.textContent=firstKnown.value;sub.textContent=firstKnown.name}
-  else{big.textContent='待接入';sub.textContent='无可用数据'}
+  // The first parameter is always the primary; the other four are secondary.
+  const first=defs[0],firstImported=values[first.id],firstRow=rows[0];
+  big.textContent=firstImported?firstImported.value+' '+first.d[2]:(firstRow?.querySelector('b')?.textContent||'待接入');
+  sub.textContent=first.d[1];
+  if(firstRow)firstRow.remove();
   const foot=card.querySelector('.health-foot');foot.textContent=numberKnown+'/5 项可用 · '+(numberKnown===0?'尚无可信数据':'含公开资料计算/专项录入');
   if(numberKnown)ready+=numberKnown;
  });
@@ -108,3 +111,6 @@ renderEnv=function(){
  if(indicator)indicator.textContent='可用 '+ready+'/50 项（公开数据 '+model+' 项、专项录入 '+external+' 项），待接入 '+missingN+' 项';
 };
 })();
+
+/* Desktop: two rows of five cards. Responsive at narrower widths. */
+(function(){const style=document.createElement('style');style.textContent='#envGrid.health-card-grid{grid-template-columns:repeat(5,minmax(0,1fr))}#envGrid .health-rows{grid-template-columns:1fr;gap:8px}#envGrid .health-card{padding:13px 12px}#envGrid .health-main{overflow-wrap:anywhere;font-size:19px}@media(max-width:1250px){#envGrid.health-card-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:850px){#envGrid.health-card-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:570px){#envGrid.health-card-grid{grid-template-columns:1fr}}';document.head.appendChild(style)})();
