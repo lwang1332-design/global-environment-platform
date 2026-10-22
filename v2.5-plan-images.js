@@ -55,6 +55,7 @@
   ];
   function moduleIndex(value){
     const t=String(value||'');
+    const explicit=t.match(/^\s*\[(0[1-7])\]/);if(explicit)return Number(explicit[1])-1;
     if(/监测|预警|传感|智能|联动|控制策略|远程|预测|在线监控|状态诊断|数据采集|压差监控/.test(t))return 6;
     if(/盐雾|腐蚀|防腐|涂层|耐蚀|不锈钢|镀锌|异种金属|材料防护|C5|CX|防锈/.test(t))return 4;
     if(/沙尘|沙蚀|防沙|高海拔|低气压|紫外|UV|台风|雷电|防雷|防霉|霉菌|生物|暴雪|风吹雪|特殊环境/.test(t))return 5;
@@ -65,7 +66,7 @@
   }
   function coreTechTable(items){
     const groups=TECH_MODULES.map(()=>[]);
-    (items||[]).forEach(item=>groups[moduleIndex(item)].push(String(item)));
+    (items||[]).forEach(item=>groups[moduleIndex(item)].push(String(item).replace(/^\s*\[0[1-7]\]\s*/,'')));
     return '<div class="core-tech-table-wrap"><table class="core-tech-table"><thead><tr><th>编号</th><th>技术模块</th><th>方案配置</th></tr></thead><tbody>'+
       TECH_MODULES.map(([num,module],i)=>'<tr><td class="core-tech-num">'+num+'</td><td class="core-tech-module">'+esc(module)+'</td><td class="core-tech-details">'+(groups[i].length?groups[i].map(x=>'<div class="core-tech-line">• '+esc(x)+'</div>').join(''):'<span class="core-tech-none">—</span>')+'</td></tr>').join('')+
       '</tbody></table></div>';
