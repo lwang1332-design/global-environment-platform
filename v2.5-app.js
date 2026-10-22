@@ -28,8 +28,8 @@ async function locate(name){name=String(name||'').trim();if(!name)throw Error('�
 
 async function loadWeather(lat,lon,years){
   const end=new Date();end.setUTCDate(end.getUTCDate()-10);const start=new Date(end);start.setUTCFullYear(start.getUTCFullYear()-years);
-  const vars='temperature_2m,relative_humidity_2m,precipitation,rain,snowfall,wind_speed_10m,shortwave_radiation';
-  const merged={temperature_2m:[],relative_humidity_2m:[],precipitation:[],rain:[],snowfall:[],wind_speed_10m:[],shortwave_radiation:[]};
+  const vars='temperature_2m,relative_humidity_2m,precipitation,rain,snowfall,wind_speed_10m,wind_gusts_10m,shortwave_radiation,surface_pressure';
+  const merged={temperature_2m:[],relative_humidity_2m:[],precipitation:[],rain:[],snowfall:[],wind_speed_10m:[],wind_gusts_10m:[],shortwave_radiation:[],surface_pressure:[]};
   const chunks=[];let cur=new Date(start);
   while(cur<=end){let ce=new Date(Date.UTC(cur.getUTCFullYear(),11,31));if(ce>end)ce=new Date(end);chunks.push([new Date(cur),ce]);cur=new Date(Date.UTC(ce.getUTCFullYear()+1,0,1));}
   for(let i=0;i<chunks.length;i++){
@@ -42,7 +42,7 @@ async function loadWeather(lat,lon,years){
   return{h:merged,start:iso(start),end:iso(end),years};
 }
 async function loadElev(lat,lon){const r=await fetch(`https://api.open-meteo.com/v1/elevation?latitude=${lat}&longitude=${lon}`);if(!r.ok)throw Error('海拔 HTTP '+r.status);const j=await r.json();return j.elevation?.[0]}
-async function loadAir(lat,lon){const e=new Date();e.setUTCDate(e.getUTCDate()-1);const s=new Date(e);s.setUTCDate(s.getUTCDate()-89);const u=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=pm10,dust,sulphur_dioxide,sea_salt_aerosol&start_date=${iso(s)}&end_date=${iso(e)}&timezone=auto&domains=cams_global`;const r=await fetch(u);if(!r.ok)throw Error('CAMS HTTP '+r.status);const j=await r.json();if(j.error)throw Error(j.reason||'CAMS错误');return j.hourly||{}}
+async function loadAir(lat,lon){const e=new Date();e.setUTCDate(e.getUTCDate()-1);const s=new Date(e);s.setUTCDate(s.getUTCDate()-89);const u=`https://air-quality-api.open-meteo.com/v1/air-quality?latitude=${lat}&longitude=${lon}&hourly=pm10,pm2_5,dust,sulphur_dioxide,nitrogen_dioxide,sea_salt_aerosol&start_date=${iso(s)}&end_date=${iso(e)}&timezone=auto&domains=cams_global`;const r=await fetch(u);if(!r.ok)throw Error('CAMS HTTP '+r.status);const j=await r.json();if(j.error)throw Error(j.reason||'CAMS错误');return j.hourly||{}}
 
 function derive(h,air,elev){
   const T=h.temperature_2m||[],RH=h.relative_humidity_2m||[],P=h.precipitation||[],Snow=h.snowfall||[],W=h.wind_speed_10m||[],Rad=h.shortwave_radiation||[];
