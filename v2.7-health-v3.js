@@ -102,7 +102,7 @@ function stored(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||'{}');re
 function merged(){const overrides=stored(),out={};for(let i=1;i<=50;i++)out[i]=overrides[i]?{...overrides[i],quality:'人工验证'}:(records[i]||{value:null,source:'待接入',rule:'尚无可信来源',quality:'专项缺口'});return out}
 function draw(){
 const root=document.getElementById('envGrid');if(!root)return;root.className='env-health-v3';
-const vals=merged(),groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
+const vals=merged();window.envHealthV31={version:'3.1',createdAt:new Date().toISOString(),context:loc(),fields:FIELDS.map((d,i)=>({id:i+1,group:d[0],name:d[1],unit:d[2],...(vals[i+1]||{})}))};const groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
 root.innerHTML=groups.map(g=>{
  const p=g[0],active=g.filter(x=>x.record.value!==null).length;
  const cKey=mainLabels[p.group],risk=p.record.value!==null&&typeof p.record.value==='number'&&Number.isFinite(env[cKey])?riskLevel(cKey):null;
@@ -116,5 +116,5 @@ const summary=document.getElementById('ev3-summary');if(summary)summary.textCont
 renderEnv=draw;
 const style=document.createElement('style');style.textContent='#envGrid.env-health-v3{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid #dfe7f1;background:#fff}#envGrid .ev3-card{padding:9px 10px;min-width:0;border-right:1px solid #e2e8f1;border-bottom:1px solid #e2e8f1;background:#fff}#envGrid .ev3-header{display:flex;justify-content:space-between;gap:5px;color:#123a64;font-size:13px}#envGrid .ev3-risk{font-size:10px;color:#647b95}#envGrid .ev3-number{font-size:18px;color:#104676;font-weight:750;overflow-wrap:anywhere;margin-top:4px}#envGrid .ev3-caption{font-size:11px;color:#7890ad;margin-top:2px;min-height:15px}#envGrid .ev3-details{border-top:1px solid #e4ebf3;padding-top:6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,auto);gap:7px 8px}#envGrid .ev3-item{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:10px;align-items:flex-start;color:#667d95}#envGrid .ev3-item b{color:#173a5f;text-align:left;overflow-wrap:anywhere}#envGrid .ev3-foot{font-size:9px;color:#8797aa;margin-top:6px}#ev3-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 0;font-size:11px;color:#506784}#ev3-tools button{background:#eef4ff;border:1px solid #cddff8;border-radius:5px;padding:6px 9px;color:#104676;cursor:pointer}@media(max-width:900px){#envGrid.env-health-v3{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:680px){#envGrid.env-health-v3{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:460px){#envGrid.env-health-v3{grid-template-columns:1fr}}';
 document.head.appendChild(style);
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{draw()},{once:true});else{tools();draw()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{draw()},{once:true});else{draw()}
 })();
