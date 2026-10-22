@@ -119,7 +119,7 @@
     const ver=level=>{
       const byDomain=meta[level]?.verifiedCapabilities;
       const v=byDomain&&byDomain[domain.name];
-      return v&&v.approved===true&&Number.isFinite(Number(v.level))
+      return v&&v.approved===true&&String(v.evidenceRef||'').trim().length>=4&&Number.isFinite(Number(v.level))
         ?Math.max(current,Math.min(3,Number(v.level))):current;
     };
     return {Standard:ver('Standard'),Pro:ver('Pro'),Plus:ver('Plus')};
@@ -178,7 +178,7 @@
       const head=table.querySelector('thead');
       if(head)head.innerHTML=`<tr><th>风险域</th><th>项目要求</th><th>当前机组</th><th class="${selectedPlan==='Standard'?'gap-plan-head-active':''}">Standard</th><th class="${selectedPlan==='Pro'?'gap-plan-head-active':''}">Pro</th><th class="${selectedPlan==='Plus'?'gap-plan-head-active':''}">Plus</th><th>场景包</th><th>剩余Gap</th></tr>`;
     }
-    $('gapBadge').textContent=`当前${selectedPlan} + 场景包 · 剩余Gap：${rows.some(r=>r.unknown)?'存在待评价风险':max>=2?'高':max===1?'中':'低'}`;
+    $('gapBadge').textContent=`当前${selectedPlan} + 场景包 · 剩余Gap：${rows.some(r=>r.unknown)?'存在待评价风险':max>=2?'高':max===1?'中':'规则计算低（待验证）'}`;
     $('gapBody').innerHTML=rows.map(r=>`<tr>
       <td><b>${esc(r.domain)}</b></td>
       <td>${r.need}/3</td>
@@ -187,7 +187,7 @@
       <td class="${selectedPlan==='Pro'?'gap-plan-active':''}">${r.Pro}/3</td>
       <td class="${selectedPlan==='Plus'?'gap-plan-active':''}">${r.Plus}/3</td>
       <td>${r.scenePackage?`+${r.scenePackage}`:'0'}</td>
-      <td class="${r.rem>=2?'gap-high':r.rem===1?'gap-mid':'gap-low'}">${r.unknown?'待评价 · 缺少'+esc(r.missing.join('/')):(r.rem===0?'0 · 已覆盖':`Gap ${r.rem}`)}</td>
+      <td class="${r.rem>=2?'gap-high':r.rem===1?'gap-mid':'gap-low'}">${r.unknown?'待评价 · 缺少'+esc(r.missing.join('/')):(r.rem===0?'0 · 规则缺口为0（待验证）':`Gap ${r.rem}`)}</td>
     </tr>`).join('');
 
     const card=$('gapBody')?.closest('.card');
