@@ -16,6 +16,11 @@ function banner(section,id,title,message){
 }
 const originalRender=renderDecision;
 renderDecision=function(){originalRender();const st=state();window.EA_DECISION_INTEGRITY=st;
+ document.querySelectorAll('#gapBody tr td:last-child').forEach(td=>{
+  if(/^0\s*[·•]\s*已覆盖/.test(td.textContent||''))td.textContent='0 · 规则缺口为0（待验证）';
+ });
+ const gb=document.getElementById('gapBadge');if(gb&&!/待验证|待评价|核验/.test(gb.textContent||'')){gb.textContent+=' · 待工程验证'}
+
  if(!st.unknown){['eaSceneUncertainty','eaPlanUncertainty','eaReportUncertainty'].forEach(id=>{const e=document.getElementById(id);if(e)e.hidden=true});const gap=document.getElementById('eaGapUncertainty');if(gap)gap.hidden=true;if(st.capabilitiesPending){banner('gap','eaGapUncertainty','能力证据未核准','当前方案没有已批准的风险域验证记录。规则计算Gap不等于工程验收结果。');}return}
  const missing=st.missing.map(k=>important[k]||k).join('、');
  banner('scenes','eaSceneUncertainty','场景识别待核实','缺少 '+missing+'；主/次场景分数为不完整数据下的暂定结果，不得作为冻结设计输入');
