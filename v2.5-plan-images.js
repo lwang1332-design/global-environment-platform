@@ -43,6 +43,37 @@
     return '<span class="plan-status-badge optional">可选</span>';
   }
 
+  // Fixed seven-domain taxonomy; presentation only, original plan items stay intact.
+  const TECH_MODULES=[
+    ['01','总体架构与热管理'],
+    ['02','环境隔离与防护'],
+    ['03','湿度与凝露控制'],
+    ['04','低温防护与防冰'],
+    ['05','腐蚀与材料防护'],
+    ['06','特殊环境专项防护'],
+    ['07','智能监测与环境控制']
+  ];
+  function moduleIndex(value){
+    const t=String(value||'');
+    if(/监测|预警|传感|智能|联动|控制策略|远程|预测|在线监控|状态诊断|数据采集|压差监控/.test(t))return 6;
+    if(/盐雾|腐蚀|防腐|涂层|耐蚀|不锈钢|镀锌|异种金属|材料防护|C5|CX|防锈/.test(t))return 4;
+    if(/沙尘|沙蚀|防沙|高海拔|低气压|紫外|UV|台风|雷电|防雷|防霉|霉菌|生物|暴雪|风吹雪|特殊环境/.test(t))return 5;
+    if(/凝露|露点|湿度|除湿|防潮|湿膜|干燥|加湿/.test(t))return 2;
+    if(/低温|保温|防冰|结冰|伴热|防冻|融冰|预热|加热|冷启动|低温润滑|防寒/.test(t))return 3;
+    if(/防雨|防水|风驱雨|防尘|密封|过滤|滤芯|百叶|排水|进风口防护|迷宫|IPX|IP[0-9]/.test(t))return 1;
+    return 0;
+  }
+  function coreTechTable(items){
+    const groups=TECH_MODULES.map(()=>[]);
+    (items||[]).forEach(item=>groups[moduleIndex(item)].push(String(item)));
+    return '<div class="core-tech-table-wrap"><table class="core-tech-table"><thead><tr><th>编号</th><th>技术模块</th><th>方案配置</th></tr></thead><tbody>'+
+      TECH_MODULES.map(([num,module],i)=>'<tr><td class="core-tech-num">'+num+'</td><td class="core-tech-module">'+esc(module)+'</td><td class="core-tech-details">'+(groups[i].length?groups[i].map(x=>'<div class="core-tech-line">• '+esc(x)+'</div>').join(''):'<span class="core-tech-none">—</span>')+'</td></tr>').join('')+
+      '</tbody></table></div>';
+  }
+  const techCss=document.createElement('style');
+  techCss.textContent='.core-tech-table-wrap{width:100%;overflow-x:auto}.core-tech-table{width:100%;border-collapse:collapse;table-layout:fixed;font-size:11px;line-height:1.5;color:#25364e}.core-tech-table th{background:#edf3fb;color:#163c68;text-align:left;font-weight:700;padding:8px 9px;border:1px solid #dce5f0}.core-tech-table td{padding:8px 9px;border:1px solid #e1e8f1;vertical-align:top;overflow-wrap:anywhere}.core-tech-table th:first-child{width:44px}.core-tech-table th:nth-child(2){width:130px}.core-tech-table .core-tech-num{color:#235c9c;font-weight:700;text-align:center}.core-tech-table .core-tech-module{color:#173a65;font-weight:600}.core-tech-line+.core-tech-line{margin-top:5px}.core-tech-none{color:#9aa7b5}.plan-config .core-tech-table-wrap{margin-top:8px}@media(max-width:660px){.core-tech-table{min-width:460px}}';
+  document.head.appendChild(techCss);
+
   renderPlans=function(){
     const r=recommendedPlan();
     if(!planManual)selectedPlan=r.name;
@@ -65,7 +96,7 @@
           <div class="plan-copy">
             <div class="plan-config">
               <div class="plan-subtitle">核心技术配置</div>
-              <ul>${items.map(x=>`<li>${esc(x)}</li>`).join('')}</ul>
+              ${coreTechTable(items)}
             </div>
             ${majorComponentsHtml(d,name)}
             ${metaHtml(d,name)}
