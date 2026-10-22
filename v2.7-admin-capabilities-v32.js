@@ -1,0 +1,17 @@
+/* Evidence-based domain capability administration. Existing 06 plan table remains untouched. */
+(function(){
+const domains=['防腐','凝露','防雨','沙尘','高温','低温','高海拔','暴雪结冰','工矿污染','维护性'];
+const root=document.getElementById('adminArea');if(!root)return;
+const panel=document.createElement('div');panel.className='card';panel.id='adminCapabilities';
+panel.innerHTML='<details><summary style="font-size:15px;font-weight:700;color:#123a64;cursor:pointer">06—08 风险域防护能力验证管理（展开）</summary><p class="note">按场景和 Standard/Pro/Plus 录入已验证风险域能力。仅已批准、具有验证依据的能力参与 Design Gap；未经验证不自动给Pro或Plus满级。</p><div class="grid2"><label>场景 <select id="capScene"></select></label><label>方案 <select id="capTier"><option>Standard</option><option>Pro</option><option>Plus</option></select></label></div><div style="overflow:auto"><table class="history"><thead><tr><th>风险域</th><th>能力等级(1-3)</th><th>验证依据/报告编号</th><th>已批准</th></tr></thead><tbody id="capRows"></tbody></table></div><p class="note" id="capHint">请先选择场景及方案。</p></details>';
+const target=document.getElementById('adminSevenModules');if(target)target.insertAdjacentElement('afterend',panel);else root.appendChild(panel);
+const $=id=>document.getElementById(id);
+function entry(){const scenario=$('capScene').value,tier=$('capTier').value,d=workingScenarios[scenario];if(!d)return null;d.planMeta??={};d.planMeta[tier]??={};d.planMeta[tier].verifiedCapabilities??={};return d.planMeta[tier].verifiedCapabilities}
+function fillScenarios(){const old=$('capScene').value;$('capScene').innerHTML=Object.keys(workingScenarios||{}).map(n=>'<option>'+n+'</option>').join('');if(old&&workingScenarios[old])$('capScene').value=old;else $('capScene').value=$('sceneSelect').value;draw()}
+function draw(){const caps=entry();if(!caps)return;const escape=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));$('capRows').innerHTML=domains.map((name,i)=>{const x=caps[name]||{};return '<tr data-domain="'+name+'"><td>'+String(i+1).padStart(2,'0')+' '+name+'</td><td><select data-k="level">'+[1,2,3].map(v=>'<option value="'+v+'"'+(Number(x.level||1)===v?' selected':'')+'>'+v+'</option>').join('')+'</select></td><td><input data-k="evidenceRef" style="min-width:230px" value="'+escape(x.evidenceRef||'')+'" placeholder="试验报告/设计评审编号"></td><td><input data-k="approved" type="checkbox"'+(x.approved?' checked':'')+'></td></tr>'}).join('');$('capRows').querySelectorAll('tr[data-domain]').forEach(r=>r.addEventListener('change',()=>update(r)));count()}
+function count(){const caps=entry();$('capHint').textContent='已批准能力 '+Object.values(caps||{}).filter(x=>x.approved).length+'/10。未批准能力不改变 Design Gap。'}
+function update(row){const caps=entry(),domain=row.dataset.domain,level=Number(row.querySelector('[data-k=level]').value),evidenceRef=row.querySelector('[data-k=evidenceRef]').value.trim(),checkbox=row.querySelector('[data-k=approved]');if(checkbox.checked&&evidenceRef.length<4){checkbox.checked=false;$('capHint').textContent='批准前必须填写有效试验/评审依据（不少于4字符）';return}caps[domain]={level,evidenceRef,approved:checkbox.checked};markDirty('防护能力验证资料已修改，请审核后发布到云端');count()}
+$('capScene').onchange=draw;$('capTier').onchange=draw;$('sceneSelect').addEventListener('change',()=>{if(workingScenarios[$('sceneSelect').value]){$('capScene').value=$('sceneSelect').value;draw()}});
+const previousApply=applyCloud;applyCloud=function(row){previousApply(row);fillScenarios()};
+fillScenarios();
+})();
