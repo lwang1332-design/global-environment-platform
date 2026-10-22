@@ -28,7 +28,15 @@ function updateCloudMeta(){const v=cloudRow?.version||'—',t=cloudRow?.updatedA
 async function api(path,opt={}){const r=await fetch(CLOUD_API+path,{cache:'no-store',...opt,headers:{'Content-Type':'application/json',...(token?{Authorization:'Bearer '+token}:{}),...(opt.headers||{})}});let j={};try{j=await r.json()}catch{}if(!r.ok)throw Error(j.error||j.detail||('HTTP '+r.status));return j}
 async function login(){try{$('loginMsg').className='msg';$('loginMsg').textContent='正在验证并读取云端技术货架…';const j=await api('/auth/login',{method:'POST',body:JSON.stringify({password:$('pwd').value})});token=j.token;$('loginCard').classList.add('hidden');$('adminArea').classList.remove('hidden');await reloadCloud();await loadHistory()}catch(e){$('loginMsg').className='msg err';$('loginMsg').textContent='登录失败：'+e.message}}
 async function reloadCloud(){try{const j=await api('/config/latest?ts='+Date.now());applyCloud(j.config);$('saveMsg').className='msg ok';$('saveMsg').textContent='已读取云端最新技术货架。修改后点击“发布到云端”。'}catch(e){$('saveMsg').className='msg err';$('saveMsg').textContent='云端读取失败：'+e.message;throw e}}
-async function loadHistory(){try{const j=await api('/config/history?limit=8');$('historyBody').innerHTML=(j.items||[]).map(x=>`<tr><td>${x.version}</td><td>${x.status==='published'?'当前':'历史'}</td><td>${x.updatedAt?new Date(x.updatedAt).toLocaleString():'—'}</td><td>${x.updatedBy||'—'}</td><td>${x.description||''}</td><td>${x.status==='published'?'—':`<button type="button" class="btn secondary" data-restore-version="${x.version}">恢复</button>`}</td></tr>`).join('')||'<tr><td colspan="5">暂无历史版本</td></tr>'}catch(e){$('historyBody').innerHTML=`<tr><td colspan="5">历史版本读取失败：${e.message}</td></tr>`}}
+function historyEscape(v){return String(v??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+async function loadHistory(){
+ try{
+  const j=await api('/config/history?limit=8');
+  const rows=Array.isArray(j.items)?j.items:[];
+  $('historyBody').innerHTML=rows.map(x=>'<tr><td>'+historyEscape(x.version)+'</td><td>'+(x.status==='published'?'当前':'历史')+'</td><td>'+historyEscape(x.updatedAt?new Date(x.updatedAt).toLocaleString():'—')+'</td><td>'+historyEscape(x.updatedBy||'—')+'</td><td>'+historyEscape(x.description||'')+'</td><td>'+(x.status==='published'?'—':'<button type="button" class="btn secondary" data-restore-version="'+historyEscape(x.version)+'">恢复</button>')+'</td></tr>').join('')||'<tr><td colspan="6">暂无历史版本</td></tr>';
+  $('historyBody').querySelectorAll('[data-restore-version]').forEach(btn=>btn.addEventListener('click',()=>restoreCloudVersion(btn.dataset.restoreVersion)));
+ }catch(e){$('historyBody').textContent='历史版本读取失败：'+e.message}
+}
 async function restoreCloudVersion(version){
  if(!token){alert('请先登录管理员');return}
  if(!confirm('确认将历史版本 '+version+' 恢复并重新发布？系统会生成一条新的发布版本。'))return;
