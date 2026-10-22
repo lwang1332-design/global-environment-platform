@@ -28,7 +28,7 @@ async function locate(name){name=String(name||'').trim();if(!name)throw Error('è
 
 async function loadWeather(lat,lon,years){
   const end=new Date();end.setUTCDate(end.getUTCDate()-10);const start=new Date(end);start.setUTCFullYear(start.getUTCFullYear()-years);
-  const vars='temperature_2m,relative_humidity_2m,precipitation,rain,snowfall,wind_speed_10m,wind_gusts_10m,shortwave_radiation,surface_pressure';
+  const vars='temperature_2m,relative_humidity_2m,precipitation,rain,snowfall,wind_speed_10m,wind_gusts_10m,shortwave_radiation,surface_pressure,snow_depth,weather_code,dew_point_2m';
   const merged={temperature_2m:[],relative_humidity_2m:[],precipitation:[],rain:[],snowfall:[],wind_speed_10m:[],wind_gusts_10m:[],shortwave_radiation:[],surface_pressure:[]};
   const chunks=[];let cur=new Date(start);
   while(cur<=end){let ce=new Date(Date.UTC(cur.getUTCFullYear(),11,31));if(ce>end)ce=new Date(end);chunks.push([new Date(cur),ce]);cur=new Date(Date.UTC(ce.getUTCFullYear()+1,0,1));}
