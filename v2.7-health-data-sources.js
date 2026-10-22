@@ -93,7 +93,8 @@ renderEnv=function(){
     row.title=notes[x.id]||'缺少经核验的数据源和统计口径';
     missingN++;return;
    }
-   if(Number.isFinite(detail)){row.querySelector('b').textContent=(Math.round(detail*100)/100)+' '+x.d[2];row.title=[window.healthMetricProvenance?.[x.id]?.source||'ERA5/CAMS计算',window.healthMetricProvenance?.[x.id]?.note||'气象数据推导'].join(' · ');numberKnown++;model++;if(!firstKnown)firstKnown={value:row.querySelector('b').textContent,name:x.d[1]};}\n   else if(row.querySelector('b').textContent!=='暂无数据'&&row.querySelector('b').textContent!=='待接入'){
+   if(Number.isFinite(detail)){row.querySelector('b').textContent=(Math.round(detail*100)/100)+' '+x.d[2];row.title=[window.healthMetricProvenance?.[x.id]?.source||'ERA5/CAMS计算',window.healthMetricProvenance?.[x.id]?.note||'气象数据推导'].join(' · ');numberKnown++;model++;if(!firstKnown)firstKnown={value:row.querySelector('b').textContent,name:x.d[1]};}
+   else if(row.querySelector('b').textContent!=='暂无数据'&&row.querySelector('b').textContent!=='待接入'){
     numberKnown++;model++;
     if(!firstKnown)firstKnown={value:row.querySelector('b').textContent,name:x.d[1]};
    }else missingN++;
