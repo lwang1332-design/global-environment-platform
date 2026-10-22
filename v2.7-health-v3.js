@@ -114,33 +114,7 @@ const count=Object.values(vals).filter(x=>x.value!==null).length;
 const summary=document.getElementById('ev3-summary');if(summary)summary.textContent='50项环境数据 · 可用'+count+'项 · 其余'+(50-count)+'项需专项来源（数值不可伪造）';
 }
 renderEnv=draw;
-function tools(){
-if(document.getElementById('ev3-tools'))return;
-const box=document.createElement('div');box.id='ev3-tools';box.className='ev3-tools';
-box.innerHTML='<strong id="ev3-summary">50项环境数据</strong><button id="ev3-export" type="button">导出50项模板</button><button id="ev3-import" type="button">导入核实数据</button><input id="ev3-file" type="file" accept=".csv" hidden><small>逐项悬停查看来源、统计期与算法；人工数据按坐标和年限隔离。</small>';
-const grid=document.getElementById('envGrid');grid?.parentElement?.insertBefore(box,grid);
-document.getElementById('ev3-export').onclick=()=>{
- const rows=[['序号','一级分类','二级参数','单位','数值','数据来源','观测时期','备注'],...FIELDS.map((f,i)=>[i+1,f[0],f[1],f[2],'','','',records[i+1]?.rule||''])];
- const csv='\ufeff'+rows.map(r=>r.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
- const url=URL.createObjectURL(new Blob([csv],{type:'text/csv;charset=utf-8'}));const a=document.createElement('a');a.href=url;a.download='02项目环境体检50项核实数据.csv';a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
-};
-document.getElementById('ev3-import').onclick=()=>document.getElementById('ev3-file').click();
-document.getElementById('ev3-file').onchange=async e=>{
- const file=e.target.files?.[0];if(!file)return;
- try{
- const src=(await file.text()).replace(/^\ufeff/,'');const lines=[];let row=[],cell='',quote=false;
- for(let i=0;i<src.length;i++){const ch=src[i];if(ch==='"'){if(quote&&src[i+1]==='"'){cell+='"';i++}else quote=!quote}else if(ch===','&&!quote){row.push(cell);cell=''}else if((ch==='\n'||ch==='\r')&&!quote){if(ch==='\r'&&src[i+1]==='\n')i++;row.push(cell);if(row.some(x=>x.trim()))lines.push(row);row=[];cell=''}else cell+=ch}row.push(cell);if(row.some(x=>x.trim()))lines.push(row);
- if(lines[0]?.[0]!=='序号'||lines[0]?.[4]!=='数值')throw Error('列结构不符');
- const vals={};for(const r of lines.slice(1)){const id=Number(r[0]),f=FIELDS[id-1],raw=(r[4]||'').trim();if(!raw)continue;
- if(!f||r[2]!==f[1]||r[3]!==f[2]||!r[5]?.trim()||!r[6]?.trim())throw Error('第'+id+'项参数、单位或来源不正确');
- const category=[25,46,50].includes(id);const num=Number(raw);if(!category&&!Number.isFinite(num))throw Error('第'+id+'项不是数值');
- vals[id]={value:category?raw:num,source:r[5],period:r[6],rule:r[7]||'人工核实',quality:'人工验证'};
- }
- localStorage.setItem(STORAGE,JSON.stringify({context:loc(),fields:vals}));draw();alert('已导入'+Object.keys(vals).length+'项核实数据');
- }catch(err){alert('导入失败：'+err.message)}finally{e.target.value=''}
-};
-}
 const style=document.createElement('style');style.textContent='#envGrid.env-health-v3{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid #dfe7f1;background:#fff}#envGrid .ev3-card{padding:9px 10px;min-width:0;border-right:1px solid #e2e8f1;border-bottom:1px solid #e2e8f1;background:#fff}#envGrid .ev3-header{display:flex;justify-content:space-between;gap:5px;color:#123a64;font-size:13px}#envGrid .ev3-risk{font-size:10px;color:#647b95}#envGrid .ev3-number{font-size:18px;color:#104676;font-weight:750;overflow-wrap:anywhere;margin-top:4px}#envGrid .ev3-caption{font-size:11px;color:#7890ad;margin-top:2px;min-height:15px}#envGrid .ev3-details{border-top:1px solid #e4ebf3;padding-top:6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,auto);gap:7px 8px}#envGrid .ev3-item{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:10px;align-items:flex-start;color:#667d95}#envGrid .ev3-item b{color:#173a5f;text-align:left;overflow-wrap:anywhere}#envGrid .ev3-foot{font-size:9px;color:#8797aa;margin-top:6px}#ev3-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 0;font-size:11px;color:#506784}#ev3-tools button{background:#eef4ff;border:1px solid #cddff8;border-radius:5px;padding:6px 9px;color:#104676;cursor:pointer}@media(max-width:900px){#envGrid.env-health-v3{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:680px){#envGrid.env-health-v3{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:460px){#envGrid.env-health-v3{grid-template-columns:1fr}}';
 document.head.appendChild(style);
-if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{tools();draw()},{once:true});else{tools();draw()}
+if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{draw()},{once:true});else{tools();draw()}
 })();
