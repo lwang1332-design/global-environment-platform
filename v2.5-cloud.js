@@ -33,7 +33,7 @@ let shelfScenarioModel=JSON.parse(JSON.stringify(DEFAULT_SCENARIO_MODEL));
 let lastSceneRanking=[];
 
 function shelfSetRunDisabled(v){['topRun','placeRun','coordRun'].forEach(id=>{const el=document.getElementById(id);if(el)el.disabled=v})}
-function shelfResetToBuiltIn(){cfg={scenarios:{}};activePackages=packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])]]);riskRules=mergeRiskRules(DEFAULT_RISK_RULES,{});shelfMatchRule={...MATCH_RULE};shelfScenarioModel=JSON.parse(JSON.stringify(DEFAULT_SCENARIO_MODEL))}
+function shelfResetToBuiltIn(){window.EA_METRIC_RISK_RULES={};cfg={scenarios:{}};activePackages=packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])]]);riskRules=mergeRiskRules(DEFAULT_RISK_RULES,{});shelfMatchRule={...MATCH_RULE};shelfScenarioModel=JSON.parse(JSON.stringify(DEFAULT_SCENARIO_MODEL))}
 function shelfPatchMatchHelpers(){
   matchClass=function(score){return score>=shelfMatchRule.high?'high':score>=shelfMatchRule.medium?'mid':'low'};
   matchLabel=function(score){return score>=shelfMatchRule.high?'高匹配':score>=shelfMatchRule.medium?'中匹配':'低匹配'};
@@ -132,7 +132,7 @@ async function syncShelfCloud(){
     const j=await r.json(),row=j?.config,c=row?.config;if(!c)throw Error('云端未返回配置');
     cfg={scenarios:c.scenarios||{}};
     activePackages=Array.isArray(c.packages)&&c.packages.length?c.packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])]]):packages.map(p=>[p[0],p[1],p[2],[...(p[3]||[])]]);
-    riskRules=mergeRiskRules(DEFAULT_RISK_RULES,c.riskRules||{});shelfMatchRule={...MATCH_RULE,...(c.matchRule||{})};shelfScenarioModel=c.scenarioModel||JSON.parse(JSON.stringify(DEFAULT_SCENARIO_MODEL));shelfPatchMatchHelpers();
+    riskRules=mergeRiskRules(DEFAULT_RISK_RULES,c.riskRules||{});window.EA_METRIC_RISK_RULES=c.metricRiskRules||{};shelfMatchRule={...MATCH_RULE,...(c.matchRule||{})};shelfScenarioModel=c.scenarioModel||JSON.parse(JSON.stringify(DEFAULT_SCENARIO_MODEL));shelfPatchMatchHelpers();
     shelfCloudMeta={version:row.version||'CLOUD',updatedAt:row.updatedAt||null,source:'cloud'};
     status.shelf[2]='成功';status.shelf[3]=`${shelfCloudMeta.version} · ${shelfScenarioModel.version||'SCENE'}${shelfCloudMeta.updatedAt?' · '+new Date(shelfCloudMeta.updatedAt).toLocaleString():''}`;
     if(msg)msg.textContent=`云端技术货架 ${shelfCloudMeta.version} / 场景模型 ${shelfScenarioModel.version} 已加载。点击“地名检索并分析”或“按经纬度分析”开始。`;
