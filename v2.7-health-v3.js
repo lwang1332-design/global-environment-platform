@@ -59,8 +59,8 @@ derive=function(h,a,elev){
  add(14,joint(i=>W[i]>=12&&P[i]>=0.1),'ERA5','同期风速≥12m/s且小时降水≥0.1mm；工程筛查口径','代理',period);
  add(15,null,'需同期风沙历史数据','CAMS近90天不与ERA5多年逐时强制拼接','专项缺口');
  add(16,ann(RAIN.filter(valid).reduce((s,x)=>s+x,0),RAIN.filter(valid).length),'ERA5','统计期逐小时降雨量折合年值','再分析',period);
- add(17,max(days(P,z=>z.reduce((s,x)=>s+x,0))),'ERA5','逐日降水量最大值','再分析',period);
- add(18,q(P,.99),'ERA5','全小时样本（含无雨小时）降雨量P99','再分析',period);
+ add(17,max(days(RAIN,z=>z.reduce((s,x)=>s+x,0))),'ERA5','逐日降雨量最大值','再分析',period);
+ add(18,q(RAIN,.99),'ERA5','全小时样本（含无雨小时）降雨量P99','再分析',period);
  const wr=[];for(let i=0;i<n;i++)if(valid(W[i])&&valid(P[i]))wr.push(W[i]*P[i]);
  add(19,q(wr,.99),'ERA5','同期小时风速×降水量P99','代理',period);
  const fr=WC.some(x=>x===66||x===67),hasCodes=WC.some(valid);
@@ -78,22 +78,22 @@ derive=function(h,a,elev){
  add(31,valid(max(SD))?max(SD)*100:null,'ERA5','积雪深度m转cm；网格模式值','再分析',period);
  add(32,max(days(SF,z=>z.reduce((s,x)=>s+x,0))),'ERA5','逐日降雪深度最大值；Open-Meteo snowfall单位cm','再分析',period);
  add(33,ann(count(SF,x=>valid(x)&&x>0),SF.filter(valid).length),'ERA5','有降雪小时数年化','再分析',period);
- let crossings=0;for(let i=1;i<n;i++)if(valid(T[i])&&valid(T[i-1])&&T[i-1]<0&&T[i]>=0)crossings++;
- add(34,ann(crossings,T.filter(valid).length),'ERA5','气温过零上穿年化次数，材料实际冻融仅供参考','代理',period);
+ let crossings=0,frozen=false;for(let i=1;i<n;i++){if(!valid(T[i])||!valid(T[i-1])){frozen=false;continue}if(T[i-1]>=0&&T[i]<0)frozen=true;else if(T[i-1]<0&&T[i]>=0&&frozen){crossings++;frozen=false}}
+ add(34,ann(crossings,T.filter(valid).length),'ERA5','空气温度完成冻结→解冻的循环次数（代理），不代替部件表面冻融','代理',period);
  add(35,SD.filter(valid).length?ann(count(days(SD,z=>max(z)),v=>v>0.01)*24,SD.filter(valid).length)/24:null,'ERA5-Land','雪深>1cm的日数折合每年；需要有雪深资料','代理',period);
  add(36,valid(elev)?elev:null,'Open-Meteo Elevation','项目坐标高程','地理数据','当前坐标');
  add(37,valid(mean(BP))?mean(BP)/10:null,'ERA5','小时地面气压均值 hPa→kPa','再分析',period);
  add(38,valid(min(BP))?min(BP)/10:null,'ERA5','地面气压小时最低值 hPa→kPa','再分析',period);
- let den=[];for(let i=0;i<n;i++)if(valid(BP[i])&&valid(T[i]))den.push(BP[i]*100/(287.05*(T[i]+273.15)));
- add(39,mean(den),'ERA5','理想干空气近似密度，未修正水汽','模型估算',period);
- add(40,min(den),'ERA5','理想干空气最低密度，未修正水汽','模型估算',period);
+ let den=[];for(let i=0;i<n;i++)if(valid(BP[i])&&valid(T[i])&&valid(RH[i])&&T[i]>-273.15){const es=6.112*Math.exp(17.67*T[i]/(T[i]+243.5)),e=Math.min(BP[i]*0.99,es*Math.max(0,Math.min(100,RH[i]))/100),tk=T[i]+273.15;den.push((BP[i]-e)*100/(287.05*tk)+e*100/(461.5*tk))}
+ add(39,mean(den),'ERA5','按同期地表气压、温度、湿度计算湿空气密度','模型估算',period);
+ add(40,min(den),'ERA5','按同期地表气压、温度、湿度计算湿空气最低密度','模型估算',period);
  add(41,mean(a.sulphur_dioxide),'CAMS','90天SO₂小时均值','再分析',aPeriod);
  add(42,null,'需H₂S检测','无统一全球可信历史接口','专项缺口');
  add(43,null,'需Cl₂检测','无统一全球可信历史接口','专项缺口');
  add(44,mean(a.nitrogen_dioxide),'CAMS','90天NO₂小时均值','再分析',aPeriod);
  add(45,null,'需NH₃检测','无统一全球可信历史接口','专项缺口');
  add(46,null,'需土地覆盖数据','植被类型/周边占比需GIS土地覆盖接口','专项缺口');
- add(47,q(RAD,.95),'ERA5','P95短波辐射 W/m²，非年总辐照量','再分析',period);
+ add(47,q(RAD,.99),'ERA5','P99短波辐射 W/m²，非年总辐照量','再分析',period);
  add(48,null,'需台风路径数据库','应按影响半径、风速阈值和统计期统计','专项缺口');
  add(49,null,'需雷电密度数据','雷击密度需专业闪电定位资料','专项缺口');
  add(50,null,'需生物专项调查','需定义昆虫鸟类、藻菌或生物附着场景','专项缺口');
