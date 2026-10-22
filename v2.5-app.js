@@ -54,7 +54,13 @@ function derive(h,air,elev){
     wind95:quantile(W,.95),rad95:quantile(Rad,.95),alt:Number(elev||0),pm10:avg(air.pm10||[]),dust:avg(air.dust||[]),
     so2:avg(air.sulphur_dioxide||[]),salt:avg(air.sea_salt_aerosol||[])
   };
-  window.__envMissing=new Set(Object.keys(env).filter(k=>!Number.isFinite(env[k])));
+  // Treat missing source arrays as unknown, even if legacy reducers return numerical zero.
+  const raw={t99:T,tmin:T,rhAvg:RH,rh90:RH,rainYear:h.rain||P,rain1h:h.rain||P,snowHours:Snow,wind95:W,rad95:Rad,pm10:air.pm10,dust:air.dust,so2:air.sulphur_dioxide,salt:air.sea_salt_aerosol};
+  window.__envMissing=new Set(Object.keys(env).filter(k=>!Number.isFinite(env[k])||((raw[k]||[]).filter(Number.isFinite).length===0&&k!=='alt')));
+  if(!Number.isFinite(elev))window.__envMissing.add('alt');
+  if(T.filter(Number.isFinite).length){const daily=[];for(let i=0;i<T.length;i+=24){const z=T.slice(i,i+24).filter(Number.isFinite);if(z.length>=18)daily.push(Math.max(...z))}if(daily.length)env.t99=quantile(daily,.99)}
+  if((h.rain||[]).some(Number.isFinite)){const rain=(h.rain||[]).filter(Number.isFinite);env.rainYear=rain.reduce((a,b)=>a+b,0)*annualFactor;env.rain1h=Math.max(...rain)}
+  window.__riskUnknown=new Set();
   Object.keys(env).forEach(k=>{if(!Number.isFinite(env[k]))env[k]=0});
 }
 
