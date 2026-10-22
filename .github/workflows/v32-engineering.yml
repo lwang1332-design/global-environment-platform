@@ -1,0 +1,25 @@
+name: V3.2 Engineering Regression
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'v2.7-*.js'
+      - 'v2.5-app.js'
+      - 'v2.5-cloud.js'
+      - 'v2.5-report.html'
+      - 'v2.7.html'
+      - 'tests/v32_acceptance.test.cjs'
+      - '.github/workflows/v32-engineering.yml'
+  workflow_dispatch:
+jobs:
+  regression:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verify formula and data catalog regression
+        run: node tests/v32_acceptance.test.cjs
