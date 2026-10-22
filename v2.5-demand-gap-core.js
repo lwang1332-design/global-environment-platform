@@ -137,15 +137,23 @@
     return 0; // Selected upgrade packages need verified domain capability before reducing Gap.
   }
 
+  const DOMAIN_SOURCES={
+    '防腐':['salt','so2'],'凝露':['rhAvg','rh90'],'防雨':['rainYear','rain1h'],
+    '沙尘':['pm10','dust'],'高温':['t99','rad95'],'低温':['tmin'],
+    '高海拔':['alt'],'暴雪结冰':['snowHours'],'工矿污染':['so2','pm10'],
+    '维护性':[]
+  };
+  const missingDomain=domain=>(DOMAIN_SOURCES[domain.name]||[]).filter(k=>window.__envMissing?.has(k));
   gapRows=function(){
     return CORE_DOMAINS.map(domain=>{
+      const missing=missingDomain(domain);
       const need=projectNeed(domain),current=currentCapability(domain),caps=planCapabilities(domain,need,current);
       const selectedCap=caps[selectedPlan]||caps.Standard;
       const scenePackage=scenePackageBoost(domain);
       const supplied=Math.min(3,selectedCap+scenePackage);
-      const rem=Math.max(0,need-supplied);
+      const rem=missing.length?3:Math.max(0,need-supplied);
       return {
-        domain:domain.name,need,current,base:current,
+        domain:domain.name,missing,unknown:missing.length>0,need,current,base:current,
         Standard:caps.Standard,Pro:caps.Pro,Plus:caps.Plus,
         scenePackage,pkg:scenePackage,
         plan:Math.max(0,selectedCap-current),supplied,rem
@@ -170,7 +178,7 @@
       const head=table.querySelector('thead');
       if(head)head.innerHTML=`<tr><th>风险域</th><th>项目要求</th><th>当前机组</th><th class="${selectedPlan==='Standard'?'gap-plan-head-active':''}">Standard</th><th class="${selectedPlan==='Pro'?'gap-plan-head-active':''}">Pro</th><th class="${selectedPlan==='Plus'?'gap-plan-head-active':''}">Plus</th><th>场景包</th><th>剩余Gap</th></tr>`;
     }
-    $('gapBadge').textContent=`当前${selectedPlan} + 场景包 · 剩余Gap：${max>=2?'高':max===1?'中':'低'}`;
+    $('gapBadge').textContent=`当前${selectedPlan} + 场景包 · 剩余Gap：${rows.some(r=>r.unknown)?'存在待评价风险':max>=2?'高':max===1?'中':'低'}`;
     $('gapBody').innerHTML=rows.map(r=>`<tr>
       <td><b>${esc(r.domain)}</b></td>
       <td>${r.need}/3</td>
@@ -179,7 +187,7 @@
       <td class="${selectedPlan==='Pro'?'gap-plan-active':''}">${r.Pro}/3</td>
       <td class="${selectedPlan==='Plus'?'gap-plan-active':''}">${r.Plus}/3</td>
       <td>${r.scenePackage?`+${r.scenePackage}`:'0'}</td>
-      <td class="${r.rem>=2?'gap-high':r.rem===1?'gap-mid':'gap-low'}">${r.rem===0?'0 · 已覆盖':`Gap ${r.rem}`}</td>
+      <td class="${r.rem>=2?'gap-high':r.rem===1?'gap-mid':'gap-low'}">${r.unknown?'待评价 · 缺少'+esc(r.missing.join('/')):(r.rem===0?'0 · 已覆盖':`Gap ${r.rem}`)}</td>
     </tr>`).join('');
 
     const card=$('gapBody')?.closest('.card');
