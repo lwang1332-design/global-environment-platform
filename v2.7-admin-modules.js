@@ -11,10 +11,12 @@ const style=document.createElement('style');style.textContent='.admin-module-gri
 let syncing=false;
 function parse(source){const bins=groups.map(()=>[]);String(source||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(x=>bins[classify(x)].push(x.replace(/^\[(0[1-7])\]\s*/,'')));return bins}
 function draw(){if(syncing)return;const val=document.getElementById(document.getElementById('moduleTier').value).value;const bins=parse(val);document.getElementById('moduleGrid').innerHTML=groups.map((g,i)=>'<div class="admin-module-box"><label>' +String(i+1).padStart(2,'0')+' · '+g+'</label><textarea data-module="'+i+'" placeholder="每行一条方案措施"></textarea></div>').join('');panel.querySelectorAll('[data-module]').forEach((x,i)=>{x.value=bins[i].join('\n');x.addEventListener('input',commit)});document.getElementById('moduleCount').textContent=bins.reduce((n,g)=>n+g.length,0)+' 条措施'}
-function commit(){const id=document.getElementById('moduleTier').value;let rows=[];panel.querySelectorAll('[data-module]').forEach((el,i)=>el.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(x=>rows.push('['+String(i+1).padStart(2,'0')+'] '+x.replace(/^\[(0[1-7])\]\s*/,''))));const raw=document.getElementById(id);syncing=true;raw.value=rows.join('\n');raw.dispatchEvent(new Event('input',{bubbles:true}));syncing=false;document.getElementById('moduleCount').textContent=rows.length+' 条措施'}
+function commit(){const id=document.getElementById('moduleTier').value;let rows=[];panel.querySelectorAll('[data-module]').forEach((el,i)=>el.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(x=>rows.push('['+String(i+1).padStart(2,'0')+'] '+x.replace(/^\[(0[1-7])\]\s*/,''))));const raw=document.getElementById(id);syncing=true;raw.value=rows.join('\n');raw.dispatchEvent(new Event('input',{bubbles:true}));syncing=false;if(typeof markDirty==='function')markDirty('七模块技术措施已修改，请先保存当前场景，再发布云端');document.getElementById('moduleCount').textContent=rows.length+' 条措施'}
 document.getElementById('moduleTier').onchange=draw;
 ids.forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(document.getElementById('moduleTier').value===id&&!syncing)draw()}));
 document.getElementById('sceneSelect')?.addEventListener('change',()=>setTimeout(draw,0));
 new MutationObserver(()=>{if(!syncing&&panel.offsetParent!==null)draw()}).observe(document.getElementById('planStandard'),{attributes:true,attributeFilter:['value']});
+const priorApply=applyCloud;
+applyCloud=function(row){priorApply(row);setTimeout(draw,0)};
 draw();
 })();
