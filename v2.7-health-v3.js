@@ -60,7 +60,7 @@ derive=function(h,a,elev){
  const wr=[];for(let i=0;i<n;i++)if(valid(W[i])&&valid(P[i]))wr.push(W[i]*P[i]);
  add(19,q(wr,.99),'ERA5','同期小时风速×降水量P99','代理',period);
  const fr=WC.some(x=>x===66||x===67),hasCodes=WC.some(valid);
- add(20,ann((()=>{let longest=0,run=0;for(const v of RAIN){run=valid(v)&&v>0?run+1:0;longest=Math.max(longest,run)}return longest})(),RAIN.filter(valid).length)?(()=>{let longest=0,run=0;for(const v of RAIN){run=valid(v)&&v>0?run+1:0;longest=Math.max(longest,run)}return longest})():null,'ERA5','统计期最长连续降雨小时数，非年化','再分析',period);
+ add(20,RAIN.filter(valid).length?(()=>{let longest=0,run=0;for(const v of RAIN){run=valid(v)&&v>0?run+1:0;longest=Math.max(longest,run)}return longest})():null,'ERA5','统计期最长连续降雨小时数，非年化','再分析',period);
  add(21,null,'需盐沉积采样','单位面积日盐沉积通量不能由海盐浓度直接代替','专项缺口');
  add(22,q(a.sea_salt_aerosol,.95),'CAMS','90天海盐气溶胶小时浓度P95','再分析',aPeriod);
  add(23,RH.filter(valid).length?100*count(RH,x=>valid(x)&&x>80)/RH.filter(valid).length:null,'ERA5','RH>80%比例（TOW代理，非ISO正式TOW）','代理',period);
