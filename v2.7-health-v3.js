@@ -119,6 +119,22 @@ derive=function(h,a,elev){
  const rainValid=RAIN.filter(valid);
  if(rainValid.length){env.rain1h=max(rainValid);window.__envMissing?.delete('rain1h')}
  else window.__envMissing?.add('rain1h');
+ // Statistical companions use the SAME source series and calculation run as EA01–EA50.
+ // Different statistical definitions remain named derivatives; no P95/P99 or mean substitution.
+ const companions={
+  rh90:{value:ann(count(RH,x=>valid(x)&&x>=90),RH.filter(valid).length),source:'EA06/EA07 · ERA5 RH hours',formula:'count(RH>=90%)/validRH*8760'},
+  wind95:{value:q(W,.95),source:'EA11/EA12 · ERA5 wind series',formula:'P95(wind_speed_10m)'},
+  rad95:{value:q(RAD,.95),source:'EA47 · ERA5 irradiance series',formula:'P95(shortwave_radiation)'},
+  pm10:{value:mean(a.pm10||[]),source:'EA26 · CAMS PM10 series',formula:'mean(pm10)'},
+  dust:{value:mean(a.dust||[]),source:'EA28 · CAMS Dust series',formula:'mean(dust)'},
+  salt:{value:mean(a.sea_salt_aerosol||[]),source:'EA22 · CAMS sea salt series',formula:'mean(sea_salt_aerosol)'},
+  rain1h:{value:max(RAIN),source:'EA16–EA20 · ERA5 rain series',formula:'max(rain)'}
+ };
+ for(const [k,r] of Object.entries(companions)){
+  if(valid(r.value)){env[k]=r.value;window.__envMissing?.delete(k)}
+  else window.__envMissing?.add(k);
+ }
+ window.EA_DERIVED_COMPANIONS=companions;
  // Retain wind95, rad95, PM10/dust/salt means as separate explicitly named legacy metrics.
  // Their statistics differ from EA12/EA47/EA26/EA28/EA22 and must not be mapped blindly.
  window.EA_ENGINE_LINEAGE={version:CATALOG_VERSION,shared,legacyDistinct:['rh90','rain1h','wind95','rad95','pm10','dust','salt']};
