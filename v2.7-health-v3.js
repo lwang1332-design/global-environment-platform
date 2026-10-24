@@ -55,19 +55,19 @@ derive=function(h,a,elev){
  add(11,mean(W),'ERA5','10m风速小时均值','再分析',period);
  add(12,q(W,.99),'ERA5','10m风速P99','再分析',period);
  add(13,ann(events(G,x=>valid(x)&&x>=25),G.filter(valid).length),'ERA5','阵风≥25m/s连续小时合并事件；筛查阈值可调整','代理',period);
- const joint=(pred)=>{let total=0,yes=0;for(let i=0;i<n;i++)if(valid(W[i])&&valid(P[i])){total++;if(pred(i))yes++}return ann(yes,total)};
- add(14,joint(i=>W[i]>=12&&P[i]>=0.1),'ERA5','同期风速≥12m/s且小时降水≥0.1mm；工程筛查口径','代理',period);
+ const joint=(pred)=>{let total=0,yes=0;for(let i=0;i<n;i++)if(valid(W[i])&&valid(RAIN[i])){total++;if(pred(i))yes++}return ann(yes,total)};
+ add(14,joint(i=>W[i]>=12&&RAIN[i]>=0.1),'ERA5','同期风速≥12m/s且小时降雨≥0.1mm；工程筛查口径','代理',period);
  add(15,null,'需同期风沙历史数据','CAMS近90天不与ERA5多年逐时强制拼接','专项缺口');
  add(16,ann(RAIN.filter(valid).reduce((s,x)=>s+x,0),RAIN.filter(valid).length),'ERA5','统计期逐小时降雨量折合年值','再分析',period);
  add(17,max(days(RAIN,z=>z.reduce((s,x)=>s+x,0))),'ERA5','逐日降雨量最大值','再分析',period);
  add(18,q(RAIN,.99),'ERA5','全小时样本（含无雨小时）降雨量P99','再分析',period);
- const wr=[];for(let i=0;i<n;i++)if(valid(W[i])&&valid(P[i]))wr.push(W[i]*P[i]);
- add(19,q(wr,.99),'ERA5','同期小时风速×降水量P99','代理',period);
+ const wr=[];for(let i=0;i<n;i++)if(valid(W[i])&&valid(RAIN[i]))wr.push(W[i]*RAIN[i]);
+ add(19,q(wr,.99),'ERA5','同期小时风速×降雨量P99','代理',period);
  const fr=WC.some(x=>x===66||x===67),hasCodes=WC.some(valid);
  add(20,RAIN.filter(valid).length?(()=>{let longest=0,run=0;for(const v of RAIN){run=valid(v)&&v>0?run+1:0;longest=Math.max(longest,run)}return longest})():null,'ERA5','统计期最长连续降雨小时数，非年化','再分析',period);
  add(21,null,'需盐沉积采样','单位面积日盐沉积通量不能由海盐浓度直接代替','专项缺口');
  add(22,q(a.sea_salt_aerosol,.95),'CAMS','90天海盐气溶胶小时浓度P95','再分析',aPeriod);
- add(23,RH.filter(valid).length?100*count(RH,x=>valid(x)&&x>80)/RH.filter(valid).length:null,'ERA5','RH>80%比例（TOW代理，非ISO正式TOW）','代理',period);
+ add(23,RH.filter(valid).length?100*count(RH,x=>valid(x)&&x>80)/RH.filter(valid).length:null,'ERA5','RH>80%时间比例，仅作湿润潜势代理，不属于ISO 9223正式TOW','代理',period);
  add(24,null,'需验证的腐蚀风险模型','缺乏盐沉积、SO₂沉积及实际湿润时间','专项缺口');
  add(25,null,'ISO 9223专项评定','不得凭海盐气溶胶直接给出C等级','专项缺口');
  add(26,q(a.pm10,.95),'CAMS','90天PM10小时P95','再分析',aPeriod);
@@ -109,8 +109,9 @@ const root=document.getElementById('envGrid');if(!root)return;root.className='en
 const vals=merged();window.envHealthV31={version:CATALOG_VERSION,createdAt:new Date().toISOString(),context:loc(),fields:METRIC_CATALOG.map((d,i)=>({...d,...(vals[i+1]||{}),riskStatus:(()=>{const value=vals[i+1]?.value,rule=window.EA_METRIC_RISK_RULES?.[d.id];if(value===null||value===undefined||window.__envMissing?.has(d.legacyKey))return 'UNKNOWN';if(rule?.approved&&Number.isFinite(Number(value))&&Number.isFinite(Number(rule.high))&&Number.isFinite(Number(rule.medium))&&String(rule.source||'').trim()){const v=Number(value),h=Number(rule.high),m=Number(rule.medium);return rule.direction==='low'?(v<=h?'HIGH':v<=m?'MEDIUM':'LOW'):(v>=h?'HIGH':v>=m?'MEDIUM':'LOW')}if(d.legacyKey&&riskRules[d.legacyKey])return riskLevel(d.legacyKey)===3?'HIGH':riskLevel(d.legacyKey)===2?'MEDIUM':'LOW';return 'UNRATED'})(),riskRuleSource:window.EA_METRIC_RISK_RULES?.[d.id]?.approved?window.EA_METRIC_RISK_RULES[d.id].source:(d.legacyKey&&riskRules[d.legacyKey]?'旧版管理员规则':'无已批准的风险阈值')}))};const groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
 root.innerHTML=groups.map(g=>{
  const p=g[0],active=g.filter(x=>x.record.value!==null).length;
- const cKey=mainLabels[p.group],risk=p.record.value!==null&&typeof p.record.value==='number'&&Number.isFinite(env[cKey])&&!window.__envMissing?.has(cKey)?riskLevel(cKey):null;
- const status=risk===3?'高风险':risk===2?'中风险':risk===1?'低风险':'待评价';
+ const statuses=g.map(x=>window.envHealthV31.fields[x.id-1]?.riskStatus||'UNKNOWN');
+ const qualityUnknown=statuses.includes('UNKNOWN')||statuses.includes('UNRATED');
+ const status=statuses.includes('HIGH')?'高风险':statuses.includes('MEDIUM')?'中风险':qualityUnknown?'待评价':statuses.every(x=>x==='LOW')?'低风险':'待评价';
  const row=x=>'<div class="ev3-item" title="'+escape([x.record.source,x.record.period,x.record.rule].filter(Boolean).join(' | '))+'"><span>'+escape(x.name)+'</span><b>'+escape(unitValue(x.record.value,x.unit))+'</b></div>';
  return '<article class="ev3-card"><div class="ev3-header"><b>'+escape(p.group)+'</b><span class="ev3-risk">'+status+'</span></div><div class="ev3-number">'+escape(unitValue(p.record.value,p.unit))+'</div><div class="ev3-caption">'+escape(p.name)+'</div><div class="ev3-details">'+g.slice(1).map(row).join('')+'</div><div class="ev3-foot">'+active+'/5 有数据 · '+escape(p.record.quality)+' · '+escape(p.record.source)+'</div></article>'
 }).join('');
