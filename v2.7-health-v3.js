@@ -97,8 +97,20 @@ derive=function(h,a,elev){
  add(48,null,'需台风路径数据库','应按影响半径、风速阈值和统计期统计','专项缺口');
  add(49,null,'需雷电密度数据','雷击密度需专业闪电定位资料','专项缺口');
  add(50,null,'需生物专项调查','需定义昆虫鸟类、藻菌或生物附着场景','专项缺口');
- // Legacy consumers remain on their existing keyed variables; only correct matching fields with equivalent semantics.
- // Do not mutate legacy scenario engine inputs (03-10 remain on their original definitions).
+ // A single calculated result drives equivalent legacy fields used by 03–10.
+ const shared={t99:1,tmin:2,rhAvg:6,rainYear:16,snowHours:33,alt:36,so2:41};
+ for(const [legacy,id] of Object.entries(shared)){
+   const v=records[id]?.value;
+   if(valid(v)){env[legacy]=v;window.__envMissing?.delete(legacy)}
+   else{window.__envMissing?.add(legacy)}
+ }
+ // The legacy rain1h threshold means absolute maximum (not hourly P99).
+ const rainValid=RAIN.filter(valid);
+ if(rainValid.length){env.rain1h=max(rainValid);window.__envMissing?.delete('rain1h')}
+ else window.__envMissing?.add('rain1h');
+ // Retain wind95, rad95, PM10/dust/salt means as separate explicitly named legacy metrics.
+ // Their statistics differ from EA12/EA47/EA26/EA28/EA22 and must not be mapped blindly.
+ window.EA_ENGINE_LINEAGE={version:CATALOG_VERSION,shared,legacyDistinct:['rh90','rain1h','wind95','rad95','pm10','dust','salt']};
 };
 const mainLabels={'温度':'t99','湿度':'rhAvg','风速':'wind95','降雨':'rainYear','盐雾':'salt','沙尘':'pm10','冰雪':'snowHours','海拔':'alt','有害气体':'so2','其它环境':'rad95'};
 const unitValue=(v,unit)=>v==null?'—':typeof v==='string'?v:((Math.abs(v)<1&&v!==0?v.toFixed(3):v.toFixed(1)).replace(/\.0$/,''))+' '+unit;
