@@ -142,7 +142,17 @@ derive=function(h,a,elev){
 const mainLabels={'温度':'t99','湿度':'rhAvg','风速':'wind95','降雨':'rainYear','盐雾':'salt','沙尘':'pm10','冰雪':'snowHours','海拔':'alt','有害气体':'so2','其它环境':'rad95'};
 const unitValue=(v,unit)=>v==null?'—':typeof v==='string'?v:((Math.abs(v)<1&&v!==0?v.toFixed(3):v.toFixed(1)).replace(/\.0$/,''))+' '+unit;
 function stored(){try{const d=JSON.parse(localStorage.getItem(STORAGE)||'{}');return d.context===loc()?d.fields||{}:{}}catch(_){return {}}}
-function merged(){const overrides=stored(),out={};for(let i=1;i<=50;i++)out[i]=overrides[i]?{...overrides[i],quality:'人工验证'}:(records[i]||{value:null,source:'待接入',rule:'尚无可信来源',quality:'专项缺口'});return out}
+function merged(){
+ const overrides=stored(),out={};
+ for(let i=1;i<=50;i++){
+  const override=overrides[i],baseline=records[i]||{value:null,source:'待接入',rule:'尚无可信来源',quality:'专项缺口'};
+  // A manually entered measurement is separate evidence, never silently certified.
+  out[i]=override&&override.reviewStatus==='APPROVED'&&override.evidenceRef&&override.sourceDate&&override.source
+    ?{...baseline,...override,quality:'专项资料（本地审核，需云端复核）'}
+    :baseline;
+ }
+ return out;
+}
 function draw(){
 const root=document.getElementById('envGrid');if(!root)return;root.className='env-health-v3';
 const vals=merged();window.envHealthV31={version:CATALOG_VERSION,createdAt:new Date().toISOString(),context:loc(),fields:METRIC_CATALOG.map((d,i)=>({...d,...(vals[i+1]||{}),riskStatus:(()=>{const value=vals[i+1]?.value,rule=window.EA_METRIC_RISK_RULES?.[d.id];if(value===null||value===undefined||window.__envMissing?.has(d.legacyKey))return 'UNKNOWN';if(rule?.approved&&Number.isFinite(Number(value))&&Number.isFinite(Number(rule.high))&&Number.isFinite(Number(rule.medium))&&String(rule.source||'').trim()){const v=Number(value),h=Number(rule.high),m=Number(rule.medium);return rule.direction==='low'?(v<=h?'HIGH':v<=m?'MEDIUM':'LOW'):(v>=h?'HIGH':v>=m?'MEDIUM':'LOW')}if(d.legacyKey&&riskRules[d.legacyKey])return riskLevel(d.legacyKey)===3?'HIGH':riskLevel(d.legacyKey)===2?'MEDIUM':'LOW';return 'UNRATED'})(),riskRuleSource:window.EA_METRIC_RISK_RULES?.[d.id]?.approved?window.EA_METRIC_RISK_RULES[d.id].source:(d.legacyKey&&riskRules[d.legacyKey]?'旧版管理员规则':'无已批准的风险阈值')}))};const groups=[];for(let i=0;i<50;i+=5)groups.push(FIELDS.slice(i,i+5).map((d,j)=>({id:i+j+1,group:d[0],name:d[1],unit:d[2],record:vals[i+j+1]})));
@@ -155,7 +165,7 @@ root.innerHTML=groups.map(g=>{
  return '<article class="ev3-card"><div class="ev3-header"><b>'+escape(p.group)+'</b><span class="ev3-risk">'+status+'</span></div><div class="ev3-number">'+escape(unitValue(p.record.value,p.unit))+'</div><div class="ev3-caption">'+escape(p.name)+'</div><div class="ev3-details">'+g.slice(1).map(row).join('')+'</div><div class="ev3-foot">'+active+'/5 有数据 · '+escape(p.record.quality)+' · '+escape(p.record.source)+'</div></article>'
 }).join('');
 const count=Object.values(vals).filter(x=>x.value!==null).length;
-const summary=document.getElementById('ev3-summary');if(summary)summary.textContent='50项环境数据 · 可用'+count+'项 · 其余'+(50-count)+'项需专项来源（数值不可伪造）';
+window.EA_METRIC_RESULTS=window.envHealthV31.fields;const summary=document.getElementById('ev3-summary');if(summary)summary.textContent='50项环境数据 · 可用'+count+'项 · 其余'+(50-count)+'项需专项来源（数值不可伪造）';
 }
 renderEnv=draw;
 const style=document.createElement('style');style.textContent='#envGrid.env-health-v3{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:0;border:1px solid #dfe7f1;background:#fff}#envGrid .ev3-card{padding:9px 10px;min-width:0;border-right:1px solid #e2e8f1;border-bottom:1px solid #e2e8f1;background:#fff}#envGrid .ev3-header{display:flex;justify-content:space-between;gap:5px;color:#123a64;font-size:13px}#envGrid .ev3-risk{font-size:10px;color:#647b95}#envGrid .ev3-number{font-size:18px;color:#104676;font-weight:750;overflow-wrap:anywhere;margin-top:4px}#envGrid .ev3-caption{font-size:11px;color:#7890ad;margin-top:2px;min-height:15px}#envGrid .ev3-details{border-top:1px solid #e4ebf3;padding-top:6px;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-template-rows:repeat(2,auto);gap:7px 8px}#envGrid .ev3-item{display:flex;flex-direction:column;gap:3px;min-width:0;font-size:10px;align-items:flex-start;color:#667d95}#envGrid .ev3-item b{color:#173a5f;text-align:left;overflow-wrap:anywhere}#envGrid .ev3-foot{font-size:9px;color:#8797aa;margin-top:6px}#ev3-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 0;font-size:11px;color:#506784}#ev3-tools button{background:#eef4ff;border:1px solid #cddff8;border-radius:5px;padding:6px 9px;color:#104676;cursor:pointer}@media(max-width:900px){#envGrid.env-health-v3{grid-template-columns:repeat(3,minmax(0,1fr))}}@media(max-width:680px){#envGrid.env-health-v3{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:460px){#envGrid.env-health-v3{grid-template-columns:1fr}}';
