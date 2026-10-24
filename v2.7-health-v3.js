@@ -97,6 +97,17 @@ derive=function(h,a,elev){
  add(48,null,'需台风路径数据库','应按影响半径、风速阈值和统计期统计','专项缺口');
  add(49,null,'需雷电密度数据','雷击密度需专业闪电定位资料','专项缺口');
  add(50,null,'需生物专项调查','需定义昆虫鸟类、藻菌或生物附着场景','专项缺口');
+ // Record raw effective sample counts and observational coverage for reproducibility.
+ const arrays={T,RH,RAIN,W,G,SF,SD,BP,RAD,SO2:a.sulphur_dioxide||[],NO2:a.nitrogen_dioxide||[],PM10:a.pm10||[],PM25:a.pm2_5||[],DUST:a.dust||[],SALT:a.sea_salt_aerosol||[]};
+ const rawInputs={};
+ [[1,'T'],[2,'T'],[3,'T'],[4,'T'],[5,'T'],[6,'RH'],[7,'RH'],[11,'W'],[12,'W'],[13,'G'],[14,'RAIN'],[16,'RAIN'],[17,'RAIN'],[18,'RAIN'],[19,'RAIN'],[20,'RAIN'],[22,'SALT'],[23,'RH'],[26,'PM10'],[27,'PM25'],[28,'DUST'],[31,'SD'],[32,'SF'],[33,'SF'],[34,'T'],[35,'SD'],[37,'BP'],[38,'BP'],[39,'BP'],[40,'BP'],[41,'SO2'],[44,'NO2'],[47,'RAD']].forEach(([id,k])=>rawInputs[id]=k);
+ for(let id=1;id<=50;id++){
+  const source=arrays[rawInputs[id]];if(!source){records[id].sampleCount=null;records[id].coverage=null;continue}
+  const sampleCount=source.filter(valid).length;
+  const denominator=rawInputs[id]==='SALT'||['PM10','PM25','DUST','SO2','NO2'].includes(rawInputs[id])?source.length:T.length;
+  records[id].sampleCount=sampleCount;
+  records[id].coverage=denominator?sampleCount/denominator:null;
+ }
  // A single calculated result drives equivalent legacy fields used by 03–10.
  const shared={t99:1,tmin:2,rhAvg:6,rainYear:16,snowHours:33,alt:36,so2:41};
  for(const [legacy,id] of Object.entries(shared)){
