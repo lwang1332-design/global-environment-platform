@@ -70,7 +70,12 @@ async function importCfg(e){
   if(failures.length)throw Error(failures.join('；'));
   if(!Object.keys(incoming).length)throw Error('场景数据为空');
   const partial=Object.keys(incoming).length!==expected.length;
-  if(!confirm('JSON校验通过：'+Object.keys(incoming).length+' 个场景，'+(partial?'局部合并并保留其他配置':'全量场景')+'。仅应用到编辑区，不会直接发布，是否继续？'))return;
+  const delta=[];
+  for(const [name,d] of Object.entries(incoming))for(const level of ['Standard','Pro','Plus']){
+   const old=JSON.stringify(workingScenarios[name]?.plans?.[level]||[]),next=JSON.stringify(d.plans[level]||[]);
+   if(old!==next)delta.push(name+' / '+({Standard:'标准方案',Pro:'强化方案',Plus:'极致方案'}[level]));
+  }
+  if(!confirm('JSON校验通过：'+Object.keys(incoming).length+' 个场景，'+(partial?'局部合并并保留其他配置':'全量场景')+'。方案差异 '+delta.length+' 组：'+delta.slice(0,8).join('；')+(delta.length>8?' 等':'')+'。仅应用到编辑区，不会直接发布，是否继续？'))return;
   const next=clone(workingScenarios);
   for(const [name,d] of Object.entries(incoming))next[name]={...next[name],...clone(d),plans:{...next[name].plans,...clone(d.plans)}};
   workingScenarios=next;
