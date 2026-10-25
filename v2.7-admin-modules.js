@@ -4,7 +4,7 @@ const groups=['总体架构与热管理','环境隔离与防护','湿度与凝�
 const ids=['planStandard','planPro','planPlus'];
 function classify(value){
  const t=String(value||'');
- const explicit=t.match(/^\\s*\\[(0[1-7])\\]/);if(explicit)return Number(explicit[1])-1;
+ const explicit=t.match(/^\s*\[(0[1-7])\]/);if(explicit)return Number(explicit[1])-1;
  if(/监测|预警|传感|智能|联动|控制策略|远程|预测|在线监控|状态诊断|数据采集|压差监控/.test(t))return 6;
  if(/盐雾|腐蚀|防腐|涂层|耐蚀|不锈钢|镀锌|异种金属|材料防护|C5|CX|防锈/.test(t))return 4;
  if(/沙尘|沙蚀|防沙|高海拔|低气压|紫外|UV|台风|雷电|防雷|防霉|霉菌|生物|暴雪|风吹雪|特殊环境/.test(t))return 5;
