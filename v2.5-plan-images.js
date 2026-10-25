@@ -1,7 +1,7 @@
 // V2.7 plan images + plan metadata: Standard / Pro / Plus each has an independent image, caption, risk, positioning and cost change.
 (function installPlanImages(){
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
-  const PLAN_LABELS={Standard:'标准环境适应方案',Pro:'增强环境适应方案',Plus:'极端环境适应方案'};
+  const PLAN_LABELS={Standard:'标准方案',Pro:'强化方案',Plus:'极致方案'};
 
   window.planImageFallback=function(img){
     const box=img?.closest?.('.plan-image-box');
@@ -78,7 +78,7 @@
   renderPlans=function(){
     const r=recommendedPlan();
     if(!planManual)selectedPlan=r.name;
-    $('planBadge').textContent=`系统推荐：${r.name}`;
+    $('planBadge').textContent=`系统推荐：${PLAN_LABELS[r.name]||r.name}`;
     const d=getScenario(selectedScene);
 
     $('planGrid').innerHTML=['Standard','Pro','Plus'].map(name=>{
@@ -87,7 +87,7 @@
       const items=Array.isArray(d?.plans?.[name])?d.plans[name]:[];
       return `<div class="plan plan-row ${recommended?'recommended':''} ${selected?'selected':''}">
         <div class="plan-head">
-          <h4><span class="plan-level">${name.toUpperCase()}</span><span class="plan-cn-title">${PLAN_LABELS[name]||''}</span></h4>
+          <h4><span class="plan-level">${PLAN_LABELS[name]||name}</span><span class="plan-cn-title"></span></h4>
           <div class="plan-head-actions">
             <div class="plan-status">${statusHtml(name,recommended,selected)}</div>
             <label class="plan-radio-label"><input type="radio" name="plan" ${selected?'checked':''} onchange="selectedPlan='${name}';planManual=true;renderPlans();renderPackages();renderGap();renderResult()"><span>作为场景主方案</span></label>
@@ -108,10 +108,10 @@
     }).join('');
 
     const selectionNote=planManual&&selectedPlan!==r.name
-      ? `当前人工选择 <b>${esc(selectedPlan)}</b>，系统推荐 <b>${r.name}</b> 保持不变；07 推荐升级包、08 Design Gap 和项目输出按当前人工选择方案继续计算。`
-      : `当前主方案与系统推荐一致，为 <b>${r.name}</b>。`;
+      ? `当前人工选择 <b>${esc(PLAN_LABELS[selectedPlan]||selectedPlan)}</b>，系统推荐 <b>${PLAN_LABELS[r.name]||r.name}</b> 保持不变；07 推荐升级包、08 Design Gap 和项目输出按当前人工选择方案继续计算。`
+      : `当前主方案与系统推荐一致，为 <b>${PLAN_LABELS[r.name]||r.name}</b>。`;
 
-    $('planReason').innerHTML=`推荐规则：项目环境最高需求 <b>${r.envCode}/3</b>，当前机组基础能力 <b>${r.machine}/3</b>，能力差 <b>${r.gap}</b> → 系统推荐 <b>${r.name}</b>。场景方案内容来自 <b>${esc(selectedScene)}</b> 技术货架。方案图、大部件差异化配置、方案定位和相对成本变化不参与 Standard / Pro / Plus 推荐算法；“主要风险”用于 07 升级包推荐评价，但不反向改变 06 三档方案推荐结果。<br><span class="plan-selection-note">${selectionNote}</span>`;
+    $('planReason').innerHTML=`推荐规则：项目环境最高需求 <b>${r.envCode}/3</b>，当前机组基础能力 <b>${r.machine}/3</b>，能力差 <b>${r.gap}</b> → 系统推荐 <b>${PLAN_LABELS[r.name]||r.name}</b>。场景方案内容来自 <b>${esc(selectedScene)}</b> 技术货架。方案图、大部件差异化配置、方案定位和相对成本变化不参与 三级方案推荐算法；“主要风险”用于 07 升级包推荐评价，但不反向改变 06 三档方案推荐结果。<br><span class="plan-selection-note">${selectionNote}</span>`;
   };
 
   const previousSave=saveReportSnapshot;
