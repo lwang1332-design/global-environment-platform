@@ -54,6 +54,32 @@ function saveRiskRules(){document.querySelectorAll('[data-rule]').forEach(el=>{c
 async function publishCloud(){if(window.EA_ADMIN_PLAN_PENDING){$('saveMsg').className='msg err';$('saveMsg').textContent='七模块方案有尚未保存到编辑区的改动。请先点击“保存当前场景到编辑区”，再发布云端。';return}if(!token){alert('管理员登录已失效，请重新登录。');return}try{$('saveMsg').className='msg';$('saveMsg').textContent='正在发布到云端参数库…';const j=await api('/config/publish',{method:'POST',headers:{Authorization:'Bearer '+token},body:JSON.stringify({config:compose(),description:$('publishDesc').value.trim()||'管理员发布技术货架'})});applyCloud(j.config);$('saveMsg').className='msg ok';$('saveMsg').textContent=`发布成功：${j.config.version}。其他用户刷新/重新打开平台后将自动读取此版本。`;await loadHistory()}catch(e){$('saveMsg').className='msg err';$('saveMsg').textContent='发布失败：'+e.message}}
 function resetDefaults(){if(!confirm('恢复内置默认技术货架到编辑区？恢复后仍需点击“发布到云端”才会影响其他用户。'))return;workingScenarios=clone(scenarioData);workingPackages=clone(packages);workingRules=clone(DEFAULT_RISK_RULES);workingMatch={...MATCH_RULE};workingMetricRules={};markDirty('已恢复内置默认值到编辑区，尚未发布。');initEditors()}
 function exportCfg(){const blob=new Blob([JSON.stringify(compose(),null,2)],{type:'application/json'});const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`environment-shelf-${cloudRow?.version||'draft'}.json`;a.click();URL.revokeObjectURL(a.href)}
-async function importCfg(e){const f=e.target.files?.[0];if(!f)return;try{const j=JSON.parse(await f.text());const c=j.config||j;if(c.scenarios&&Object.keys(c.scenarios).length===9){workingScenarios=clone(c.scenarios)}else if(c.scenarios){workingScenarios=clone(scenarioData);for(const [n,o] of Object.entries(c.scenarios)){if(!workingScenarios[n])continue;workingScenarios[n]={...workingScenarios[n],...o,plans:{...workingScenarios[n].plans,...(o.plans||{})}}}}workingPackages=Array.isArray(c.packages)?clone(c.packages):clone(packages);workingRules={};for(const [k,v] of Object.entries(DEFAULT_RISK_RULES))workingRules[k]={...v,...(c.riskRules?.[k]||{})};workingMatch={...MATCH_RULE,...(c.matchRule||{})};workingMetricRules=clone(c.metricRiskRules||{});markDirty('JSON 已导入编辑区，尚未发布。');initEditors()}catch(err){$('saveMsg').className='msg err';$('saveMsg').textContent='导入失败：'+err.message}}
+async function importCfg(e){
+ const f=e.target.files?.[0];if(!f)return;
+ try{
+  const j=JSON.parse(await f.text()),c=j.config||j;
+  const expected=Object.keys(workingScenarios),incoming=c.scenarios||{};
+  if(!c.scenarios||typeof c.scenarios!=='object'||Array.isArray(c.scenarios))throw Error('缺少 scenarios 对象');
+  const unknown=Object.keys(incoming).filter(n=>!expected.includes(n));
+  if(unknown.length)throw Error('未知场景：'+unknown.join('、'));
+  const failures=[];
+  for(const [name,d] of Object.entries(incoming)){
+   if(!d||!d.plans) {failures.push(name+' 缺少 plans');continue;}
+   for(const level of ['Standard','Pro','Plus'])if(!Array.isArray(d.plans[level]))failures.push(name+' '+level+' 缺少有效数组');
+  }
+  if(failures.length)throw Error(failures.join('；'));
+  if(!Object.keys(incoming).length)throw Error('场景数据为空');
+  const partial=Object.keys(incoming).length!==expected.length;
+  if(!confirm('JSON校验通过：'+Object.keys(incoming).length+' 个场景，'+(partial?'局部合并并保留其他配置':'全量场景')+'。仅应用到编辑区，不会直接发布，是否继续？'))return;
+  const next=clone(workingScenarios);
+  for(const [name,d] of Object.entries(incoming))next[name]={...next[name],...clone(d),plans:{...next[name].plans,...clone(d.plans)}};
+  workingScenarios=next;
+  if(Array.isArray(c.packages))workingPackages=clone(c.packages);
+  if(c.riskRules){workingRules={};for(const [k,v] of Object.entries(DEFAULT_RISK_RULES))workingRules[k]={...v,...(c.riskRules[k]||{})}}
+  if(c.matchRule)workingMatch={...MATCH_RULE,...clone(c.matchRule)};
+  if(c.metricRiskRules)workingMetricRules=clone(c.metricRiskRules);
+  markDirty('JSON已校验并导入编辑区，尚未发布。');initEditors();
+ }catch(err){$('saveMsg').className='msg err';$('saveMsg').textContent='导入失败：'+err.message}
+}
 $('loginBtn').onclick=login;$('pwd').addEventListener('keydown',e=>{if(e.key==='Enter')login()});$('sceneSelect').onchange=loadScene;$('packageSelect').onchange=loadPackage;$('saveRiskRules').onclick=saveRiskRules;$('saveScene').onclick=saveScene;$('savePackage').onclick=savePackage;$('publishBtn').onclick=publishCloud;$('reloadBtn').onclick=reloadCloud;$('resetBtn').onclick=resetDefaults;$('exportBtn').onclick=exportCfg;$('importFile').onchange=importCfg;
-</script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="v2.5-admin-excel.js?v=20260923-planlayout3"></script><script src="v2.5-admin-plan-images.js?v=20260923-planlayout3"></script><script src="v2.7-metric-catalog.js?v=20261024-v324"></script><script src="v2.7-admin-modules.js?v=20261025-module-alignment1"></script><script src="v2.7-admin-metric-rules-v32.js?v=20261022-v322"></script><script src="v2.7-admin-capabilities-v32.js?v=20261022-cap-evidence"></script><script src="v2.7-admin-auth-v32.js?v=20261022-admin-auth-v32"></script></body></html>
+</script><script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script><script src="v2.5-admin-excel.js?v=20261025-detail189"></script><script src="v2.5-admin-plan-images.js?v=20260923-planlayout3"></script><script src="v2.7-metric-catalog.js?v=20261024-v324"></script><script src="v2.7-admin-modules.js?v=20261025-module-alignment1"></script><script src="v2.7-admin-metric-rules-v32.js?v=20261022-v322"></script><script src="v2.7-admin-capabilities-v32.js?v=20261022-cap-evidence"></script><script src="v2.7-admin-auth-v32.js?v=20261022-admin-auth-v32"></script></body></html>
