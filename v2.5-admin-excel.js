@@ -13,6 +13,61 @@ function get(o,...keys){for(const k of keys){if(Object.prototype.hasOwnProperty.
 function typeCn(code){return TYPE_LABELS[code]||code||'—'}
 function scenarioNames(){return Object.keys(workingScenarios||{})}
 
+
+const MODULE_NAMES=['总体架构与热管理','环境隔离与防护','湿度与凝露控制','低温防护与防冰','腐蚀与材料防护','特殊环境专项防护','智能监测与环境控制'];
+const PLAN_LEVELS={Standard:'标准方案',Pro:'强化方案',Plus:'极致方案'};
+function classifyPlan(v){
+ const t=String(v||''),explicit=t.match(/^\s*\[(0[1-7])\]/);
+ if(explicit)return Number(explicit[1])-1;
+ if(/监测|预警|传感|智能|联动|控制策略|远程|预测|在线监控|状态诊断|数据采集|压差监控/.test(t))return 6;
+ if(/盐雾|腐蚀|防腐|涂层|耐蚀|不锈钢|镀锌|异种金属|材料防护|C5|CX|防锈/.test(t))return 4;
+ if(/沙尘|沙蚀|防沙|高海拔|低气压|紫外|UV|台风|雷电|防雷|防霉|霉菌|生物|暴雪|风吹雪|特殊环境/.test(t))return 5;
+ if(/凝露|露点|湿度|除湿|防潮|湿膜|干燥|加湿/.test(t))return 2;
+ if(/低温|保温|防冰|结冰|伴热|防冻|融冰|预热|加热|冷启动|低温润滑|防寒/.test(t))return 3;
+ if(/防雨|防水|风驱雨|防尘|密封|过滤|滤芯|百叶|排水|进风口防护|迷宫|IPX|IP[0-9]/.test(t))return 1;
+ return 0;
+}
+function normalizeMeasure(v){return String(v||'').replace(/^\s*\[0[1-7]\]\s*/,'')}
+function moduleDetailRows(scenarios){
+ const rows=[];
+ for(const [scene,d] of Object.entries(scenarios||{}))for(const [level,cn] of Object.entries(PLAN_LEVELS)){
+  const buckets=MODULE_NAMES.map(()=>[]);
+  (d.plans?.[level]||[]).forEach((v,index)=>buckets[classifyPlan(v)].push({value:String(v),index}));
+  for(let m=0;m<7;m++){const code=String(m+1).padStart(2,'0');
+   if(!buckets[m].length)rows.push([scene,level,cn,code,MODULE_NAMES[m],'','','','','是']);
+   for(const rec of buckets[m])rows.push([scene,level,cn,code,MODULE_NAMES[m],rec.index+1,scene+'|'+level+'|'+(rec.index+1),normalizeMeasure(rec.value),rec.value,'是']);
+  }
+ }
+ return rows;
+}
+function parseDetailSheet(book,scenes){
+ if(!book.Sheets['06_七模块明细'])return null;
+ const old=excelBook;excelBook=book;let rows;
+ try{rows=rowsFromSheet('06_七模块明细',['技术措施']);}finally{excelBook=old;}
+ const errors=[],slots=new Set(),records=new Map(),allowed=new Set(scenes);
+ for(const r of rows){
+  const scene=txt(r['场景']),level=txt(r['方案编码']),code=txt(r['模块编号']).padStart(2,'0'),m=Number(code)-1;
+  if(!allowed.has(scene)||!PLAN_LEVELS[level]||m<0||m>6||code!==String(m+1).padStart(2,'0')){errors.push('06明细 第'+r.__row+'行：场景、方案或模块编号无效');continue;}
+  slots.add(scene+'|'+level+'|'+code);
+  if(!enabled(r['启用']))continue;
+  const value=String(r['技术措施']||''),raw=String(r['原始配置内容']||'');
+  if(!value.trim())continue;
+  const order=Number(r['原方案内序号']);if(!Number.isInteger(order)||order<1){errors.push('06明细 第'+r.__row+'行：措施序号无效');continue;}
+  const text=normalizeMeasure(raw)===value?raw:'['+code+'] '+value;
+  const key=scene+'|'+level,arr=records.get(key)||[];arr.push({order,text});records.set(key,arr);
+ }
+ for(const scene of scenes)for(const level of Object.keys(PLAN_LEVELS))for(let m=1;m<=7;m++){
+  const key=scene+'|'+level+'|'+String(m).padStart(2,'0');if(!slots.has(key))errors.push('06明细缺少模块：'+key);
+ }
+ const plans=new Map();
+ for(const scene of scenes)for(const level of Object.keys(PLAN_LEVELS)){
+  const key=scene+'|'+level,arr=records.get(key)||[],seen=new Set();
+  for(const rec of arr){if(seen.has(rec.order))errors.push('06明细序号重复：'+key+' / '+rec.order);seen.add(rec.order);}
+  arr.sort((a,b)=>a.order-b.order);plans.set(key,arr.map(x=>x.text));
+ }
+ return{errors,plans,slots:slots.size};
+}
+
 function ensureXlsx(){if(typeof XLSX==='undefined')throw new Error('Excel 解析组件未加载，请刷新页面后重试；如公司网络拦截公共 CDN，请联系管理员将 SheetJS 改为本地依赖。')}
 
 function installStyle(){
@@ -28,7 +83,7 @@ function installUi(){
  if(!publishCard||document.getElementById('excelImportCard'))return;
  const card=document.createElement('div');card.className='card excel-flow';card.id='excelImportCard';
  card.innerHTML=`<h2>Excel 技术货架导入</h2>
- <div class="note">支持 04 客户诉求、05 设计需求、06 Standard / Pro / Plus 场景方案、07 升级包。Excel 仅在当前浏览器本地解析；通过校验并确认发布后，才写入 Supabase 云端参数库。</div>
+ <div class="note">支持 04 客户诉求、05 设计需求、06 标准方案 / 强化方案 / 极致方案 场景方案、07 升级包。Excel 仅在当前浏览器本地解析；通过校验并确认发布后，才写入 Supabase 云端参数库。</div>
  <div class="excel-steps">
    <div class="excel-step"><b>① 导入 Excel</b><small>选择 .xlsx / .xls 文件</small></div>
    <div class="excel-step"><b>② 数据校验</b><small>字段、场景、类型、04→05映射</small></div>
@@ -82,6 +137,7 @@ function rowsFromSheet(name,markerAliases){
 
 function parseWorkbook(){
  const errors=[],warnings=[],scenes=scenarioNames(),sceneSet=new Set(scenes),knownTypes=new Set(Object.keys(TYPE_LABELS));
+ const detail=parseDetailSheet(excelBook,scenes);if(detail)errors.push(...detail.errors);
  const r04=rowsFromSheet('04_客户诉求',['客户诉求标题']);
  const r05=rowsFromSheet('05_设计需求',['设计需求 / 验证要求','设计需求/验证要求','设计需求']);
  const r06=rowsFromSheet('06_场景方案',['Standard']);
@@ -107,7 +163,8 @@ function parseWorkbook(){
  for(const r of r06){if(!enabled(get(r,'启用')))continue;const scene=txt(get(r,'场景'));if(!sceneSet.has(scene)){errors.push(`06 第${r.__row}行：未知场景“${scene||'空'}”`);continue}if(planSeen.has(scene))errors.push(`06：场景“${scene}”出现多行`);planSeen.add(scene);
    plans.push({scene,Standard:splitMulti(get(r,'Standard')),Pro:splitMulti(get(r,'Pro')),Plus:splitMulti(get(r,'Plus')),planMeta:{Standard:{majorComponentPlan:txt(get(r,'Standard_大部件差异化配置','Standard大部件差异化配置','Standard_大部件差异化方案','Standard大部件差异化方案')),mainRisk:txt(get(r,'Standard_主要风险','Standard主要风险')),positioning:txt(get(r,'Standard_方案定位','Standard方案定位')),costChange:txt(get(r,'Standard_成本变化','Standard成本变化'))},Pro:{majorComponentPlan:txt(get(r,'Pro_大部件差异化配置','Pro大部件差异化配置','Pro_大部件差异化方案','Pro大部件差异化方案')),mainRisk:txt(get(r,'Pro_主要风险','Pro主要风险')),positioning:txt(get(r,'Pro_方案定位','Pro方案定位')),costChange:txt(get(r,'Pro_成本变化','Pro成本变化'))},Plus:{majorComponentPlan:txt(get(r,'Plus_大部件差异化配置','Plus大部件差异化配置','Plus_大部件差异化方案','Plus大部件差异化方案')),mainRisk:txt(get(r,'Plus_主要风险','Plus主要风险')),positioning:txt(get(r,'Plus_方案定位','Plus方案定位')),costChange:txt(get(r,'Plus_成本变化','Plus成本变化'))}},row:r.__row});
  }
- for(const scene of scenes)if(!planSeen.has(scene))errors.push(`06：缺少场景“${scene}”的 Standard / Pro / Plus 方案行`);
+ if(detail){for(const p of plans)for(const level of Object.keys(PLAN_LEVELS))p[level]=detail.plans.get(p.scene+'|'+level)||[];}
+ for(const scene of scenes)if(!planSeen.has(scene))errors.push(`06：缺少场景“${scene}”的 标准方案 / 强化方案 / 极致方案 方案行`);
 
  const pkgs=[];const pkgSeen=new Set();
  for(const r of r07){if(!enabled(get(r,'启用')))continue;const name=txt(get(r,'升级包名称','升级包')),applicable=txt(get(r,'适用风险 / 触发条件','适用风险/触发条件','适用风险','触发条件')),measures=txt(get(r,'具体措施','具体方案/措施','措施')),types=splitCodes(get(r,'触发类型代码','类型代码')),order=num(get(r,'排序','序号'),999);
@@ -127,12 +184,12 @@ function parseWorkbook(){
    candidateScenarios[scene]={...base,demands:ds.map(x=>[x.title,x.desc,x.type]),reqs:rq,plans:p?{Standard:p.Standard,Pro:p.Pro,Plus:p.Plus}:clone(base.plans||{Standard:[],Pro:[],Plus:[]}),planMeta:p?.planMeta||clone(base.planMeta||{})};
  }
  const candidatePackages=pkgs.sort((a,b)=>a.order-b.order).map(x=>[x.name,x.applicable,x.measures,x.types]);
- return{errors,warnings,candidate:{scenarios:candidateScenarios,packages:candidatePackages},stats:{demands:demands.length,reqs:reqs.length,plans:plans.length,packages:candidatePackages.length}};
+ return{errors,warnings,candidate:{scenarios:candidateScenarios,packages:candidatePackages},stats:{demands:demands.length,reqs:reqs.length,plans:plans.length,packages:candidatePackages.length,slots:detail?.slots||0}};
 }
 
 function renderValidation(v){
  const el=document.getElementById('excelStatus');const parts=[];
- parts.push(`<div class="msg ${v.errors.length?'err':'ok'}"><b>${v.errors.length?'校验未通过':'校验通过'}</b>：04客户诉求 ${v.stats.demands} 条；05设计需求 ${v.stats.reqs} 条；06场景方案 ${v.stats.plans} 个场景；07升级包 ${v.stats.packages} 个。</div>`);
+ parts.push(`<div class="msg ${v.errors.length?'err':'ok'}"><b>${v.errors.length?'校验未通过':'校验通过'}</b>：04客户诉求 ${v.stats.demands} 条；05设计需求 ${v.stats.reqs} 条；06场景方案 ${v.stats.plans} 个场景；七模块位置 ${v.stats.slots||'旧版模板未提供'}；07升级包 ${v.stats.packages} 个。</div>`);
  if(v.errors.length)parts.push(`<div class="bad"><b>错误 ${v.errors.length} 项：</b><ul>${v.errors.slice(0,40).map(x=>`<li>${esc(x)}</li>`).join('')}</ul>${v.errors.length>40?'<div>其余错误请修正后重新导入。</div>':''}</div>`);
  if(v.warnings.length)parts.push(`<div class="warn"><b>提醒 ${v.warnings.length} 项：</b><ul>${v.warnings.slice(0,30).map(x=>`<li>${esc(x)}</li>`).join('')}</ul></div>`);
  el.innerHTML=parts.join('');
@@ -187,6 +244,7 @@ function exportExcel(){
    XLSX.utils.book_append_sheet(wb,aoaSheet('04 客户核心诉求',['记录ID','场景','场景内序号','客户诉求标题','客户语言描述','类型中文','类型代码','启用','备注'],dRows),'04_客户诉求');
    XLSX.utils.book_append_sheet(wb,aoaSheet('05 产品设计需求',['记录ID','场景','类型中文','类型代码','类型内序号','设计需求 / 验证要求','启用','备注'],rRows),'05_设计需求');
    XLSX.utils.book_append_sheet(wb,aoaSheet('06 场景方案',['记录ID','场景','Standard','Pro','Plus','Standard_大部件差异化配置','Standard_主要风险','Standard_方案定位','Standard_成本变化','Pro_大部件差异化配置','Pro_主要风险','Pro_方案定位','Pro_成本变化','Plus_大部件差异化配置','Plus_主要风险','Plus_方案定位','Plus_成本变化','启用','备注'],pRows),'06_场景方案');
+   XLSX.utils.book_append_sheet(wb,aoaSheet('06 七模块逐条技术措施',['场景','方案编码','方案名称','模块编号','技术模块','原方案内序号','措施记录ID','技术措施','原始配置内容','启用'],moduleDetailRows(cfg.scenarios)),'06_七模块明细');
    XLSX.utils.book_append_sheet(wb,aoaSheet('07 升级包',['记录ID','排序','升级包名称','适用风险 / 触发条件','具体措施','触发类型中文','触发类型代码','启用','备注'],kRows),'07_升级包');
    const dict=[['场景名称','', '类型代码','类型中文'],...scenarioNames().map((s,i)=>[s,'',Object.keys(TYPE_LABELS)[i]||'',Object.values(TYPE_LABELS)[i]||''])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dict),'99_字典');
    XLSX.writeFile(wb,`环境技术货架_04-07_${cloudRow?.version||'draft'}.xlsx`);
