@@ -94,7 +94,7 @@ function installUi(){
  if(!publishCard||document.getElementById('excelImportCard'))return;
  const card=document.createElement('div');card.className='card excel-flow';card.id='excelImportCard';
  card.innerHTML=`<h2>Excel 技术货架导入</h2>
- <div class="note">支持 04 客户诉求、05 设计需求、06 标准方案 / 强化方案 / 极致方案 场景方案、07 升级包。Excel 仅在当前浏览器本地解析；通过校验并确认发布后，才写入 Supabase 云端参数库。</div>
+ <div class="note">支持单独导入06_七模块明细（可附带方案附加信息），也支持原04—07全量模板；未涉及的场景与规则保持不变。Excel 仅在当前浏览器本地解析；通过校验并确认发布后，才写入 Supabase 云端参数库。</div>
  <div class="excel-steps">
    <div class="excel-step"><b>① 导入 Excel</b><small>选择 .xlsx / .xls 文件</small></div>
    <div class="excel-step"><b>② 数据校验</b><small>字段、场景、类型、04→05映射</small></div>
@@ -146,7 +146,52 @@ function rowsFromSheet(name,markerAliases){
  });
 }
 
+
+const SCENE_ALIASES={
+ '常温、内陆气候\n（不含盐湖）':'常温内陆气候',
+ '热带雨林气候或亚热带/热带季风气候区':'热带雨林气候',
+ '滨海盐雾气候\n（不含盐湖）':'滨海盐雾气候',
+ '沙戈荒气候\n':'沙戈荒气候',
+ '高温环境':'高温环境',
+ '高海拔高寒环境\n':'高原高寒气候',
+ '极寒暴雪环境':'寒地暴雪气候',
+ '海洋气候':'海洋气候'
+};
+function resolveScenario(raw){const s=String(raw??'');return SCENE_ALIASES[s]||SCENE_ALIASES[s.trim()]||s.trim()}
+function parseOnly06Workbook(){
+ const errors=[],warnings=[],detail=rowsFromSheet('06_七模块明细',['技术措施']);
+ const names=new Set(Object.keys(workingScenarios)),levels={标准方案:'Standard',强化方案:'Pro',极致方案:'Plus'};
+ const buckets=new Map(),slots=new Map();
+ for(const r of detail){
+  const scene=resolveScenario(r['场景']),level=levels[txt(r['方案名称'])],code=txt(r['模块编号']).padStart(2,'0'),module=Number(code)-1;
+  if(!names.has(scene)||!level||module<0||module>=MODULE_NAMES.length){errors.push('06第'+r.__row+'行：场景、方案或模块编号错误');continue;}
+  if(txt(r['技术模块'])!==MODULE_NAMES[module]){errors.push('06第'+r.__row+'行：模块编号与名称不一致');continue;}
+  const key=scene+'|'+level,cell=key+'|'+code;
+  if(slots.has(cell)){errors.push('06第'+r.__row+'行：重复模块位置 '+cell);continue;}
+  slots.set(cell,true);
+  const bin=buckets.get(key)||[];bin.push({module,value:String(r['技术措施']??'')});buckets.set(key,bin);
+ }
+ const selected=[...new Set([...buckets.keys()].map(k=>k.split('|')[0]))];
+ for(const scene of selected)for(const level of Object.values(levels))for(let i=1;i<=7;i++){
+  if(!slots.has(scene+'|'+level+'|'+String(i).padStart(2,'0')))errors.push('06缺少模块：'+scene+' '+level+' '+i);
+ }
+ const result=clone(workingScenarios);
+ for(const [key,records] of buckets){const [scene,level]=key.split('|');result[scene].plans[level]=records.sort((a,b)=>a.module-b.module).filter(x=>x.value.trim()).map(x=>'['+String(x.module+1).padStart(2,'0')+'] '+x.value);}
+ if(excelBook.Sheets['方案附加信息']){
+  for(const r of rowsFromSheet('方案附加信息',['主要风险'])){
+   const scene=resolveScenario(r['场景']),level=levels[txt(r['方案名称'])];
+   if(!names.has(scene)||!level){warnings.push('附加信息第'+r.__row+'行无法匹配场景或方案');continue;}
+   const meta={...(result[scene].planMeta?.[level]||{})};
+   meta.mainRisk=r['主要风险']??'';meta.positioning=r['方案定位']??'';
+   meta.costChange=r['成本预估']??'';
+   result[scene].planMeta={...(result[scene].planMeta||{}),[level]:meta};
+  }
+ }
+ return {errors,warnings,candidate:{scenarios:result,packages:clone(workingPackages)},stats:{demands:0,reqs:0,plans:selected.length,packages:workingPackages.length,slots:slots.size}};
+}
+
 function parseWorkbook(){
+ if(excelBook?.Sheets?.['06_七模块明细']&&!excelBook.Sheets['04_客户诉求'])return parseOnly06Workbook();
  const errors=[],warnings=[],scenes=scenarioNames(),sceneSet=new Set(scenes),knownTypes=new Set(Object.keys(TYPE_LABELS));
  const detail=parseDetailSheet(excelBook,scenes,workingScenarios);if(detail)errors.push(...detail.errors);
  const r04=rowsFromSheet('04_客户诉求',['客户诉求标题']);

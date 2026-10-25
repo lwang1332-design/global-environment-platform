@@ -18,14 +18,48 @@ const panel=document.createElement('div');panel.id='adminSevenModules';panel.inn
 const toolbar=host.querySelector('.toolbar');host.insertBefore(panel,toolbar);
 const style=document.createElement('style');style.textContent='.admin-module-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}.admin-module-box{border:1px solid #dce5f0;background:#fbfdff;border-radius:6px;padding:9px}.admin-module-box label{display:block;color:#123a64;font-weight:bold;font-size:12px}.admin-module-box textarea{width:100%;min-height:80px;margin-top:5px;font-size:12px}.admin-module-box:last-child{grid-column:1/-1}@media(max-width:740px){.admin-module-grid{grid-template-columns:1fr}.admin-module-box:last-child{grid-column:auto}}';document.head.appendChild(style);
 let syncing=false;
-function parse(source){const bins=groups.map(()=>[]);String(source||'').split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(x=>bins[classify(x)].push(x.replace(/^\[(0[1-7])\]\s*/,'')));return bins}
-function draw(){if(syncing)return;const val=document.getElementById(document.getElementById('moduleTier').value).value;const bins=parse(val);document.getElementById('moduleGrid').innerHTML=groups.map((g,i)=>'<div class="admin-module-box"><label>' +String(i+1).padStart(2,'0')+' · '+g+'</label><textarea data-module="'+i+'" placeholder="每行一条方案措施"></textarea></div>').join('');panel.querySelectorAll('[data-module]').forEach((x,i)=>{x.value=bins[i].join('\n');x.addEventListener('input',commit)});document.getElementById('moduleCount').textContent=bins.reduce((n,g)=>n+g.length,0)+' 条措施'}
-function commit(){const id=document.getElementById('moduleTier').value;let rows=[];panel.querySelectorAll('[data-module]').forEach((el,i)=>el.value.split(/\r?\n/).map(x=>x.trim()).filter(Boolean).forEach(x=>rows.push('['+String(i+1).padStart(2,'0')+'] '+x.replace(/^\[(0[1-7])\]\s*/,''))));const raw=document.getElementById(id);syncing=true;raw.value=rows.join('\n');raw.dispatchEvent(new Event('input',{bubbles:true}));syncing=false;window.EA_ADMIN_PLAN_PENDING=true;if(typeof markDirty==='function')markDirty('七模块技术措施已修改，请先保存当前场景，再发布云端');document.getElementById('moduleCount').textContent=rows.length+' 条措施'}
+function parseCurrent(){
+ const scene=document.getElementById('sceneSelect').value;
+ const level={planStandard:'Standard',planPro:'Pro',planPlus:'Plus'}[document.getElementById('moduleTier').value];
+ const items=workingScenarios?.[scene]?.plans?.[level]||[];
+ const bins=groups.map(()=>[]);
+ items.forEach(value=>bins[classify(value)].push(String(value).replace(/^\s*\[0[1-7]\]\s?/,'')));
+ return bins;
+}
+function draw(){
+ if(syncing)return;
+ const bins=parseCurrent();
+ document.getElementById('moduleGrid').innerHTML=groups.map((g,i)=>'<div class="admin-module-box"><label>'+String(i+1).padStart(2,'0')+' · '+g+'</label><textarea data-module="'+i+'"></textarea></div>').join('');
+ panel.querySelectorAll('[data-module]').forEach((el,i)=>{el.value=bins[i].join('\n');el.addEventListener('input',commit)});
+ document.getElementById('moduleCount').textContent=bins.reduce((n,g)=>n+g.length,0)+' 个模块配置文本';
+}
+function commit(){
+ const scene=document.getElementById('sceneSelect').value;
+ const level={planStandard:'Standard',planPro:'Pro',planPlus:'Plus'}[document.getElementById('moduleTier').value];
+ const rows=[];
+ panel.querySelectorAll('[data-module]').forEach((el,i)=>{if(el.value.trim())rows.push('['+String(i+1).padStart(2,'0')+'] '+el.value)});
+ workingScenarios[scene].plans[level]=rows;
+ const raw=document.getElementById(document.getElementById('moduleTier').value);
+ syncing=true;raw.value=rows.join('\n');syncing=false;
+ window.EA_ADMIN_PLAN_PENDING=true;
+ if(typeof markDirty==='function')markDirty('七模块技术措施已修改，请先保存当前场景，再发布云端');
+ document.getElementById('moduleCount').textContent=rows.length+' 个模块配置文本';
+}
+const originalSaveScene=saveScene;
+saveScene=function(){
+ const scene=document.getElementById('sceneSelect').value;
+ const preserved=JSON.parse(JSON.stringify(workingScenarios[scene].plans));
+ originalSaveScene();
+ workingScenarios[scene].plans=preserved;
+ window.EA_ADMIN_PLAN_PENDING=false;
+ loadScene();
+};
+
 document.getElementById('moduleTier').onchange=draw;
 ids.forEach(id=>document.getElementById(id).addEventListener('input',()=>{if(document.getElementById('moduleTier').value===id&&!syncing)draw()}));
 document.getElementById('sceneSelect')?.addEventListener('change',()=>setTimeout(draw,0));
-new MutationObserver(()=>{if(!syncing&&panel.offsetParent!==null)draw()}).observe(document.getElementById('planStandard'),{attributes:true,attributeFilter:['value']});
-document.getElementById('saveScene')?.addEventListener('click',()=>{window.EA_ADMIN_PLAN_PENDING=false});
+
+
 const priorApply=applyCloud;
 applyCloud=function(row){priorApply(row);window.EA_ADMIN_PLAN_PENDING=false;setTimeout(draw,0)};
 draw();
