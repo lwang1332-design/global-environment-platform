@@ -32,38 +32,49 @@ function moduleDetailRows(scenarios){
  const rows=[];
  for(const [scene,d] of Object.entries(scenarios||{}))for(const [level,cn] of Object.entries(PLAN_LEVELS)){
   const buckets=MODULE_NAMES.map(()=>[]);
-  (d.plans?.[level]||[]).forEach((v,index)=>buckets[classifyPlan(v)].push({value:String(v),index}));
-  for(let m=0;m<7;m++){const code=String(m+1).padStart(2,'0');
-   if(!buckets[m].length)rows.push([scene,level,cn,code,MODULE_NAMES[m],'','','','','是']);
-   for(const rec of buckets[m])rows.push([scene,level,cn,code,MODULE_NAMES[m],rec.index+1,scene+'|'+level+'|'+(rec.index+1),normalizeMeasure(rec.value),rec.value,'是']);
+  (d.plans?.[level]||[]).forEach(value=>buckets[classifyPlan(value)].push(normalizeMeasure(value)));
+  for(let m=0;m<7;m++){
+   const code=String(m+1).padStart(2,'0');
+   if(!buckets[m].length)rows.push([scene,cn,code,MODULE_NAMES[m],'']);
+   else for(const value of buckets[m])rows.push([scene,cn,code,MODULE_NAMES[m],value]);
   }
  }
  return rows;
 }
-function parseDetailSheet(book,scenes){
+function parseDetailSheet(book,scenes,baseline){
  if(!book.Sheets['06_七模块明细'])return null;
  const old=excelBook;excelBook=book;let rows;
  try{rows=rowsFromSheet('06_七模块明细',['技术措施']);}finally{excelBook=old;}
  const errors=[],slots=new Set(),records=new Map(),allowed=new Set(scenes);
+ const nameToLevel=Object.fromEntries(Object.entries(PLAN_LEVELS).map(([k,v])=>[v,k]));
  for(const r of rows){
-  const scene=txt(r['场景']),level=txt(r['方案编码']),code=txt(r['模块编号']).padStart(2,'0'),m=Number(code)-1;
-  if(!allowed.has(scene)||!PLAN_LEVELS[level]||m<0||m>6||code!==String(m+1).padStart(2,'0')){errors.push('06明细 第'+r.__row+'行：场景、方案或模块编号无效');continue;}
+  const scene=txt(r['场景']),level=nameToLevel[txt(r['方案名称'])],code=txt(r['模块编号']).padStart(2,'0'),m=Number(code)-1;
+  if(!allowed.has(scene)||!level||m<0||m>6||code!==String(m+1).padStart(2,'0')){
+   errors.push('06明细 第'+r.__row+'行：场景、方案名称或模块编号无效');continue;
+  }
+  if(txt(r['技术模块'])!==MODULE_NAMES[m]){errors.push('06明细 第'+r.__row+'行：模块名称与编号不一致');continue;}
   slots.add(scene+'|'+level+'|'+code);
-  if(!enabled(r['启用']))continue;
-  const value=String(r['技术措施']||''),raw=String(r['原始配置内容']||'');
-  if(!value.trim())continue;
-  const order=Number(r['原方案内序号']);if(!Number.isInteger(order)||order<1){errors.push('06明细 第'+r.__row+'行：措施序号无效');continue;}
-  const text=normalizeMeasure(raw)===value?raw:'['+code+'] '+value;
-  const key=scene+'|'+level,arr=records.get(key)||[];arr.push({order,text});records.set(key,arr);
+  const value=String(r['技术措施']||'').trim();if(!value)continue;
+  const key=scene+'|'+level,arr=records.get(key)||[];arr.push({module:m,text:value});records.set(key,arr);
  }
  for(const scene of scenes)for(const level of Object.keys(PLAN_LEVELS))for(let m=1;m<=7;m++){
   const key=scene+'|'+level+'|'+String(m).padStart(2,'0');if(!slots.has(key))errors.push('06明细缺少模块：'+key);
  }
  const plans=new Map();
  for(const scene of scenes)for(const level of Object.keys(PLAN_LEVELS)){
-  const key=scene+'|'+level,arr=records.get(key)||[],seen=new Set();
-  for(const rec of arr){if(seen.has(rec.order))errors.push('06明细序号重复：'+key+' / '+rec.order);seen.add(rec.order);}
-  arr.sort((a,b)=>a.order-b.order);plans.set(key,arr.map(x=>x.text));
+  const key=scene+'|'+level,arr=records.get(key)||[];
+  const original=baseline?.[scene]?.plans?.[level]||[];
+  const queues=MODULE_NAMES.map(()=>[]);
+  original.forEach((raw,i)=>queues[classifyPlan(raw)].push({raw:String(raw),index:i}));
+  const used=new Set(),output=[];
+  for(const rec of arr){
+   const queue=queues[rec.module]||[];
+   const match=queue.find(x=>!used.has(x.index)&&normalizeMeasure(x.raw)===rec.text);
+   if(match){used.add(match.index);output.push({index:match.index,text:match.raw});}
+   else output.push({index:original.length+output.length,text:'['+String(rec.module+1).padStart(2,'0')+'] '+rec.text});
+  }
+  output.sort((a,b)=>a.index-b.index);
+  plans.set(key,output.map(x=>x.text));
  }
  return{errors,plans,slots:slots.size};
 }
@@ -137,7 +148,7 @@ function rowsFromSheet(name,markerAliases){
 
 function parseWorkbook(){
  const errors=[],warnings=[],scenes=scenarioNames(),sceneSet=new Set(scenes),knownTypes=new Set(Object.keys(TYPE_LABELS));
- const detail=parseDetailSheet(excelBook,scenes);if(detail)errors.push(...detail.errors);
+ const detail=parseDetailSheet(excelBook,scenes,workingScenarios);if(detail)errors.push(...detail.errors);
  const r04=rowsFromSheet('04_客户诉求',['客户诉求标题']);
  const r05=rowsFromSheet('05_设计需求',['设计需求 / 验证要求','设计需求/验证要求','设计需求']);
  const r06=rowsFromSheet('06_场景方案',['Standard']);
@@ -244,7 +255,7 @@ function exportExcel(){
    XLSX.utils.book_append_sheet(wb,aoaSheet('04 客户核心诉求',['记录ID','场景','场景内序号','客户诉求标题','客户语言描述','类型中文','类型代码','启用','备注'],dRows),'04_客户诉求');
    XLSX.utils.book_append_sheet(wb,aoaSheet('05 产品设计需求',['记录ID','场景','类型中文','类型代码','类型内序号','设计需求 / 验证要求','启用','备注'],rRows),'05_设计需求');
    XLSX.utils.book_append_sheet(wb,aoaSheet('06 场景方案',['记录ID','场景','Standard','Pro','Plus','Standard_大部件差异化配置','Standard_主要风险','Standard_方案定位','Standard_成本变化','Pro_大部件差异化配置','Pro_主要风险','Pro_方案定位','Pro_成本变化','Plus_大部件差异化配置','Plus_主要风险','Plus_方案定位','Plus_成本变化','启用','备注'],pRows),'06_场景方案');
-   XLSX.utils.book_append_sheet(wb,aoaSheet('06 七模块逐条技术措施',['场景','方案编码','方案名称','模块编号','技术模块','原方案内序号','措施记录ID','技术措施','原始配置内容','启用'],moduleDetailRows(cfg.scenarios)),'06_七模块明细');
+   XLSX.utils.book_append_sheet(wb,aoaSheet('06 七模块逐条技术措施',['场景','方案名称','模块编号','技术模块','技术措施'],moduleDetailRows(cfg.scenarios)),'06_七模块明细');
    XLSX.utils.book_append_sheet(wb,aoaSheet('07 升级包',['记录ID','排序','升级包名称','适用风险 / 触发条件','具体措施','触发类型中文','触发类型代码','启用','备注'],kRows),'07_升级包');
    const dict=[['场景名称','', '类型代码','类型中文'],...scenarioNames().map((s,i)=>[s,'',Object.keys(TYPE_LABELS)[i]||'',Object.values(TYPE_LABELS)[i]||''])];XLSX.utils.book_append_sheet(wb,XLSX.utils.aoa_to_sheet(dict),'99_字典');
    XLSX.writeFile(wb,`环境技术货架_04-07_${cloudRow?.version||'draft'}.xlsx`);
