@@ -1,4 +1,4 @@
-// Admin plugin: upload / preview / replace / clear Standard-Pro-Plus plan images + editable plan metadata.
+// Admin plugin: upload / preview / replace / clear 三级方案图片 + editable plan metadata.
 (function installAdminPlanImages(){
   const LEVELS=['Standard','Pro','Plus'];
   const esc=v=>String(v??'').replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]));
@@ -45,8 +45,8 @@
   function render(){
     installUi();if(!mediaRoot)return;
     const name=document.getElementById('sceneSelect')?.value;const d=workingScenarios?.[name];if(!d)return;ensureFields(d);
-    mediaRoot.innerHTML=LEVELS.map(level=>{const url=d.planImages?.[level]||'',cap=d.planImageCaptions?.[level]||'',m=d.planMeta?.[level]||{};return `<div class="admin-plan-media-card" data-level="${level}"><h4>${level} 方案扩展信息</h4>${preview(level,url,cap)}
-      <label>图片标题 / 图注<input data-caption="${level}" value="${esc(cap)}" placeholder="例如：海洋气候 ${level} 方案系统架构示意图"></label>
+    mediaRoot.innerHTML=LEVELS.map(level=>{const url=d.planImages?.[level]||'',cap=d.planImageCaptions?.[level]||'',m=d.planMeta?.[level]||{};return `<div class="admin-plan-media-card" data-level="${level}"><h4>${({Standard:'标准方案',Pro:'强化方案',Plus:'极致方案'}[level]||level)} 方案扩展信息</h4>${preview(level,url,cap)}
+      <label>图片标题 / 图注<input data-caption="${level}" value="${esc(cap)}" placeholder="例如：海洋气候 ${({Standard:'标准方案',Pro:'强化方案',Plus:'极致方案'}[level]||level)} 方案系统架构示意图"></label>
       <input data-file="${level}" type="file" accept="image/jpeg,image/png,image/webp" style="display:none">
       <div class="admin-plan-actions"><button type="button" class="btn secondary" data-upload="${level}">${url?'更换图片':'上传图片'}</button><button type="button" class="btn secondary" data-clear="${level}" ${url?'':'disabled'}>移除图片</button></div>
       <div class="admin-upload-state" data-state="${level}">${url?'已配置方案图':'未配置方案图'}</div>
@@ -78,8 +78,8 @@
   async function uploadImage(level,file){
     if(!file)return;if(file.size>5*1024*1024){alert('图片不能超过 5 MB');return}if(!['image/jpeg','image/png','image/webp'].includes(file.type)){alert('仅支持 JPG / PNG / WebP');return}
     const name=document.getElementById('sceneSelect').value,state=mediaRoot.querySelector(`[data-state="${level}"]`);state.textContent='正在上传…';
-    try{const fd=new FormData();fd.append('file',file);fd.append('scene',name);fd.append('level',level);const r=await fetch(CLOUD_API+'/media/upload',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});let j={};try{j=await r.json()}catch{}if(!r.ok)throw Error(j.error||j.detail||('HTTP '+r.status));const d=workingScenarios[name];ensureFields(d);d.planImages[level]=j.url;markDirty(`${name} · ${level} 方案图已上传到云端存储并写入当前编辑草稿，尚未正式发布。`);render()}catch(e){state.textContent='上传失败：'+e.message}}
-  function clearImage(level){const name=document.getElementById('sceneSelect').value,d=workingScenarios[name];ensureFields(d);d.planImages[level]='';markDirty(`${name} · ${level} 方案图已从当前编辑草稿移除，尚未发布。`);render()}
+    try{const fd=new FormData();fd.append('file',file);fd.append('scene',name);fd.append('level',level);const r=await fetch(CLOUD_API+'/media/upload',{method:'POST',headers:{Authorization:`Bearer ${token}`},body:fd});let j={};try{j=await r.json()}catch{}if(!r.ok)throw Error(j.error||j.detail||('HTTP '+r.status));const d=workingScenarios[name];ensureFields(d);d.planImages[level]=j.url;markDirty(`${name} · ${({Standard:'标准方案',Pro:'强化方案',Plus:'极致方案'}[level]||level)} 方案图已上传到云端存储并写入当前编辑草稿，尚未正式发布。`);render()}catch(e){state.textContent='上传失败：'+e.message}}
+  function clearImage(level){const name=document.getElementById('sceneSelect').value,d=workingScenarios[name];ensureFields(d);d.planImages[level]='';markDirty(`${name} · ${({Standard:'标准方案',Pro:'强化方案',Plus:'极致方案'}[level]||level)} 方案图已从当前编辑草稿移除，尚未发布。`);render()}
 
   installStyle();installUi();
   const baseLoad=loadScene;loadScene=function(){baseLoad();render()};
