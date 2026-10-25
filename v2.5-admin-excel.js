@@ -28,7 +28,7 @@ function installUi(){
  if(!publishCard||document.getElementById('excelImportCard'))return;
  const card=document.createElement('div');card.className='card excel-flow';card.id='excelImportCard';
  card.innerHTML=`<h2>Excel 技术货架导入</h2>
- <div class="note">支持 04 客户诉求、05 设计需求、06 Standard / Pro / Plus 场景方案、07 升级包。Excel 仅在当前浏览器本地解析；通过校验并确认发布后，才写入 Supabase 云端参数库。</div>
+ <div class="note">支持 04 客户诉求、05 设计需求、06 标准方案 / 强化方案 / 极致方案 场景方案、07 升级包。Excel 仅在当前浏览器本地解析；通过校验并确认发布后，才写入 Supabase 云端参数库。</div>
  <div class="excel-steps">
    <div class="excel-step"><b>① 导入 Excel</b><small>选择 .xlsx / .xls 文件</small></div>
    <div class="excel-step"><b>② 数据校验</b><small>字段、场景、类型、04→05映射</small></div>
@@ -107,7 +107,7 @@ function parseWorkbook(){
  for(const r of r06){if(!enabled(get(r,'启用')))continue;const scene=txt(get(r,'场景'));if(!sceneSet.has(scene)){errors.push(`06 第${r.__row}行：未知场景“${scene||'空'}”`);continue}if(planSeen.has(scene))errors.push(`06：场景“${scene}”出现多行`);planSeen.add(scene);
    plans.push({scene,Standard:splitMulti(get(r,'Standard')),Pro:splitMulti(get(r,'Pro')),Plus:splitMulti(get(r,'Plus')),planMeta:{Standard:{majorComponentPlan:txt(get(r,'Standard_大部件差异化配置','Standard大部件差异化配置','Standard_大部件差异化方案','Standard大部件差异化方案')),mainRisk:txt(get(r,'Standard_主要风险','Standard主要风险')),positioning:txt(get(r,'Standard_方案定位','Standard方案定位')),costChange:txt(get(r,'Standard_成本变化','Standard成本变化'))},Pro:{majorComponentPlan:txt(get(r,'Pro_大部件差异化配置','Pro大部件差异化配置','Pro_大部件差异化方案','Pro大部件差异化方案')),mainRisk:txt(get(r,'Pro_主要风险','Pro主要风险')),positioning:txt(get(r,'Pro_方案定位','Pro方案定位')),costChange:txt(get(r,'Pro_成本变化','Pro成本变化'))},Plus:{majorComponentPlan:txt(get(r,'Plus_大部件差异化配置','Plus大部件差异化配置','Plus_大部件差异化方案','Plus大部件差异化方案')),mainRisk:txt(get(r,'Plus_主要风险','Plus主要风险')),positioning:txt(get(r,'Plus_方案定位','Plus方案定位')),costChange:txt(get(r,'Plus_成本变化','Plus成本变化'))}},row:r.__row});
  }
- for(const scene of scenes)if(!planSeen.has(scene))errors.push(`06：缺少场景“${scene}”的 Standard / Pro / Plus 方案行`);
+ for(const scene of scenes)if(!planSeen.has(scene))errors.push(`06：缺少场景“${scene}”的 标准方案 / 强化方案 / 极致方案 方案行`);
 
  const pkgs=[];const pkgSeen=new Set();
  for(const r of r07){if(!enabled(get(r,'启用')))continue;const name=txt(get(r,'升级包名称','升级包')),applicable=txt(get(r,'适用风险 / 触发条件','适用风险/触发条件','适用风险','触发条件')),measures=txt(get(r,'具体措施','具体方案/措施','措施')),types=splitCodes(get(r,'触发类型代码','类型代码')),order=num(get(r,'排序','序号'),999);
