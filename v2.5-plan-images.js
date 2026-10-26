@@ -68,7 +68,7 @@
     const groups=TECH_MODULES.map(()=>[]);
     (items||[]).forEach(item=>groups[moduleIndex(item)].push(String(item).replace(/^\s*\[0[1-7]\]\s*/,'')));
     return '<div class="core-tech-table-wrap"><table class="core-tech-table"><thead><tr><th>编号</th><th>技术模块</th><th>方案配置</th></tr></thead><tbody>'+
-      TECH_MODULES.map(([num,module],i)=>'<tr><td class="core-tech-num">'+num+'</td><td class="core-tech-module">'+esc(module)+'</td><td class="core-tech-details">'+(groups[i].length?groups[i].map(x=>'<div class="core-tech-line">'+esc(x)+'</div>').join(''):'<span class="core-tech-none">—</span>')+'</td></tr>').join('')+
+      TECH_MODULES.map(([num,module],i)=>'<tr><td class="core-tech-num">'+num+'</td><td class="core-tech-module">'+esc(module)+'</td><td class="core-tech-details">'+(groups[i].length?groups[i].map(x=>'<div class="core-tech-line">'+esc(String(x).replace(/^\\s*•\\s?/,''))+'</div>').join(''):'<span class="core-tech-none">—</span>')+'</td></tr>').join('')+
       '</tbody></table></div>';
   }
   const techCss=document.createElement('style');
